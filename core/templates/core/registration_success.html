@@ -1,0 +1,73 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Registration Complete - Resilience System{% endblock %}
+{% block body_class %}public-page{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #f8fafc;
+    }
+
+    .success-container {
+        max-width: 600px;
+        margin: 4rem auto;
+        padding: 3rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+        text-align: center;
+    }
+
+    .icon-box {
+        width: 80px;
+        height: 80px;
+        background: #e0f2fe;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem auto;
+    }
+
+    .email-icon {
+        color: #0284c7;
+        font-size: 2.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="landing-nav" style="background: white; border-bottom: 1px solid #e2e8f0;">
+    <div class="container nav-container">
+        <div class="logo">
+            <i class="fa-solid fa-shield-halved" style="color: #2563eb;"></i> Resilience
+        </div>
+    </div>
+</nav>
+
+<div class="success-container">
+    <div class="icon-box">
+        <i class="fa-solid fa-envelope-open-text email-icon"></i>
+    </div>
+
+    <h2 style="margin-bottom: 1rem; color: #0f172a; font-weight: 700;">Your registration has been successfully
+        completed.</h2>
+
+    <p style="margin-bottom: 0.5rem; color: #475569; font-size: 1.1rem;">
+        A secure email has been sent to your registered email address with instructions to set your password and
+        activate your account.
+    </p>
+
+    <p style="margin-bottom: 2rem; color: #64748b; font-size: 1rem;">
+        Please check your inbox (and spam folder) and follow the instructions to proceed.
+    </p>
+
+    <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #e2e8f0;">
+        <a href="{% url 'login' %}" style="color: #2563eb; font-weight: 600; text-decoration: none;">
+            Return to Login
+        </a>
+    </div>
+</div>
+{% endblock %}

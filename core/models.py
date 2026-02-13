@@ -1,0 +1,217 @@
+"""
+Core models for Resilience System
+Enterprise-level data models
+"""
+from django.db import models
+from django.contrib.auth.models import User
+from django.core.validators import MinValueValidator, MaxValueValidator
+
+
+class Organization(models.Model):
+    """Organization/Agency model"""
+    name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    license_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('foundation', 'Foundation'),
+            ('enterprise', 'Enterprise'),
+        ],
+        default='foundation'
+    )
+    foundation_purchase_date = models.DateTimeField(null=True, blank=True)
+    enterprise_upgrade_date = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return self.name
+
+
+class Liaison(models.Model):
+    """Designated Liaison model - extends User"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='liaison_profile')
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='liaisons')
+    phone = models.CharField(max_length=20, blank=True)
+    preferred_channels = models.CharField(
+        max_length=50,
+        choices=[
+            ('email', 'Email Only'),
+            ('email_sms', 'Email + SMS'),
+            ('slack', 'Slack / Teams Webhook'),
+        ],
+        default='email'
+    )
+    incident_types = models.TextField(help_text="Key incident types of concern")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.organization.name}"
+
+
+class OperationalUpdate(models.Model):
+    """Operational updates/incidents"""
+    SEVERITY_CHOICES = [
+        ('Low', 'Low - Informational'),
+        ('Medium', 'Medium - Potential Impact'),
+        ('High', 'High - Critical Incident'),
+    ]
+    
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='updates')
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='Low')
+    owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, related_name='owned_updates')
+    impact = models.TextField(blank=True, help_text="Why it matters - operational impact analysis")
+    next_action = models.CharField(max_length=255, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    is_synthesized = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['-timestamp']
+    
+    def __str__(self):
+        return f"{self.title} ({self.severity})"
+
+
+class Decision(models.Model):
+    """Decision log entries"""
+    STATUS_CHOICES = [
+        ('Open', 'Open'),
+        ('Closed', 'Closed'),
+    ]
+    
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='decisions')
+    decision = models.CharField(max_length=255)
+    rationale = models.TextField()
+    owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, related_name='owned_decisions')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Open')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-timestamp']
+    
+    def __str__(self):
+        return f"{self.decision} - {self.status}"
+
+
+class SystemSettings(models.Model):
+    """System-wide settings per organization"""
+    organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name='settings')
+    cadence_hours = models.IntegerField(
+        default=24,
+        validators=[MinValueValidator(1), MaxValueValidator(168)],
+        help_text="Shift packet cadence in hours"
+    )
+    distribution_list = models.TextField(
+        blank=True,
+        help_text="Comma-separated email addresses for shift packet distribution"
+    )
+    current_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('Normal', 'Normal'),
+            ('Emergency Watch', 'Emergency Watch'),
+            ('High Alert', 'High Alert'),
+        ],
+        default='Normal'
+    )
+    current_phase = models.IntegerField(
+        default=0,
+        choices=[(0, 'Standard Operations'), (1, 'Escalation Protocol')]
+    )
+    last_sync = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Settings for {self.organization.name}"
+
+
+class ShiftPacket(models.Model):
+    """Generated shift packets"""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='shift_packets')
+    packet_number = models.CharField(max_length=50, unique=True)
+    generated_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20)
+    executive_summary = models.TextField()
+    key_risks = models.TextField()
+    next_actions = models.TextField()
+    sent_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-generated_at']
+    
+    def __str__(self):
+        return f"Packet #{self.packet_number} - {self.organization.name}"
+
+
+class ExternalUser(models.Model):
+    """Mapping to legacy Users table"""
+    id = models.AutoField(primary_key=True)
+    agency_name = models.CharField(max_length=150)
+    primary_liaison_name = models.CharField(max_length=100)
+    liaison_email = models.CharField(max_length=150)
+    key_incident_types = models.CharField(max_length=255, blank=True, null=True)
+    preferred_communication_channels = models.CharField(max_length=100, blank=True, null=True)
+    created_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'Users'
+        
+    def __str__(self):
+        return self.agency_name
+
+
+class ExternalPayment(models.Model):
+    """Mapping to legacy payments table"""
+    payment_id = models.AutoField(primary_key=True)
+    username = models.CharField(max_length=100)
+    payment_status = models.CharField(max_length=50)
+    payment_method = models.CharField(max_length=50)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_time = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'payments'
+        
+    def __str__(self):
+        return f"Payment #{self.payment_id} - {self.amount}"
+
+
+class ExternalSubscription(models.Model):
+    """Mapping to legacy subscriptions table"""
+    subscription_id = models.AutoField(primary_key=True)
+    username = models.CharField(max_length=100)
+    payment = models.ForeignKey(ExternalPayment, models.DO_NOTHING)
+    subscription_type = models.CharField(max_length=50)
+    duration = models.IntegerField()
+    subscription_start_date = models.DateField()
+    subscription_end_date = models.DateField()
+    subscription_status = models.CharField(max_length=30)
+    created_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'subscriptions'
+        
+    def __str__(self):
+        return self.subscription_type
+
+
+class UserCredentials(models.Model):
+    """Mapping to legacy user_credentials table"""
+    user_id = models.AutoField(primary_key=True)
+    username = models.CharField(max_length=100, unique=True)
+    # Storing plain text password as requested, despite the column name 'password_hash'
+    password_hash = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'user_credentials'
+
+    def __str__(self):
+        return self.username

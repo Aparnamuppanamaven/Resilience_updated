@@ -1,0 +1,78 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Normalize - Resilience System{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
+            <li class="nav-item active"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
+            <li class="nav-item"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
+            <li class="nav-item"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
+            <li class="nav-item"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="avatar">{{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}</div>
+                <div class="user-info">
+                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
+                    <span class="user-role">{{ user.liaison_profile.organization.name }}</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-header">
+            <h2>Normalize</h2>
+        </header>
+
+        <div class="view-container">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Incoming Updates (Raw vs Processed)</h3>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Severity</th>
+                                <th>Summary</th>
+                                <th>Owner</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for update in updates %}
+                                <tr>
+                                    <td>{{ update.timestamp|date:"H:i" }}</td>
+                                    <td><span class="badge badge-{{ update.severity|lower }}">{{ update.severity }}</span></td>
+                                    <td>{{ update.title }}</td>
+                                    <td>{{ update.owner.user.get_full_name|default:update.owner.user.username }}</td>
+                                    <td><span class="badge badge-status-normal">Synthesized</span></td>
+                                    <td><button class="btn btn-sm" style="padding: 2px 8px;">View</button></td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--text-secondary);">No updates yet.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+

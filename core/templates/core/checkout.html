@@ -1,0 +1,124 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Checkout - Resilience Foundation{% endblock %}
+{% block body_class %}public-page{% endblock %}
+
+{% block extra_css %}
+<style>
+    .checkout-container {
+        max-width: 600px;
+        margin: 4rem auto;
+        padding: 2rem;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+
+    .step-indicator {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 2rem;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .step.active {
+        color: var(--primary-color);
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="landing-nav">
+    <div class="container nav-container">
+        <div class="logo">
+            <i class="fa-solid fa-shield-halved"></i> Resilience
+        </div>
+        <a href="{% url 'index' %}" class="btn btn-outline btn-sm">Cancel</a>
+    </div>
+</nav>
+
+<div class="checkout-container">
+    <div class="step-indicator">
+        <span class="step active">1. Account Details</span>
+        <span class="step">2. Payment</span>
+        <span class="step">3. Confirmation</span>
+    </div>
+
+    <h2 style="margin-bottom: 1.5rem;">Setup Your Foundation Account</h2>
+    <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">Complete this form to initialize your Resilience
+        Foundation
+        instance.</p>
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}"
+        style="padding: 1rem; margin-bottom: 1rem; border-radius: 6px; background: #fee2e2; color: #991b1b;">
+        {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <form method="post" id="checkout-form">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label class="form-label">{{ form.agency.label }}</label>
+            {{ form.agency }}
+            {% if form.agency.errors %}
+            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.agency.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.liaison_name.label }}</label>
+            {{ form.liaison_name }}
+            {% if form.liaison_name.errors %}
+            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.liaison_name.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.liaison_email.label }}</label>
+            {{ form.liaison_email }}
+            {% if form.liaison_email.errors %}
+            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.liaison_email.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.incidents.label }}</label>
+            {{ form.incidents }}
+            {% if form.incidents.errors %}
+            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.incidents.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.channels.label }}</label>
+            {{ form.channels }}
+            {% if form.channels.errors %}
+            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.channels.errors }}</div>
+            {% endif %}
+        </div>
+
+        <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #e2e8f0;">
+
+        <div class="payment-summary"
+            style="background: #f8fafc; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span>Foundation Fixed Price</span>
+                <strong>$7,500.00</strong>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">* Fully creditable towards Enterprise
+                within
+                90 days.</div>
+        </div>
+
+        <button type="submit" class="btn btn-submit">Proceed to Payment <i class="fa-solid fa-lock"
+                style="font-size: 0.75rem;"></i></button>
+    </form>
+</div>
+{% endblock %}

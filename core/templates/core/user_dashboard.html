@@ -1,0 +1,33 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - Resilience System{% endblock %}
+
+{% block content %}
+<nav class="landing-nav" style="background: white; border-bottom: 1px solid #e2e8f0;">
+    <div class="container nav-container" style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="logo">
+            <i class="fa-solid fa-shield-halved" style="color: #2563eb;"></i> Resilience
+        </div>
+        <a href="{% url 'logout' %}" class="btn btn-outline-danger"
+            style="text-decoration: none; padding: 0.5rem 1rem; border: 1px solid #dc2626; color: #dc2626; border-radius: 4px;">Logout</a>
+    </div>
+</nav>
+
+<div class="container" style="margin-top: 4rem; text-align: center;">
+    <div
+        style="background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); max-width: 800px; margin: 0 auto;">
+        <i class="fa-solid fa-user-check" style="font-size: 4rem; color: #10b981; margin-bottom: 1.5rem;"></i>
+        <h1 style="color: #0f172a; margin-bottom: 1rem;">Welcome, {{ username }}!</h1>
+        <p style="color: #64748b; font-size: 1.2rem; margin-bottom: 2rem;">
+            You have successfully logged in using your UserCredentials account.
+        </p>
+        <div style="padding: 1rem; background: #f1f5f9; border-radius: 8px; display: inline-block; text-align: left;">
+            <p style="margin: 0; color: #475569;"><strong>Authentication Method:</strong> Legacy Database Table
+                (user_credentials)</p>
+            <p style="margin: 0.5rem 0 0; color: #475569;"><strong>Password Storage:</strong> Plain Text (As Requested)
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

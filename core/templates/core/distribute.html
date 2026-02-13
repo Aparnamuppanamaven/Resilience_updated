@@ -1,0 +1,91 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Distribute Packet - Resilience System{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
+            <li class="nav-item"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
+            <li class="nav-item active"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
+            <li class="nav-item"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
+            <li class="nav-item"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="avatar">{{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}</div>
+                <div class="user-info">
+                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
+                    <span class="user-role">{{ user.liaison_profile.organization.name }}</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-header">
+            <h2>Distribute Packet</h2>
+        </header>
+
+        <div class="view-container">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Shift Packet Draft</h3>
+                    <form method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-paper-plane"></i> Send Packet Now
+                        </button>
+                    </form>
+                </div>
+                
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}" style="padding: 1rem; margin-bottom: 1rem; border-radius: 6px; background: #dcfce7; color: #166534;">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                <div style="background: #f8fafc; padding: 1.5rem; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <h4 style="margin-bottom: 1rem; color: var(--primary-color);">SHIFT PACKET #{{ packet_number }}</h4>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <strong>Status:</strong> <span class="badge badge-status-{{ settings.current_status|lower|slugify }}">{{ settings.current_status }}</span> <br>
+                        <strong>Generated:</strong> {% now "F d, Y H:i" %}
+                    </div>
+
+                    <h5>1. Executive Summary</h5>
+                    <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+                        Operations remain stable. {{ updates.count }} new updates processed in the last cycle.
+                    </p>
+
+                    <h5>2. Key Risks & Incidents</h5>
+                    <ul style="margin-bottom: 1rem; padding-left: 1.5rem;">
+                       {% for update in high_risk_updates %}
+                            <li>[{{ update.severity }}] {{ update.title }}: {{ update.description }}</li>
+                       {% empty %}
+                            <li>No high risks identified.</li>
+                       {% endfor %}
+                    </ul>
+
+                    <h5>3. Next Actions</h5>
+                     <ul style="padding-left: 1.5rem;">
+                        <li>Continue routine monitoring (Cadence: {{ settings.cadence_hours }}h).</li>
+                        <li>Verify backup comms channels at 1800h.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+

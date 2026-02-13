@@ -1,0 +1,162 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Onboarding - Resilience Foundation{% endblock %}
+{% block body_class %}public-page{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #f8fafc;
+    }
+
+    .onboarding-container {
+        max-width: 600px;
+        margin: 4rem auto;
+        padding: 3rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+        text-align: center;
+    }
+
+    .kickoff-box {
+        background: #e0f2fe;
+        border-left: 4px solid #0ea5e9;
+        padding: 1rem;
+        text-align: left;
+        margin-bottom: 2rem;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        color: #0c4a6e;
+    }
+
+    .kickoff-box i {
+        color: #0284c7;
+        margin-right: 0.5rem;
+    }
+
+    .form-group {
+        text-align: left;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    select,
+    textarea,
+    input[type="text"],
+    input[type="email"] {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 1rem;
+        color: #1e293b;
+        font-family: inherit;
+        /* Ensure textarea font matches */
+    }
+
+    .btn-submit {
+        width: 100%;
+        padding: 1rem;
+        font-size: 1rem;
+        font-weight: 600;
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .btn-submit:hover {
+        background-color: #1d4ed8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="landing-nav" style="background: white; border-bottom: 1px solid #e2e8f0;">
+    <div class="container nav-container">
+        <div class="logo">
+            <i class="fa-solid fa-shield-halved" style="color: #2563eb;"></i> Resilience
+        </div>
+    </div>
+</nav>
+
+<div class="onboarding-container">
+    <div style="margin-bottom: 1.5rem;">
+        <div
+            style="width: 64px; height: 64px; background: #22c55e; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+            <i class="fa-solid fa-check" style="color: white; font-size: 2rem;"></i>
+        </div>
+    </div>
+
+    <h2 style="margin-bottom: 0.5rem; color: #0f172a; font-weight: 700;">Payment Successful</h2>
+    <p style="margin-bottom: 2rem; color: #64748b;">Welcome to Resilience Foundation. Let's configure your initial
+        reporting cadence.</p>
+
+    <div class="kickoff-box">
+        <p style="margin: 0;">
+            <i class="fa-solid fa-video"></i> <strong>Kickoff Session:</strong> A trained Mavensoft onboarding
+            specialist is available for a standard 20-minute kickoff session (Zoom or Teams). You can schedule this
+            after configuring your initial settings.
+        </p>
+    </div>
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}"
+        style="padding: 1rem; margin-bottom: 1rem; border-radius: 6px; background: #fee2e2; color: #991b1b; text-align: left;">
+        {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <form method="post" id="onboarding-form">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label class="form-label">Shift Packet Cadence (Hours)</label>
+            {{ form.cadence_hours }}
+            <small style="color: #94a3b8; display: block; margin-top: 5px;">This determines how often the 'Distribute'
+                view prompts for a packet.</small>
+            {% if form.cadence_hours.errors %}
+            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.cadence_hours.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Stakeholder Distribution List</label>
+            {{ form.distribution_list }}
+            <textarea name="distribution_list" style="display:none;"></textarea>
+            <!-- Fallback if form field renders differently -->
+            <!-- Ensure the form field renders as textarea or has correct style. 
+                 The Django form field likely renders as textarea. 
+                 Adding styling to textarea in CSS block above or inline here if needed. 
+                 Let's assume default rendering is okay but might need width fix. 
+                 The CSS selector `select, input[type="text"], input[type="email"]` doesn't cover textarea.
+                 I should update CSS too.
+            -->
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Confirm Liaison</label>
+            <div
+                style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc; color: #1e293b; display: flex; align-items: center;">
+                <i class="fa-solid fa-user" style="color: #0f172a; margin-right: 0.75rem;"></i>
+                <span id="liaison-display">{{ liaison.user.get_full_name|default:liaison.user.username }}</span>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-submit">Regisration Completed <i class="fa-solid fa-rocket"
+                style="margin-left: 0.5rem;"></i></button>
+    </form>
+</div>
+{% endblock %}

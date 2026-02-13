@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Secure Payment - Resilience System{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 4rem 0; max-width: 900px;">
+    <div class="row" style="display: flex; gap: 2rem; flex-wrap: wrap;">
+        <!-- Order Summary -->
+        <div class="col-md-4" style="flex: 1; min-width: 300px;">
+            <div class="card"
+                style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem;">
+                <h3 style="font-size: 1.25rem; font-weight: 700; color: #1e293b; margin-bottom: 1rem;">Order Summary
+                </h3>
+                <div
+                    style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem; color: #64748b;">
+                    <span>Item</span>
+                    <span>Price</span>
+                </div>
+                <div
+                    style="display: flex; justify-content: space-between; margin-bottom: 1rem; font-weight: 600; color: #0f172a;">
+                    <span>Foundation License</span>
+                    <span>$7,500.00</span>
+                </div>
+                <div style="border-top: 1px dashed #cbd5e1; margin: 1rem 0;"></div>
+                <div
+                    style="display: flex; justify-content: space-between; font-size: 1.125rem; font-weight: 800; color: #1e3a8a;">
+                    <span>Total</span>
+                    <span>$7,500.00</span>
+                </div>
+                <div
+                    style="margin-top: 1.5rem; background: #eff6ff; padding: 0.75rem; border-radius: 6px; font-size: 0.8rem; color: #1d4ed8; display: flex; gap: 0.5rem;">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Secure SSL Encrypted Transaction</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Options -->
+        <div class="col-md-8" style="flex: 2; min-width: 300px;">
+            <h2 style="font-size: 1.75rem; font-weight: 800; color: #1e293b; margin-bottom: 1.5rem;">Payment Method</h2>
+
+            <div class="payment-tabs"
+                style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0;">
+                <button class="tab-btn active" onclick="openTab(event, 'card')"
+                    style="padding: 0.75rem 1.5rem; background: none; border: none; font-weight: 600; color: #2563eb; border-bottom: 2px solid #2563eb; cursor: pointer;">Credit/Debit
+                    Card</button>
+                <button class="tab-btn" onclick="openTab(event, 'upi')"
+                    style="padding: 0.75rem 1.5rem; background: none; border: none; font-weight: 600; color: #64748b; cursor: pointer;">UPI</button>
+            </div>
+
+            <form method="post" action="{% url 'payment' %}">
+                {% csrf_token %}
+
+                <!-- Card Payment Section -->
+                <div id="card" class="tab-content">
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Card
+                            Number</label>
+                        <div style="position: relative;">
+                            <input type="text" placeholder="0000 0000 0000 0000"
+                                style="width: 100%; padding: 0.75rem; padding-left: 2.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace;">
+                            <i class="fa-regular fa-credit-card"
+                                style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <div class="form-group" style="flex: 1; margin-bottom: 1rem;">
+                            <label
+                                style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Expiry
+                                Date</label>
+                            <input type="text" placeholder="MM/YY"
+                                style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 1rem;">
+                            <label
+                                style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">CVV</label>
+                            <input type="password" placeholder="123"
+                                style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label
+                            style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Cardholder
+                            Name</label>
+                        <input type="text" placeholder="Name on Card"
+                            style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                </div>
+
+                <!-- UPI Payment Section -->
+                <div id="upi" class="tab-content" style="display: none;">
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">UPI
+                            ID</label>
+                        <div style="position: relative;">
+                            <input type="text" placeholder="username@upi"
+                                style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        </div>
+                        <p style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">Enter your VPA (Virtual
+                            Payment Address).</p>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary"
+                    style="width: 100%; padding: 1rem; font-size: 1rem; margin-top: 1rem;">
+                    Complete Payment <i class="fa-solid fa-arrow-right" style="margin-left: 0.5rem;"></i>
+                </button>
+
+                <div style="text-align: center; margin-top: 1rem;">
+                    <a href="{% url 'payment_failed' %}"
+                        style="color: #64748b; font-size: 0.9rem; text-decoration: none;">
+                        Cancel or Simulate Failure
+                    </a>
+                </div>
+
+                <input type="hidden" name="payment_method" id="payment_method" value="card">
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+        tablinks = document.getElementsByClassName("tab-btn");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].style.borderBottom = "none";
+            tablinks[i].style.color = "#64748b";
+        }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.style.borderBottom = "2px solid #2563eb";
+        evt.currentTarget.style.color = "#2563eb";
+
+        // Update hidden input
+        var method = (tabName === 'card') ? 'card' : 'upi';
+        document.getElementById('payment_method').value = method;
+    }
+</script>
+{% endblock %}

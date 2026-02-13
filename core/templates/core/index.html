@@ -1,0 +1,297 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Resilience System - Foundation{% endblock %}
+{% block body_class %}landing-body{% endblock %}
+
+{% block content %}
+<nav class="landing-nav">
+    <div class="container nav-container">
+        <div class="logo">
+            <i class="fa-solid fa-shield-halved"></i> Resilience
+        </div>
+        <div class="nav-cta">
+            <a href="{% url 'checkout' %}" class="btn btn-primary">Get Started</a>
+            <a href="/login/" class="btn btn-primary" style="margin-left: 1rem;">Login</a>
+        </div>
+    </div>
+</nav>
+
+<header class="hero-section">
+    <div class="container hero-content">
+        <h1>Command Your Operations.</h1>
+        <p class="hero-sub">Packaging locked (Documented Facts) for Designated Liaisons. Capture critical updates,
+            normalize
+            incident data, and distribute perfect Shift Packets—every time.</p>
+        <div class="hero-actions">
+            <a href="{% url 'checkout' %}" class="btn btn-primary btn-lg">Initialize System</a>
+            <a href="#details" class="btn btn-outline btn-lg">Explore Capabilities</a>
+        </div>
+    </div>
+</header>
+
+<section class="deliverables-section">
+    <div class="container">
+        <div class="section-header deliverables-header">
+            <div class="header-side-tag">
+                <div class="blue-bar"></div>
+                <span class="tag-text">ARTIFACTS</span>
+            </div>
+            <h2>Three Core Deliverables</h2>
+        </div>
+        <div class="deliverables-grid">
+            <div class="deliverable-card">
+                <div class="card-top-group">
+                    <div class="card-number">01</div>
+                    <div class="icon-circle icon-blue"><i class="fa-solid fa-clipboard-list"></i></div>
+                </div>
+                <h3>Shift Packet</h3>
+                <span class="deliverable-label">BASELINE</span>
+                <p>A structured snapshot for handoff: status, risks, owners, next actions.</p>
+            </div>
+            <div class="deliverable-card">
+                <div class="card-top-group">
+                    <div class="card-number">02</div>
+                    <div class="icon-circle icon-blue"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                </div>
+                <h3>What Changed + Decision Log</h3>
+                <span class="deliverable-label">TIME-STAMPED</span>
+                <p>Changes and decisions with short rationale and ownership tracking.</p>
+            </div>
+            <div class="deliverable-card">
+                <div class="card-top-group">
+                    <div class="card-number">03</div>
+                    <div class="icon-circle icon-orange"><i class="fa-solid fa-bell"></i></div>
+                </div>
+                <h3>Activation Protocol</h3>
+                <span class="deliverable-label">LIAISON AUTHORITY</span>
+                <p>How Alerts are activated, updated, and closed (Alert ON/OFF, All-Clear).</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<section id="details" class="scope-section">
+    <div class="container">
+        <div class="section-header">
+            <h2>Operational Clarity, Instantly.</h2>
+            <p>A proven system, pre-configured for impact. Skip the setup delays and start leading your response
+                immediately.</p>
+        </div>
+
+        <div class="scope-grid">
+            <div class="scope-card">
+                <div class="icon-box"><i class="fa-solid fa-check-double"></i></div>
+                <h3>Included in Foundation</h3>
+                <ul>
+                    <li><i class="fa-solid fa-check"></i> Standard Shift Packet</li>
+                    <li><i class="fa-solid fa-check"></i> What Changed Analysis</li>
+                    <li><i class="fa-solid fa-check"></i> Decision Log & Export</li>
+                    <li><i class="fa-solid fa-check"></i> Single Intake Path (Liaison)</li>
+                    <li><i class="fa-solid fa-check"></i> 90-Day Enterprise Credit</li>
+                </ul>
+            </div>
+            <div class="scope-card restricted">
+                <div class="icon-box"><i class="fa-solid fa-ban"></i></div>
+                <h3>Not in Foundation</h3>
+                <ul>
+                    <li><i class="fa-solid fa-xmark"></i> Custom Integrations</li>
+                    <li><i class="fa-solid fa-xmark"></i> Automated Dispatch</li>
+                    <li><i class="fa-solid fa-xmark"></i> Multi-Dept Workflows</li>
+                    <li><i class="fa-solid fa-xmark"></i> Prescriptive Recommendations</li>
+                    <li><i class="fa-solid fa-xmark"></i> Custom Scoping</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="alerts-section">
+    <div class="container">
+        <div class="section-header" style="text-align: left; margin-bottom: 2rem;">
+            <span class="eyebrow"
+                style="color: var(--primary-color); font-weight: 700; text-transform: uppercase; font-size: 0.8rem; display: block; margin-bottom: 0.5rem; letter-spacing: 1px;">|
+                CADENCE OPTIONS</span>
+            <h2>Alert Levels & Frequency</h2>
+        </div>
+        <div class="alerts-grid">
+            <div class="alert-card level-a">
+                <div class="alert-header">
+                    <div class="alert-icon"><i class="fa-solid fa-check"></i></div>
+                    <span class="alert-badge">ALERT LEVEL A</span>
+                </div>
+                <h3>Normal (No Alert)</h3>
+                <div class="frequency-box">
+                    <span class="freq-label">Frequency</span>
+                    <span class="freq-value">1* / 24h</span>
+                </div>
+                <p class="alert-desc">Daily updates and status reports.</p>
+                <div class="status-bar bar-green">PHASE-0 & PHASE-1</div>
+            </div>
+            <div class="alert-card level-b">
+                <div class="alert-header">
+                    <div class="alert-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <span class="alert-badge">ALERT LEVEL B</span>
+                </div>
+                <h3>Emergency Watch</h3>
+                <div class="frequency-box">
+                    <span class="freq-label">Frequency</span>
+                    <span class="freq-value">~Every 8 hours</span>
+                </div>
+                <p class="alert-desc">Enhanced monitoring and coordination (=3*/24h).</p>
+                <div class="status-bar bar-yellow">PHASE-0 ELIGIBLE</div>
+            </div>
+            <div class="alert-card level-c">
+                <div class="alert-header">
+                    <div class="alert-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+                    <span class="alert-badge">ALERT LEVEL C</span>
+                </div>
+                <h3>High Alert</h3>
+                <div class="frequency-box">
+                    <span class="freq-label">Frequency</span>
+                    <span class="freq-value">~Every 3-4 hours</span>
+                </div>
+                <p class="alert-desc">Critical incident management (=6-8*/24h).</p>
+                <div class="status-bar bar-red">PHASE-1 REQUIRED</div>
+            </div>
+        </div>
+        <div class="alert-note"
+            style="margin-top: 1rem; text-align: right; background: #fef9c3; padding: 0.5rem 1rem; border-radius: 6px; float: right; font-size: 0.8rem; border: 1px solid #fde047; color: #854d0e;">
+            <i class="fa-solid fa-circle-info"></i> Activation only by designated Liaison (or authorized backup).
+        </div>
+        <div style="clear: both;"></div>
+    </div>
+</section>
+
+<section id="pricing" class="pricing-section">
+    <div class="container">
+        <div class="pricing-card featured">
+            <div class="pricing-header">
+                <h3>Foundation</h3>
+                <div class="price">$7,500 <span class="period">/ Fixed</span></div>
+                <p>Standard Entry Offer</p>
+            </div>
+            <div class="pricing-body">
+                <p class="payment-info">
+                    <i class="fa-solid fa-clock"></i> Upon payment confirmation, the Foundation package will be
+                    activated and system initialization will begin within 24–48 hours.
+                </p>
+                <div class="credit-rule-box">
+                    <i class="fa-solid fa-circle-info"></i> <strong>Credit Rule:</strong> If you proceed to Enterprise
+                    within 90 days, this $7,500 is fully credited towards the Enterprise license.
+                </div>
+                <a href="{% url 'checkout' %}" class="btn btn-primary btn-full">Initialize System</a>
+            </div>
+        </div>
+        <div class="pricing-card secondary">
+            <div class="pricing-header">
+                <h3>Enterprise</h3>
+                <div class="price">$75,000 <span class="period">one-time license</span></div>
+                <p>Enterprise Scale</p>
+            </div>
+            <div class="pricing-body">
+                <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-secondary);">
+                    <strong>Maintenance:</strong> Year 1 included.<br>
+                    Year 2+ mandatory: $8,000 / year.
+                </p>
+                <p>Includes full automation, RBAC, integrations, and audit-grade immutability features.</p>
+                <span class="btn btn-outline disabled">Requires Foundation Completion</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="shifts-section">
+    <div class="container">
+        <div class="section-header deliverables-header">
+            <div class="header-side-tag">
+                <div class="blue-bar"></div>
+                <span class="tag-text">DECISION CONTINUITY</span>
+            </div>
+            <h2>Across Shifts</h2>
+        </div>
+
+        <div class="process-flow">
+            <!-- Steps Row -->
+            <div class="steps-container">
+                <div class="step-item">
+                    <div class="step-circle circle-blue">01</div>
+                    <div class="step-title">Capture</div>
+                    <div class="step-subtitle subtitle-orange">LIAISON<br>INPUT</div>
+                </div>
+                <!-- Connector Positioned Absolute via CSS, logic handled there -->
+                <div class="step-connector"></div>
+                <div class="step-item">
+                    <div class="step-circle circle-blue">02</div>
+                    <div class="step-title">Normalize</div>
+                    <div class="step-subtitle subtitle-orange">RESILIENCE<br>ENGINE</div>
+                </div>
+                <div class="step-item">
+                    <div class="step-circle circle-orange">03</div>
+                    <div class="step-title">Distribute</div>
+                    <div class="step-subtitle subtitle-orange">SHIFT PACKET</div>
+                </div>
+            </div>
+
+            <!-- Description Boxes Row -->
+            <div class="boxes-container">
+                <div class="desc-box box-blue">
+                    <p><b>Designated Liaison (or backup) enters updates / changes / decisions</b></p>
+                </div>
+                <div class="desc-box box-blue">
+                    <p><b>Organize, timestamp, and structure updates into consistent artifacts</b></p>
+                </div>
+                <div class="desc-box box-orange">
+                    <p><b>Send to the right people with confirmations (Light in Phase-0; automated/escalation in
+                            Phase-1)</b></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="support-note">
+            <i class="fa-solid fa-circle-info"></i> Supportive and complementary — does not replace existing IM systems
+            or dispatch.
+        </div>
+    </div>
+</section>
+
+<section class="qa-section">
+    <div class="container">
+        <div class="section-header">
+            <h2>Common Questions</h2>
+        </div>
+        <div class="qa-grid">
+            <div class="qa-item">
+                <h4><i class="fa-regular fa-comments"></i> Is there a presale call?</h4>
+                <p>No. Resilience Foundation is a productized offering. We do not do custom discovery or Zoom sales
+                    calls before
+                    purchase. All necessary details are here.</p>
+            </div>
+            <div class="qa-item">
+                <h4><i class="fa-solid fa-video"></i> what about Zoom?</h4>
+                <p>Zoom is for delivery, not selling. We include a standard 20-min kickoff after purchase to align
+                    with your liaison.</p>
+            </div>
+            <div class="qa-item">
+                <h4><i class="fa-solid fa-users"></i> What support do I get?</h4>
+                <p>You get guided onboarding support via email/tickets to help your liaison set up. Foundation does
+                    not
+                    include custom engineering.</p>
+            </div>
+            <div class="qa-item">
+                <h4><i class="fa-solid fa-database"></i> How is data handled?</h4>
+                <p>Data remains isolated. Foundation focuses on input/output logic validation before deeper
+                    integration
+                    in Enterprise.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="landing-footer">
+    <div class="container">
+        <p>&copy; 2026 Resilience Systems. All rights reserved.</p>
+    </div>
+</footer>
+{% endblock %}

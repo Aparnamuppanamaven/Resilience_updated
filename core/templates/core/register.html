@@ -1,0 +1,131 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Register - Resilience System{% endblock %}
+{% block body_class %}public-page{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #f8fafc;
+    }
+
+    .login-container {
+        max-width: 450px;
+        margin: 4rem auto;
+        padding: 3rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+        text-align: center;
+    }
+
+    .form-group {
+        text-align: left;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 1rem;
+        color: #1e293b;
+    }
+
+    .btn-submit {
+        width: 100%;
+        padding: 1rem;
+        font-size: 1rem;
+        font-weight: 600;
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .btn-submit:hover {
+        background-color: #1d4ed8;
+    }
+
+    .login-link {
+        display: block;
+        margin-top: 1rem;
+        color: #64748b;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+
+    .login-link:hover {
+        color: #2563eb;
+        text-decoration: underline;
+    }
+
+    .errorlist {
+        color: #dc2626;
+        list-style: none;
+        padding: 0;
+        margin-bottom: 1rem;
+        text-align: left;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="landing-nav" style="background: white; border-bottom: 1px solid #e2e8f0;">
+    <div class="container nav-container">
+        <div class="logo">
+            <i class="fa-solid fa-shield-halved" style="color: #2563eb;"></i> Resilience
+        </div>
+    </div>
+</nav>
+
+<div class="login-container">
+    <div style="margin-bottom: 2rem;">
+        <i class="fa-solid fa-user-plus" style="font-size: 3rem; color: #2563eb;"></i>
+    </div>
+
+    <h2 style="margin-bottom: 0.5rem; color: #0f172a; font-weight: 700;">Create Account</h2>
+    <p style="margin-bottom: 2rem; color: #64748b;">Sign up for a new account</p>
+
+    {% if form.errors %}
+    <div class="alert alert-danger"
+        style="margin-bottom: 1.5rem; padding: 0.75rem; background: #fee2e2; color: #dc2626; border-radius: 6px; font-size: 0.9rem;">
+        Please correct the errors below.
+    </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        {% for field in form %}
+        <div class="form-group">
+            <label class="form-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <ul class="errorlist">
+                {% for error in field.errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <button type="submit" class="btn-submit">Sign Up</button>
+
+        <a href="{% url 'login' %}" class="login-link">Already have an account? Sign In</a>
+    </form>
+</div>
+{% endblock %}

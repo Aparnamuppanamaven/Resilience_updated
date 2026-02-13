@@ -1,0 +1,153 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - Resilience System{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item active">
+                <a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="avatar">{{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}</div>
+                <div class="user-info">
+                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
+                    <span class="user-role">{{ user.liaison_profile.organization.name }}</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Top Header -->
+        <header class="top-header">
+            <h2 id="page-title">Dashboard</h2>
+            <div class="header-actions">
+                <div class="status-indicator-wrapper">
+                    <span class="status-label">Current Status:</span>
+                    <span id="system-status-badge" class="badge badge-status-{{ settings.current_status|lower|slugify }}">{{ settings.current_status }}</span>
+                </div>
+                <button id="activate-alert-btn" class="btn btn-outline-danger btn-sm">
+                    {% if settings.current_status == 'Normal' %}
+                        <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
+                    {% else %}
+                        <i class="fa-solid fa-check"></i> Deactivate Alert
+                    {% endif %}
+                </button>
+                <div class="last-updated">
+                    Last detailed sync: <span id="last-sync-time">{{ settings.last_sync|timesince }} ago</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dynamic View Container -->
+        <div id="view-container" class="view-container">
+            <div class="dashboard-grid">
+                <div class="card stat-card">
+                    <div class="stat-label">Current Status</div>
+                    <div class="stat-value" style="color: var(--{% if settings.current_status == 'High Alert' %}status-alert-text{% else %}primary-color{% endif %})">
+                        {{ settings.current_status }}
+                    </div>
+                    <div class="stat-label">{% if settings.current_phase == 0 %}Standard Operations{% else %}Escalation Protocol{% endif %} Active</div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-label">Next Shift Packet Due</div>
+                    <div class="stat-value">{{ time_remaining|floatformat:0 }}h</div>
+                    <div class="stat-label">Cadence: Every {{ settings.cadence_hours }}h</div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-label">Pending Updates</div>
+                    <div class="stat-value">{{ pending_updates_count }}</div>
+                    <div class="stat-label">Since last packet</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Quick Actions</h3>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <a href="{% url 'capture' %}" class="btn btn-primary">
+                        <i class="fa-solid fa-plus"></i> Create Update
+                    </a>
+                    <a href="{% url 'distribute' %}" class="btn btn-primary" style="background-color: var(--secondary-color);">
+                        <i class="fa-solid fa-file-export"></i> Generate Shift Packet
+                    </a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Recent Activity</h3>
+                </div>
+                <div class="timeline">
+                    {% for update in recent_updates %}
+                        <div class="timeline-item">
+                            <div class="timeline-time">{{ update.timestamp|date:"H:i" }}</div>
+                            <div class="timeline-content">
+                                <div class="timeline-header">
+                                    <span class="timeline-title">{{ update.title }}</span>
+                                    <span class="badge badge-{{ update.severity|lower }}">{{ update.severity }}</span>
+                                </div>
+                                <p>{{ update.description }}</p>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p style="color: var(--text-secondary);">No recent activity.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+{% block extra_js %}
+<script>
+    document.getElementById('activate-alert-btn').addEventListener('click', function() {
+        fetch('{% url "toggle_alert" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status) {
+                location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}
+
+

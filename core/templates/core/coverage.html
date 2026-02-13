@@ -1,0 +1,74 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Coverage & Comms - Resilience System{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
+            <li class="nav-item"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
+            <li class="nav-item"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
+            <li class="nav-item"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
+            <li class="nav-item active"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="avatar">{{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}</div>
+                <div class="user-info">
+                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
+                    <span class="user-role">{{ user.liaison_profile.organization.name }}</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-header">
+            <h2>Coverage & Comms</h2>
+        </header>
+
+        <div class="view-container">
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Resilience Scope</h3>
+                    </div>
+                    <ul style="list-style: none; line-height: 2;">
+                        <li><i class="fa-solid fa-check" style="color: green; margin-right: 8px;"></i> Incidents outliving a shift</li>
+                        <li><i class="fa-solid fa-check" style="color: green; margin-right: 8px;"></i> Severe Weather Events</li>
+                        <li><i class="fa-solid fa-check" style="color: green; margin-right: 8px;"></i> Landslides / Geo-risks</li>
+                        <li><i class="fa-solid fa-check" style="color: green; margin-right: 8px;"></i> Cyber / Comms Disruption</li>
+                    </ul>
+                </div>
+                 <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Backup Communications</h3>
+                    </div>
+                    <div style="text-align: center; padding: 1rem;">
+                        <i class="fa-solid fa-tower-cell" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 1rem;"></i>
+                        <p style="margin-bottom: 1rem;">Primary Data Link: <span style="color: green; font-weight: bold;">ONLINE</span></p>
+                        <hr style="margin: 1rem 0; border: 0; border-top: 1px solid #eee;">
+                        <h5>Emergency SMS Channel</h5>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                            <input type="password" class="form-control" placeholder="Enter Passphrase">
+                            <button class="btn btn-primary" onclick="alert('Secure SMS Link Established')">Verify</button>
+                        </div>
+                        <p style="margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+                            Preferred Channel: {{ liaison.preferred_channels }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+
