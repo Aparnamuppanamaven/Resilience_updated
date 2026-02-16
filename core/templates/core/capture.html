@@ -11,6 +11,9 @@
             <span class="logo-text">Resilience</span>
         </div>
         <ul class="nav-links">
+            {% if is_admin %}
+            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a></li>
+            {% endif %}
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
             <li class="nav-item active"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
             <li class="nav-item"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
@@ -97,7 +100,7 @@
                         {% endif %}
                     </div>
 
-                    <button type="submit" class="btn btn-submit">Submit Update to Timeline</button>
+                    <button type="submit" class="btn btn-submit" data-disable-text="Please wait...">Submit Update to Timeline</button>
                 </form>
             </div>
         </div>

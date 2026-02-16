@@ -1,0 +1,119 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Admin - Add Users - Resilience System{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item active">
+                <a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a>
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="avatar">{{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}</div>
+                <div class="user-info">
+                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
+                    <span class="user-role">Admin</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-header">
+            <h2>Admin – Add Users</h2>
+        </header>
+
+        <div class="view-container">
+            {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}" style="padding: 1rem; margin-bottom: 1rem; border-radius: 6px; background: #dcfce7; color: #166534;">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <div class="card" style="max-width: 560px; margin-bottom: 2rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Add new user</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="">
+                        {% csrf_token %}
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label class="form-label">{{ form.username.label }}</label>
+                            {{ form.username }}
+                            {% if form.username.errors %}<ul class="errorlist" style="color: #dc2626; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.username.errors }}</ul>{% endif %}
+                        </div>
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label class="form-label">{{ form.password.label }}</label>
+                            {{ form.password }}
+                            {% if form.password.errors %}<ul class="errorlist" style="color: #dc2626; font-size: 0.875rem;">{{ form.password.errors }}</ul>{% endif %}
+                        </div>
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label class="form-label">{{ form.confirm_password.label }}</label>
+                            {{ form.confirm_password }}
+                            {% if form.confirm_password.errors %}<ul class="errorlist" style="color: #dc2626; font-size: 0.875rem;">{{ form.confirm_password.errors }}</ul>{% endif %}
+                        </div>
+                        {% if form.non_field_errors %}<ul class="errorlist" style="color: #dc2626;">{{ form.non_field_errors }}</ul>{% endif %}
+                        <button type="submit" class="btn btn-primary" data-disable-text="Adding...">Add user</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Existing users</h3>
+                </div>
+                <div class="card-body">
+                    {% if users_list %}
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">
+                                <th style="padding: 0.75rem;">Username</th>
+                                <th style="padding: 0.75rem;">Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in users_list %}
+                            <tr style="border-bottom: 1px solid #e2e8f0;">
+                                <td style="padding: 0.75rem;">{{ u.username }}</td>
+                                <td style="padding: 0.75rem;">{{ u.created_at|date:"M d, Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p style="color: #64748b;">No users yet. Add one above.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

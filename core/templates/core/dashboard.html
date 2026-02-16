@@ -12,6 +12,11 @@
             <span class="logo-text">Resilience</span>
         </div>
         <ul class="nav-links">
+            {% if is_admin %}
+            <li class="nav-item">
+                <a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a>
+            </li>
+            {% endif %}
             <li class="nav-item active">
                 <a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
             </li>

@@ -11,8 +11,12 @@
             <i class="fa-solid fa-shield-halved"></i> Resilience
         </div>
         <div class="nav-cta">
-            <a href="{% url 'checkout' %}" class="btn btn-primary">Get Started</a>
-            <a href="/login/" class="btn btn-primary" style="margin-left: 1rem;">Login</a>
+            {% if request.user.is_authenticated or request.session.user_credentials_id %}
+                <a href="{% url 'logout' %}" class="btn btn-primary">Logout</a>
+            {% else %}
+                <a href="{% url 'checkout' %}" class="btn btn-primary">Get Started</a>
+                <a href="{% url 'login' %}" class="btn btn-primary" style="margin-left: 1rem;">Login</a>
+            {% endif %}
         </div>
     </div>
 </nav>
@@ -20,11 +24,15 @@
 <header class="hero-section">
     <div class="container hero-content">
         <h1>Command Your Operations.</h1>
-        <p class="hero-sub">Packaging locked (Documented Facts) for Designated Liaisons. Capture critical updates,
-            normalize
-            incident data, and distribute perfect Shift Packets—every time.</p>
+        <p class="hero-sub">Structured Decision Continuity for Designated Liaisons.
+
+        </p>
         <div class="hero-actions">
-            <a href="{% url 'checkout' %}" class="btn btn-primary btn-lg">Initialize System</a>
+            {% if request.user.is_authenticated or request.session.user_credentials_id %}
+                <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg">Go to Dashboard</a>
+            {% else %}
+                <a href="{% url 'checkout' %}" class="btn btn-primary btn-lg">Initialize System</a>
+            {% endif %}
             <a href="#details" class="btn btn-outline btn-lg">Explore Capabilities</a>
         </div>
     </div>
@@ -99,7 +107,7 @@
                     <li><i class="fa-solid fa-xmark"></i> Custom Integrations</li>
                     <li><i class="fa-solid fa-xmark"></i> Automated Dispatch</li>
                     <li><i class="fa-solid fa-xmark"></i> Multi-Dept Workflows</li>
-                    <li><i class="fa-solid fa-xmark"></i> Prescriptive Recommendations</li>
+                    <li><i class="fa-solid fa-xmark"></i> Automated Decision-Making</li>
                     <li><i class="fa-solid fa-xmark"></i> Custom Scoping</li>
                 </ul>
             </div>
@@ -181,7 +189,11 @@
                     <i class="fa-solid fa-circle-info"></i> <strong>Credit Rule:</strong> If you proceed to Enterprise
                     within 90 days, this $7,500 is fully credited towards the Enterprise license.
                 </div>
-                <a href="{% url 'checkout' %}" class="btn btn-primary btn-full">Initialize System</a>
+                {% if request.user.is_authenticated or request.session.user_credentials_id %}
+                    <a href="{% url 'dashboard' %}" class="btn btn-primary btn-full">Go to Dashboard</a>
+                {% else %}
+                    <a href="{% url 'checkout' %}" class="btn btn-primary btn-full">Initialize System</a>
+                {% endif %}
             </div>
         </div>
         <div class="pricing-card secondary">
@@ -264,27 +276,102 @@
         <div class="qa-grid">
             <div class="qa-item">
                 <h4><i class="fa-regular fa-comments"></i> Is there a presale call?</h4>
-                <p>No. Resilience Foundation is a productized offering. We do not do custom discovery or Zoom sales
-                    calls before
-                    purchase. All necessary details are here.</p>
+                <p>No. Foundation is a standardized, productized offering, so it does not require pre-sale discovery. After purchase, we include a standard kickoff to confirm your liaison, cadence, and outputs.</p>
             </div>
             <div class="qa-item">
                 <h4><i class="fa-solid fa-video"></i> what about Zoom?</h4>
-                <p>Zoom is for delivery, not selling. We include a standard 20-min kickoff after purchase to align
-                    with your liaison.</p>
+                <p>Zoom/Teams is for delivery alignment, not selling. We include a standard 20-minute kickoff after purchase (and additional onboarding help as needed via email/tickets).</p>
             </div>
             <div class="qa-item">
                 <h4><i class="fa-solid fa-users"></i> What support do I get?</h4>
-                <p>You get guided onboarding support via email/tickets to help your liaison set up. Foundation does
-                    not
-                    include custom engineering.</p>
+                <p>Guided onboarding support via email/tickets to help your designated liaison set up. Foundation does not include custom engineering.</p>
             </div>
             <div class="qa-item">
                 <h4><i class="fa-solid fa-database"></i> How is data handled?</h4>
-                <p>Data remains isolated. Foundation focuses on input/output logic validation before deeper
-                    integration
-                    in Enterprise.</p>
+                <p>Foundation operates independently and does not require integration into existing systems. We capture only what your liaison provides for shift continuity artifacts.</p>
             </div>
+            <div class="qa-item">
+                <h4><i class="fa-solid fa-file-invoice-dollar"></i> Can we pay by invoice / Net 30 / PO?</h4>
+                <p>Yes. Government billing supported: Net 30 invoice, PO accepted. You may pay by ACH or card.</p>
+            </div>
+            <div class="qa-item">
+                <h4><i class="fa-solid fa-floppy-disk"></i> Can I save and finish signup later?</h4>
+                <p>Yes. You can save progress and resume later; nothing is submitted until confirmation.</p>
+            </div>
+            <div class="qa-item">
+                <h4><i class="fa-solid fa-user-shield"></i> Who can activate or change alert status?</h4>
+                <p>Only the designated liaison (or authorized backup). Activation and all-clear follow the Activation Protocol.</p>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="team-section">
+    <div class="container">
+        <div class="section-header deliverables-header">
+            <div class="header-side-tag">
+                <div class="blue-bar"></div>
+                <span class="tag-text">TEAM</span>
+            </div>
+            <h2>Designated Liaisons</h2>
+        </div>
+
+        <div class="team-grid">
+            <!-- Nick -->
+            <div class="team-card">
+                <div class="team-top">
+                    <div class="team-avatar blue">NR</div>
+                    <div>
+                        <h3>Nick Romito</h3>
+                        <p class="team-role">Resilience Liaison</p>
+                    </div>
+                </div>
+
+                <div class="team-details">
+                    <div class="team-row">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <span>Columbus, Ohio</span>
+                    </div>
+                    <div class="team-row">
+                        <i class="fa-solid fa-phone"></i>
+                        <span>+1 (614) 512-5675</span>
+                    </div>
+                    <div class="team-row">
+                        <i class="fa-solid fa-envelope"></i>
+                        <span>nick.romito@mavensoft.com</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paul -->
+            <div class="team-card">
+                <div class="team-top">
+                    <div class="team-avatar orange">PK</div>
+                    <div>
+                        <h3>Paul Keller</h3>
+                        <p class="team-role">Resilience Liaison</p>
+                    </div>
+                </div>
+
+                <div class="team-details">
+                    <div class="team-row">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <span>Beaverton, Oregon</span>
+                    </div>
+                    <div class="team-row">
+                        <i class="fa-solid fa-phone"></i>
+                        <span>503-801-7464</span>
+                    </div>
+                    <div class="team-row">
+                        <i class="fa-solid fa-envelope"></i>
+                        <span>paul.keller@mavensoft.com</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="team-note">
+            <i class="fa-solid fa-circle-info"></i>
+            Dedicated Resilience lines. Activation authority aligned with designated liaison protocol.
         </div>
     </div>
 </section>

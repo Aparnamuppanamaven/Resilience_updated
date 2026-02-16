@@ -17,7 +17,45 @@
 </head>
 <body class="{% block body_class %}{% endblock %}">
     {% block content %}{% endblock %}
-    
+
+    <!-- Prevent double submit: disable buttons on form submit, re-enable if form doesn't navigate away -->
+    <script>
+    (function() {
+        function init() {
+            document.body.addEventListener('submit', function(e) {
+                var form = e.target;
+                if (form.tagName !== 'FORM') return;
+                var buttons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+                var disabledList = [];
+                buttons.forEach(function(btn) {
+                    if (btn.disabled) return;
+                    btn.disabled = true;
+                    if (btn.tagName === 'BUTTON' && btn.dataset.disableText) {
+                        btn.dataset.originalText = btn.innerHTML;
+                        btn.innerHTML = btn.dataset.disableText;
+                    }
+                    disabledList.push(btn);
+                });
+                setTimeout(function() {
+                    disabledList.forEach(function(btn) {
+                        if (btn && btn.parentNode) {
+                            btn.disabled = false;
+                            if (btn.dataset.originalText) {
+                                btn.innerHTML = btn.dataset.originalText;
+                                delete btn.dataset.originalText;
+                            }
+                        }
+                    });
+                }, 4000);
+            });
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    })();
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

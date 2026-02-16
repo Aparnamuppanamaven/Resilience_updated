@@ -11,6 +11,9 @@
             <span class="logo-text">Resilience</span>
         </div>
         <ul class="nav-links">
+            {% if is_admin %}
+            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a></li>
+            {% endif %}
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
             <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
             <li class="nav-item"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
@@ -40,7 +43,7 @@
                     <h3 class="card-title">Shift Packet Draft</h3>
                     <form method="post" style="display: inline;">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" data-disable-text="Please wait...">
                             <i class="fa-solid fa-paper-plane"></i> Send Packet Now
                         </button>
                     </form>

@@ -91,7 +91,14 @@
     <h2 style="margin-bottom: 0.5rem; color: #0f172a; font-weight: 700;">Welcome Back</h2>
     <p style="margin-bottom: 2rem; color: #64748b;">Sign in to existing workspace</p>
 
-    {% if form.errors %}
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}"
+        style="margin-bottom: 1.5rem; padding: 0.75rem; background: {% if message.tags == 'error' %}#fee2e2; color: #dc2626{% else %}#dbeafe; color: #1d4ed8{% endif %}; border-radius: 6px; font-size: 0.9rem;">
+        {{ message }}
+    </div>
+    {% endfor %}
+    {% elif form.errors %}
     <div class="alert alert-danger"
         style="margin-bottom: 1.5rem; padding: 0.75rem; background: #fee2e2; color: #dc2626; border-radius: 6px; font-size: 0.9rem;">
         Invalid username or password.
@@ -111,7 +118,7 @@
             {{ form.password }}
         </div>
 
-        <button type="submit" class="btn-submit">Sign In</button>
+        <button type="submit" class="btn-submit" data-disable-text="Please wait...">Sign In</button>
 
         <a href="#" class="forgot-password">Forgot Password?</a>
         <a href="{% url 'register' %}" class="forgot-password" style="margin-top: 0.5rem;">Don't have an account? Sign
