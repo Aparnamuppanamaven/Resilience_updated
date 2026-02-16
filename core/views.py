@@ -3,9 +3,10 @@ Views for Resilience System
 Enterprise-level views
 """
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, authenticate
+from django.urls import reverse
+from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.models import User
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Q
@@ -13,12 +14,16 @@ from django.http import JsonResponse
 from datetime import timedelta
 import random
 
+from django.core.mail import send_mail
+from django.conf import settings as django_settings
+
 from .models import (
     Organization, Liaison, OperationalUpdate, 
     Decision, SystemSettings, ShiftPacket,
     ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials
 )
-from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm
+from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm
+from .password_token import make_setup_password_token, get_user_from_setup_password_token
 
 
 def index(request):
@@ -174,8 +179,31 @@ def onboarding(request):
             settings_obj.cadence_hours = int(form.cleaned_data['cadence_hours'])
             settings_obj.distribution_list = form.cleaned_data.get('distribution_list', '')
             settings_obj.save()
-            messages.success(request, 'Onboarding completed! Welcome to Resilience System.')
-            return redirect('registration_success')
+            # Send "registration completed" email to checkout email with setup-password link
+            user = request.user
+            to_email = user.email or getattr(liaison.user, 'email', None)
+            if to_email:
+                token = make_setup_password_token(user)
+                setup_url = request.build_absolute_uri(reverse('setup_password', kwargs={'token': token}))
+                try:
+                    send_mail(
+                        subject='Resilience – Registration completed – set up your password',
+                        message=(
+                            f'Hi {user.get_full_name() or user.username},\n\n'
+                            'Your Resilience Foundation registration is complete.\n\n'
+                            'Set up your password using the link below (valid for 7 days):\n\n'
+                            f'{setup_url}\n\n'
+                            'If you did not request this, you can ignore this email.\n\n'
+                            '— Resilience Team'
+                        ),
+                        from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@resilience.example.com'),
+                        recipient_list=[to_email],
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
+            messages.success(request, 'Onboarding completed! Set up your username and password below.')
+            return redirect('complete_registration')
     else:
         form = OnboardingForm(instance=settings_obj)
         form.fields['cadence_hours'].initial = str(settings_obj.cadence_hours)
@@ -190,6 +218,26 @@ def onboarding(request):
 def registration_success(request):
     """Registration success page"""
     return render(request, 'core/registration_success.html')
+
+
+@login_required
+def complete_registration(request):
+    """Page after onboarding: set username and password (with validation)."""
+    user = request.user
+    try:
+        request.user.liaison_profile
+    except Liaison.DoesNotExist:
+        messages.error(request, 'Please complete checkout and onboarding first.')
+        return redirect('checkout')
+    form = CompleteRegistrationForm(request.POST or None, current_user=user)
+    if request.method == 'POST' and form.is_valid():
+        user.username = form.cleaned_data['username'].strip()
+        user.set_password(form.cleaned_data['new_password'])
+        user.save()
+        logout(request)
+        messages.success(request, 'Account set up successfully. Please log in with your new username and password.')
+        return redirect('login')
+    return render(request, 'core/complete_registration.html', {'form': form})
 
 
 def payment_failed(request):
@@ -215,28 +263,29 @@ def dashboard(request):
     # Pathway 2: Legacy Session Auth (UserCredentials)
     elif 'user_credentials_id' in request.session:
         try:
-            # Try to get a default organization for display
             organization = Organization.objects.first()
             if not organization:
-                # Create a dummy one if none exists
                 organization = Organization.objects.create(name="Demo Agency")
                 SystemSettings.objects.create(organization=organization)
-            
-            settings_obj = organization.settings
-            
-            # Mock a user object for the template
+            settings_obj, _ = SystemSettings.objects.get_or_create(
+                organization=organization,
+                defaults={'cadence_hours': 24}
+            )
+            # Mock user for template (avoid closure in nested class)
+            org_for_mock = organization
+            class MockProfile:
+                organization = None
+            MockProfile.organization = org_for_mock
             class MockUser:
                 username = request.session.get('user_credentials_username', 'Guest')
-                first_name = username
+                first_name = request.session.get('user_credentials_username', 'Guest')
                 last_name = ""
-                is_authenticated = True # Mock this too for safety
-                def get_full_name(self): return self.username
-                class MockProfile:
-                    organization = organization
+                is_authenticated = True
+                is_staff = False  # so Admin module is hidden for UserCredentials users
                 liaison_profile = MockProfile()
-            
-            request.user = MockUser() # Monkey patch request.user
-            
+                def get_full_name(self):
+                    return self.username
+            request.user = MockUser()
         except Exception as e:
             messages.error(request, f'Error loading dashboard: {e}')
             return redirect('login')
@@ -457,35 +506,50 @@ def toggle_alert(request):
 
 
 def register_view(request):
-    """User registration view for UserCredentials"""
+    """User registration view for UserCredentials. One account per username only."""
     if request.method == 'POST':
         form = UserSignupForm(request.POST)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Registration successful! Please login.')
-            return redirect('login')
+            try:
+                form.save()
+                messages.success(request, 'Registration successful! Please login.')
+                return redirect('login')
+            except Exception as e:
+                if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
+                    messages.error(request, 'This username is already registered. Please sign in or choose a different username.')
+                else:
+                    messages.error(request, 'Registration failed. Please try again.')
     else:
         form = UserSignupForm()
     return render(request, 'core/register.html', {'form': form})
 
 
 def login_view(request):
-    """User login view for UserCredentials"""
+    """User login: UserCredentials (legacy) or Django auth (Liaison after setup password)."""
+    # Already logged in: do not show Sign In page; redirect so UI reflects logged-in status
+    if request.user.is_authenticated or request.session.get('user_credentials_id'):
+        return redirect('dashboard')
     if request.method == 'POST':
         form = UserLoginForm(request.POST)
         if form.is_valid():
             username = form.cleaned_data['username']
             password = form.cleaned_data['password']
+            # 1) Try UserCredentials (legacy table)
             try:
-                # Plain text password check as requested
-                user = UserCredentials.objects.get(username=username, password_hash=password)
-                # Success
-                request.session['user_credentials_id'] = user.user_id
-                request.session['user_credentials_username'] = user.username
-                messages.success(request, f'Welcome back, {user.username}!')
+                user_cred = UserCredentials.objects.get(username=username, password_hash=password)
+                request.session['user_credentials_id'] = user_cred.user_id
+                request.session['user_credentials_username'] = user_cred.username
+                messages.success(request, f'Welcome back, {user_cred.username}!')
                 return redirect('dashboard')
             except UserCredentials.DoesNotExist:
-                messages.error(request, 'Invalid username or password.')
+                pass
+            # 2) Try Django auth (Liaison users who set password via email link)
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                messages.success(request, f'Welcome back, {user.get_full_name() or user.username}!')
+                return redirect('dashboard')
+            messages.error(request, 'Invalid username or password.')
     else:
         form = UserLoginForm()
     return render(request, 'core/login.html', {'form': form})
@@ -503,9 +567,44 @@ def user_dashboard(request):
     return render(request, 'core/user_dashboard.html', {'username': username})
 
 
+def _staff_required(user):
+    return user.is_authenticated and user.is_staff
+
+
+@login_required
+@user_passes_test(_staff_required, login_url='/login/')
+def admin_module(request):
+    """Admin page: add and list users (UserCredentials). Staff only."""
+    users_list = UserCredentials.objects.all().order_by('username')
+    form = UserSignupForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, f'User "{form.cleaned_data["username"]}" added successfully.')
+        return redirect('admin_module')
+    return render(request, 'core/admin_module.html', {
+        'users_list': users_list,
+        'form': form,
+    })
+
+
 def logout_view(request):
-    """Logout view"""
+    """Logout: clear auth and session, redirect to index (default state). No message displayed."""
+    logout(request)
     request.session.flush()
-    messages.success(request, 'Logged out successfully.')
     return redirect('index')
+
+
+def setup_password(request, token):
+    """Set password from email link (after registration completed)."""
+    user = get_user_from_setup_password_token(token)
+    if not user:
+        messages.error(request, 'This link is invalid or has expired. Request a new one or contact support.')
+        return redirect('login')
+    form = SetupPasswordForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        user.set_password(form.cleaned_data['new_password'])
+        user.save()
+        messages.success(request, 'Password set successfully. You can now log in.')
+        return redirect('login')
+    return render(request, 'core/setup_password.html', {'form': form})
 

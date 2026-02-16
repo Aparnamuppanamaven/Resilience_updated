@@ -4,6 +4,7 @@ Forms for Resilience System
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from .models import OperationalUpdate, SystemSettings, UserCredentials
 
 
@@ -103,28 +104,42 @@ class OperationalUpdateForm(forms.ModelForm):
 
 
 class UserSignupForm(forms.ModelForm):
-    """Form for user registration"""
-    password = forms.CharField(widget=forms.PasswordInput(attrs={
-        'class': 'form-control',
-        'placeholder': 'Password'
-    }))
-    confirm_password = forms.CharField(widget=forms.PasswordInput(attrs={
-        'class': 'form-control',
-        'placeholder': 'Confirm Password'
-    }))
+    """Form for user registration: username, password, confirm password only."""
+    password = forms.CharField(
+        label='Password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Password'
+        })
+    )
+    confirm_password = forms.CharField(
+        label='Confirm password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Confirm Password'
+        })
+    )
 
     class Meta:
         model = UserCredentials
-        fields = ['username', 'password_hash']
+        fields = ['username']
         widgets = {
             'username': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Username'
             }),
         }
-        labels = {
-            'password_hash': 'Password'
-        }
+
+    def clean_username(self):
+        """Ensure only one account per username."""
+        username = self.cleaned_data.get('username', '').strip()
+        if not username:
+            raise forms.ValidationError('Username is required.')
+        if UserCredentials.objects.filter(username=username).exists():
+            raise forms.ValidationError(
+                'This username is already registered. Please sign in or choose a different username.'
+            )
+        return username
 
     def clean(self):
         cleaned_data = super().clean()
@@ -153,4 +168,90 @@ class UserLoginForm(forms.Form):
         'class': 'form-control',
         'placeholder': 'Password'
     }))
+
+
+class SetupPasswordForm(forms.Form):
+    """Form for setting password from email link"""
+    new_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'New password',
+            'autocomplete': 'new-password',
+        }),
+        min_length=8,
+        label='New password',
+    )
+    confirm_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Confirm password',
+            'autocomplete': 'new-password',
+        }),
+        label='Confirm password',
+    )
+
+    def clean(self):
+        data = super().clean()
+        if data.get('new_password') != data.get('confirm_password'):
+            raise forms.ValidationError('Passwords do not match.')
+        return data
+
+
+class CompleteRegistrationForm(forms.Form):
+    """Form shown after onboarding: set username and password (with validation)."""
+    username = forms.CharField(
+        max_length=150,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Choose a username',
+            'autocomplete': 'username',
+        }),
+        label='Username',
+    )
+    new_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'New password',
+            'autocomplete': 'new-password',
+        }),
+        label='New password',
+        help_text='At least 8 characters With at least one uppercase letter, one lowercase letter, and one number.',
+    )
+    confirm_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Confirm password',
+            'autocomplete': 'new-password',
+        }),
+        label='Confirm password',
+    )
+
+    def __init__(self, *args, current_user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.current_user = current_user
+        if current_user and not (args and args[0]):
+            self.fields['username'].initial = getattr(current_user, 'username', '')
+
+    def clean_username(self):
+        data = self.cleaned_data.get('username', '').strip()
+        if not data:
+            raise forms.ValidationError('Username is required.')
+        if not all(c.isalnum() or c in '@.+-_' for c in data):
+            raise forms.ValidationError('Username can only contain letters, digits, and @/./+/-/_.')
+        if User.objects.filter(username=data).exclude(pk=getattr(self.current_user, 'pk', None)).exists():
+            raise forms.ValidationError('This username is already taken.')
+        return data
+
+    def clean_new_password(self):
+        data = self.cleaned_data.get('new_password')
+        if data:
+            validate_password(data, self.current_user)
+        return data
+
+    def clean(self):
+        data = super().clean()
+        if data.get('new_password') != data.get('confirm_password'):
+            raise forms.ValidationError('Passwords do not match.')
+        return data
 

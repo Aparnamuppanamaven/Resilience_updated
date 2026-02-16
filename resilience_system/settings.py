@@ -6,6 +6,10 @@ Enterprise-level configuration.
 from pathlib import Path
 import os
 
+# Use PyMySQL as MySQLdb (works on Windows without C compiler)
+import pymysql
+pymysql.install_as_MySQLdb()
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -19,7 +23,11 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-this-in-produc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# Allow external access - for development/testing, use '*' to allow all hosts
+# For production, specify exact domains: 'yourdomain.com,www.yourdomain.com'
+ALLOWED_HOSTS = ['*']
+
+
 
 
 # Application definition
@@ -57,6 +65,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.auth_context',
             ],
         },
     },
@@ -71,7 +80,7 @@ WSGI_APPLICATION = 'resilience_system.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'Resilience_UAT',
+        'NAME': 'resilience_uat',
         'USER': 'externaldbuser',
         'PASSWORD': 'External@2026',
         'HOST': '20.157.93.134',
@@ -146,6 +155,20 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/'
+
+# Email (for registration completed / setup password)
+# Development: messages printed to console. Production: set SMTP env vars.
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'
+)
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Resilience <noreply@resilience.example.com>')
+if os.environ.get('EMAIL_HOST'):
+    EMAIL_HOST = os.environ.get('EMAIL_HOST')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() == 'true'
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 
 # Enterprise-level security settings
 if not DEBUG:

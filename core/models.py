@@ -202,10 +202,10 @@ class ExternalSubscription(models.Model):
 
 
 class UserCredentials(models.Model):
-    """Mapping to legacy user_credentials table"""
+    """Mapping to MySQL table user_credentials (resilience_uat DB)"""
     user_id = models.AutoField(primary_key=True)
     username = models.CharField(max_length=100, unique=True)
-    # Storing plain text password as requested, despite the column name 'password_hash'
+    # Plain text password stored in password_hash column
     password_hash = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
 
