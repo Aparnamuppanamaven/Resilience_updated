@@ -1,5 +1,5 @@
 """
-URL configuration for resilience_system project.
+URL configuration for Resilience_system project.
 """
 from django.contrib import admin
 from django.urls import path, include
