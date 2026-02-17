@@ -1,4 +1,22 @@
+# Django Framework
 Django>=5.0,<6.0
+
+# MySQL Database Driver
+# Using PyMySQL instead of mysqlclient (works on Windows without C compiler)
 PyMySQL>=1.1.0
+
+# Stripe payments
 stripe>=7.0.0
+
+# Environment variables
 python-dotenv>=1.0.0
+
+# Additional dependencies (if needed for production)
+# Uncomment if you need email functionality beyond console backend
+# django-environ>=0.11.0  # For environment variable management
+# python-decouple>=3.8    # Alternative for environment variables
+
+# Development dependencies (optional)
+# Uncomment these for development
+# django-debug-toolbar>=4.2.0
+# ipython>=8.0.0
