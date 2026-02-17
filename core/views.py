@@ -22,14 +22,20 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.conf import settings as django_settings
 
+from django.db import transaction
 from .models import (
     Organization, Liaison, OperationalUpdate, 
     Decision, SystemSettings, ShiftPacket,
     ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials,
+<<<<<<< HEAD
     StripePayment
+=======
+    Payment, Invoice
+>>>>>>> 0d956f9 (Latest changes)
 )
-from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm
+from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
+from .payment_utils import generate_invoice_id, calculate_due_date, ensure_unique_invoice_id
 
 
 def index(request):
@@ -57,115 +63,229 @@ def checkout(request):
     return render(request, 'core/checkout.html', {'form': form})
 
 
+@transaction.atomic
 def payment(request):
-    """Payment page with dummy gateway"""
+    """Payment page with support for Invoice, ACH, and Credit Card"""
     checkout_data = request.session.get('checkout_data')
     if not checkout_data:
         messages.error(request, 'Session expired or invalid. Please checkout again.')
         return redirect('checkout')
 
     if request.method == 'POST':
-        # Simulate payment success
-        # Retrieve form data
-        agency = checkout_data['agency']
-        liaison_name = checkout_data['liaison_name']
-        liaison_email = checkout_data['liaison_email']
-        channels = checkout_data['channels']
-        incidents = checkout_data['incidents']
-
-        # Create organization
-        org = Organization.objects.create(
-            name=agency,
-            license_type='foundation',
-            foundation_purchase_date=timezone.now()
-        )
-        
-        # Create user account
-        username = liaison_email.split('@')[0]  # Use email prefix as username
-        
-        # Check if user already exists
-        user, created = User.objects.get_or_create(
-            username=username,
-            defaults={
-                'email': liaison_email,
-                'first_name': liaison_name.split()[0] if liaison_name.split() else '',
-                'last_name': ' '.join(liaison_name.split()[1:]) if len(liaison_name.split()) > 1 else '',
-            }
-        )
-        
-        if not created:
-            # User exists, update email
-            user.email = liaison_email
+        form = PaymentForm(request.POST)
+        if form.is_valid():
+            payment_method = form.cleaned_data['payment_method']
+            amount = 7500.00  # Fixed Foundation price
+            
+            # Retrieve checkout data
+            agency = checkout_data['agency']
+            liaison_name = checkout_data['liaison_name']
+            liaison_email = checkout_data['liaison_email']
+            channels = checkout_data['channels']
+            incidents = checkout_data['incidents']
+            
+            # Create organization
+            org = Organization.objects.create(
+                name=agency,
+                license_type='foundation',
+                foundation_purchase_date=timezone.now()
+            )
+            
+            # Create user account
+            username = liaison_email.split('@')[0]  # Use email prefix as username
+            
+            # Check if user already exists
+            user, created = User.objects.get_or_create(
+                username=username,
+                defaults={
+                    'email': liaison_email,
+                    'first_name': liaison_name.split()[0] if liaison_name.split() else '',
+                    'last_name': ' '.join(liaison_name.split()[1:]) if len(liaison_name.split()) > 1 else '',
+                }
+            )
+            
+            if not created:
+                # User exists, update email
+                user.email = liaison_email
+                user.save()
+            
+            # Set a default password (in production, send password reset email)
+            user.set_password('resilience2024!')
             user.save()
-        
-        # Set a default password (in production, send password reset email)
-        user.set_password('resilience2024!')
-        user.save()
-        
-        # Create or update liaison profile
-        Liaison.objects.update_or_create(
-            user=user,
-            defaults={
-                'organization': org,
-                'preferred_channels': channels,
-                'incident_types': incidents
-            }
-        )
-        
-        # Create default settings
-        SystemSettings.objects.get_or_create(
-            organization=org,
-            defaults={'cadence_hours': 24}
-        )
-        
-        # --- Populate Legacy Tables ---
-        try:
-            # 1. Users
-            ext_user = ExternalUser.objects.create(
-                agency_name=agency,
-                primary_liaison_name=liaison_name,
-                liaison_email=liaison_email,
-                key_incident_types=incidents,
-                preferred_communication_channels=channels,
-                created_at=timezone.now()
+            
+            # Create or update liaison profile
+            Liaison.objects.update_or_create(
+                user=user,
+                defaults={
+                    'organization': org,
+                    'preferred_channels': channels,
+                    'incident_types': incidents
+                }
             )
             
-            # 2. Payments
-            payment_method_selected = request.POST.get('payment_method', 'Credit Card')
-            ext_payment = ExternalPayment.objects.create(
-                username=username,
-                payment_status='Completed',
-                payment_method=payment_method_selected,
-                amount=7500.00,
-                payment_time=timezone.now()
+            # Create default settings
+            SystemSettings.objects.get_or_create(
+                organization=org,
+                defaults={'cadence_hours': 24}
             )
             
-            # 3. Subscriptions
-            ExternalSubscription.objects.create(
-                username=username,
-                payment=ext_payment,
-                subscription_type='Foundation',
-                duration=365,
-                subscription_start_date=timezone.now().date(),
-                subscription_end_date=timezone.now().date() + timedelta(days=365),
-                subscription_status='Active',
-                created_at=timezone.now()
+            # Create Payment record
+            payment_status = 'INVOICED' if payment_method == 'INVOICE' else ('PROCESSING' if payment_method == 'ACH' else 'PAID')
+            invoice_id = None
+            
+            if payment_method == 'INVOICE':
+                invoice_id = ensure_unique_invoice_id()
+            
+            payment_obj = Payment.objects.create(
+                amount=amount,
+                payment_method=payment_method,
+                status=payment_status,
+                invoice_id=invoice_id,
+                organization=org
             )
-        except Exception as e:
-            # Log error but don't fail the main flow
-            print(f"Error populating legacy tables: {e}") 
-        # -----------------------------
-        
-        # Auto-login user
-        user = authenticate(username=username, password='resilience2024!')
-        if user:
-            login(request, user)
-            # Clear session
-            request.session.pop('checkout_data', None)
-            messages.success(request, 'Payment successful! Account created.')
-            return redirect('onboarding')
+            
+            # Create Invoice if payment method is INVOICE
+            if payment_method == 'INVOICE':
+                Invoice.objects.create(
+                    invoice_id=invoice_id,
+                    payment=payment_obj,
+                    billing_entity_name=form.cleaned_data['billing_entity_name'],
+                    billing_email=form.cleaned_data['billing_email'],
+                    po_number=form.cleaned_data['po_number'],
+                    payment_terms='NET_30',
+                    early_pay_terms='2% / 10, Net 30',
+                    due_date=calculate_due_date('NET_30')
+                )
+            
+            # --- Populate Legacy Tables ---
+            try:
+                # 1. Users
+                ext_user = ExternalUser.objects.create(
+                    agency_name=agency,
+                    primary_liaison_name=liaison_name,
+                    liaison_email=liaison_email,
+                    key_incident_types=incidents,
+                    preferred_communication_channels=channels,
+                    created_at=timezone.now()
+                )
+                
+                # 2. Payments
+                payment_method_legacy = {
+                    'INVOICE': 'Invoice',
+                    'ACH': 'ACH',
+                    'CARD': 'Credit Card'
+                }.get(payment_method, 'Credit Card')
+                
+                ext_payment = ExternalPayment.objects.create(
+                    username=username,
+                    payment_status='Completed',
+                    payment_method=payment_method_legacy,
+                    amount=amount,
+                    payment_time=timezone.now()
+                )
+                
+                # 3. Subscriptions
+                ExternalSubscription.objects.create(
+                    username=username,
+                    payment=ext_payment,
+                    subscription_type='Foundation',
+                    duration=365,
+                    subscription_start_date=timezone.now().date(),
+                    subscription_end_date=timezone.now().date() + timedelta(days=365),
+                    subscription_status='Active',
+                    created_at=timezone.now()
+                )
+            except Exception as e:
+                # Log error but don't fail the main flow
+                print(f"Error populating legacy tables: {e}") 
+            # -----------------------------
+            
+            # Send confirmation email
+            try:
+                send_payment_confirmation_email(
+                    user=user,
+                    payment_obj=payment_obj,
+                    billing_email=form.cleaned_data['billing_email'],
+                    payment_method=payment_method,
+                    amount=amount,
+                    invoice_id=invoice_id
+                )
+            except Exception as e:
+                print(f"Error sending email: {e}")
+            
+            # Auto-login user
+            user = authenticate(username=username, password='resilience2024!')
+            if user:
+                login(request, user)
+                # Clear session
+                request.session.pop('checkout_data', None)
+                
+                # Set appropriate success message based on payment method
+                if payment_method == 'INVOICE':
+                    messages.success(request, 'Invoice generated successfully. Account created.')
+                elif payment_method == 'ACH':
+                    messages.success(request, 'Payment will be processed via ACH. An invoice will be issued for your records. Account created.')
+                else:
+                    messages.success(request, 'Payment successful! Account created.')
+                
+                return redirect('onboarding')
+        else:
+            # Form validation failed
+            return render(request, 'core/payment.html', {'form': form, 'checkout_data': checkout_data})
+    else:
+        form = PaymentForm()  # Default to INVOICE
+    
+    return render(request, 'core/payment.html', {'form': form, 'checkout_data': checkout_data})
 
-    return render(request, 'core/payment.html')
+
+def send_payment_confirmation_email(user, payment_obj, billing_email, payment_method, amount, invoice_id=None):
+    """Send payment confirmation email"""
+    payment_method_display = {
+        'INVOICE': 'Invoice - Net 30',
+        'ACH': 'ACH (Bank Transfer)',
+        'CARD': 'Credit Card'
+    }.get(payment_method, payment_method)
+    
+    subject = 'Resilience Foundation - Payment Confirmation'
+    
+    # Build email body
+    email_body = f"""Thank you for your Resilience Foundation purchase.
+
+Payment Details:
+- Amount: ${amount:,.2f}
+- Payment Method: {payment_method_display}
+- Date: {timezone.now().strftime('%B %d, %Y')}
+"""
+    
+    if invoice_id:
+        email_body += f"- Invoice ID: {invoice_id}\n"
+        email_body += f"- Payment Terms: Net 30\n"
+        email_body += f"- Early Pay Terms: 2% / 10, Net 30\n"
+    
+    email_body += f"""
+What's Included:
+- Foundation License
+- Full access to Resilience platform
+- Standard support
+
+Next Steps:
+- Your account has been created and you can begin onboarding
+- You will receive additional setup instructions shortly
+- For invoice payments, payment is due within 30 days
+
+Support:
+If you have any questions, please contact our support team.
+
+— Resilience Team
+"""
+    
+    send_mail(
+        subject=subject,
+        message=email_body,
+        from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@resilience.example.com'),
+        recipient_list=[billing_email],
+        fail_silently=True,
+    )
 
 
 @login_required

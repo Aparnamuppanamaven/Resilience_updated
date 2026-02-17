@@ -6,10 +6,16 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+<<<<<<< HEAD
 from django.utils import timezone
 from datetime import datetime, timedelta
 import re
 from .models import OperationalUpdate, SystemSettings, UserCredentials, Payment, Invoice
+=======
+from datetime import datetime, timedelta
+from .models import OperationalUpdate, SystemSettings, UserCredentials
+import re
+>>>>>>> 0d956f9 (Latest changes)
 
 
 class CheckoutForm(forms.Form):
@@ -53,6 +59,271 @@ class CheckoutForm(forms.Form):
         ],
         widget=forms.Select(attrs={'class': 'form-control'})
     )
+    number_of_users = forms.IntegerField(
+        label="Number of Users",
+        min_value=0,
+        initial=0,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g. 10'
+        })
+    )
+
+
+def luhn_algorithm(card_number):
+    """Validate credit card number using Luhn algorithm"""
+    card_number = re.sub(r'\D', '', card_number)
+    if not card_number:
+        return False
+    
+    def luhn_check(card_num):
+        def digits_of(n):
+            return [int(d) for d in str(n)]
+        digits = digits_of(card_num)
+        odd_digits = digits[-1::-2]
+        even_digits = digits[-2::-2]
+        checksum = sum(odd_digits)
+        for d in even_digits:
+            checksum += sum(digits_of(d * 2))
+        return checksum % 10 == 0
+    
+    return luhn_check(card_number)
+
+
+class PaymentForm(forms.Form):
+    """Payment form with dynamic validation for Invoice, ACH, and Credit Card"""
+    PAYMENT_METHOD_CHOICES = [
+        ('INVOICE', 'Invoice - Net 30'),
+        ('ACH', 'ACH (Bank Transfer)'),
+        ('CARD', 'Credit Card'),
+    ]
+    
+    payment_method = forms.ChoiceField(
+        label="Payment Method",
+        choices=PAYMENT_METHOD_CHOICES,
+        initial='INVOICE',
+        widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_payment_method'})
+    )
+    
+    # Common fields
+    billing_email = forms.EmailField(
+        label="Billing Email",
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'billing@agency.com'
+        })
+    )
+    
+    # Invoice fields
+    billing_entity_name = forms.CharField(
+        label="Billing Entity Name",
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Organization or Company Name'
+        })
+    )
+    po_number = forms.CharField(
+        label="PO Number",
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Purchase Order Number'
+        })
+    )
+    
+    # ACH fields
+    account_holder_name = forms.CharField(
+        label="Account Holder Name",
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Name on Account'
+        })
+    )
+    bank_name = forms.CharField(
+        label="Bank Name",
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Bank Name'
+        })
+    )
+    routing_number = forms.CharField(
+        label="Routing Number",
+        required=False,
+        max_length=9,
+        min_length=9,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '9-digit routing number',
+            'pattern': '[0-9]{9}'
+        })
+    )
+    account_number = forms.CharField(
+        label="Account Number",
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Account Number'
+        })
+    )
+    
+    # Credit Card fields
+    cardholder_name = forms.CharField(
+        label="Cardholder Name",
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Name on Card'
+        })
+    )
+    card_number = forms.CharField(
+        label="Card Number",
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '0000 0000 0000 0000',
+            'maxlength': '19'
+        })
+    )
+    expiry_date = forms.CharField(
+        label="Expiry Date",
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'MM/YY',
+            'maxlength': '5'
+        })
+    )
+    cvv = forms.CharField(
+        label="CVV",
+        required=False,
+        max_length=4,
+        min_length=3,
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': '123',
+            'maxlength': '4'
+        })
+    )
+    billing_address = forms.CharField(
+        label="Billing Address",
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Street Address, City, State, ZIP'
+        })
+    )
+    
+    def clean_routing_number(self):
+        """Validate routing number"""
+        routing_number = self.cleaned_data.get('routing_number', '').strip()
+        if routing_number:
+            if not routing_number.isdigit():
+                raise ValidationError('Routing number must contain only digits.')
+            if len(routing_number) != 9:
+                raise ValidationError('Routing number must be exactly 9 digits.')
+        return routing_number
+    
+    def clean_account_number(self):
+        """Validate account number"""
+        account_number = self.cleaned_data.get('account_number', '').strip()
+        if account_number:
+            if not account_number.isdigit():
+                raise ValidationError('Account number must contain only digits.')
+            if len(account_number) < 4 or len(account_number) > 17:
+                raise ValidationError('Account number must be between 4 and 17 digits.')
+        return account_number
+    
+    def clean_card_number(self):
+        """Validate card number using Luhn algorithm"""
+        card_number = self.cleaned_data.get('card_number', '').strip()
+        if card_number:
+            if not luhn_algorithm(card_number):
+                raise ValidationError('Invalid card number. Please check and try again.')
+        return card_number
+    
+    def clean_expiry_date(self):
+        """Validate expiry date is in the future"""
+        expiry_date = self.cleaned_data.get('expiry_date', '').strip()
+        if expiry_date:
+            try:
+                month, year = expiry_date.split('/')
+                month = int(month)
+                year = int(year)
+                if year < 100:
+                    year += 2000
+                
+                expiry = datetime(year, month, 1)
+                # Get last day of month
+                if month == 12:
+                    expiry = expiry.replace(day=31)
+                else:
+                    next_month = expiry.replace(month=month + 1)
+                    expiry = (next_month - timedelta(days=1))
+                
+                if expiry < datetime.now():
+                    raise ValidationError('Card has expired. Please use a valid card.')
+            except (ValueError, IndexError):
+                raise ValidationError('Invalid date format. Please use MM/YY format.')
+        return expiry_date
+    
+    def clean_cvv(self):
+        """Validate CVV length"""
+        cvv = self.cleaned_data.get('cvv', '').strip()
+        if cvv:
+            if not cvv.isdigit():
+                raise ValidationError('CVV must contain only digits.')
+            if len(cvv) not in [3, 4]:
+                raise ValidationError('CVV must be 3 or 4 digits.')
+        return cvv
+    
+    def clean(self):
+        """Dynamic validation based on payment method"""
+        cleaned_data = super().clean()
+        payment_method = cleaned_data.get('payment_method')
+        
+        if payment_method == 'INVOICE':
+            # Invoice requires: billing_entity_name, po_number, billing_email
+            if not cleaned_data.get('billing_entity_name'):
+                self.add_error('billing_entity_name', 'Billing entity name is required for invoice payments.')
+            if not cleaned_data.get('po_number'):
+                self.add_error('po_number', 'PO number is required for invoice payments.')
+            if not cleaned_data.get('billing_email'):
+                self.add_error('billing_email', 'Billing email is required.')
+        
+        elif payment_method == 'ACH':
+            # ACH requires: account_holder_name, bank_name, routing_number, account_number, billing_email
+            if not cleaned_data.get('account_holder_name'):
+                self.add_error('account_holder_name', 'Account holder name is required for ACH payments.')
+            if not cleaned_data.get('bank_name'):
+                self.add_error('bank_name', 'Bank name is required for ACH payments.')
+            if not cleaned_data.get('routing_number'):
+                self.add_error('routing_number', 'Routing number is required for ACH payments.')
+            if not cleaned_data.get('account_number'):
+                self.add_error('account_number', 'Account number is required for ACH payments.')
+            if not cleaned_data.get('billing_email'):
+                self.add_error('billing_email', 'Billing email is required.')
+        
+        elif payment_method == 'CARD':
+            # Credit Card requires: cardholder_name, card_number, expiry_date, cvv, billing_address, billing_email
+            if not cleaned_data.get('cardholder_name'):
+                self.add_error('cardholder_name', 'Cardholder name is required for credit card payments.')
+            if not cleaned_data.get('card_number'):
+                self.add_error('card_number', 'Card number is required for credit card payments.')
+            if not cleaned_data.get('expiry_date'):
+                self.add_error('expiry_date', 'Expiry date is required for credit card payments.')
+            if not cleaned_data.get('cvv'):
+                self.add_error('cvv', 'CVV is required for credit card payments.')
+            if not cleaned_data.get('billing_address'):
+                self.add_error('billing_address', 'Billing address is required for credit card payments.')
+            if not cleaned_data.get('billing_email'):
+                self.add_error('billing_email', 'Billing email is required.')
+        
+        return cleaned_data
 
 
 class OnboardingForm(forms.ModelForm):

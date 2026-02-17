@@ -41,81 +41,178 @@
         <div class="col-md-8" style="flex: 2; min-width: 300px;">
             <h2 style="font-size: 1.75rem; font-weight: 800; color: #1e293b; margin-bottom: 1.5rem;">Payment Method</h2>
 
-            <div class="payment-tabs"
-                style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0;">
-                <button class="tab-btn active" onclick="openTab(event, 'card')"
-                    style="padding: 0.75rem 1.5rem; background: none; border: none; font-weight: 600; color: #2563eb; border-bottom: 2px solid #2563eb; cursor: pointer;">Credit/Debit
-                    Card</button>
-                <button class="tab-btn" onclick="openTab(event, 'upi')"
-                    style="padding: 0.75rem 1.5rem; background: none; border: none; font-weight: 600; color: #64748b; cursor: pointer;">UPI</button>
-            </div>
-
-            <form method="post" action="{% url 'payment' %}">
+            <form method="post" action="{% url 'payment' %}" id="payment-form">
                 {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                <div style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
 
-                <!-- Card Payment Section -->
-                <div id="card" class="tab-content">
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Card
-                            Number</label>
-                        <div style="position: relative;">
-                            <input type="text" placeholder="0000 0000 0000 0000"
-                                style="width: 100%; padding: 0.75rem; padding-left: 2.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace;">
-                            <i class="fa-regular fa-credit-card"
-                                style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
-                        </div>
+                <div class="payment-tabs"
+                    style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0;">
+                    <button type="button" class="tab-btn active" onclick="openTab(event, 'invoice')"
+                        style="padding: 0.75rem 1.5rem; background: none; border: none; font-weight: 600; color: #2563eb; border-bottom: 2px solid #2563eb; cursor: pointer;">Invoice - Net 30</button>
+                    <button type="button" class="tab-btn" onclick="openTab(event, 'ach')"
+                        style="padding: 0.75rem 1.5rem; background: none; border: none; font-weight: 600; color: #64748b; cursor: pointer;">ACH</button>
+                    <button type="button" class="tab-btn" onclick="openTab(event, 'card')"
+                        style="padding: 0.75rem 1.5rem; background: none; border: none; font-weight: 600; color: #64748b; cursor: pointer;">Credit/Debit Card</button>
+                </div>
+
+                <!-- Invoice Payment Section (Default) -->
+                <div id="invoice" class="tab-content">
+                    <div style="background: #f0f9ff; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #2563eb;">
+                        <p style="margin: 0; color: #1e40af; font-size: 0.9rem;">
+                            <strong>Payment Terms:</strong> Net 30<br>
+                            <strong>Early Pay Terms:</strong> 2% / 10, Net 30
+                        </p>
                     </div>
+                    
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" for="id_billing_entity_name" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Billing Entity Name *</label>
+                        {{ form.billing_entity_name }}
+                        {% if form.billing_entity_name.errors %}
+                        <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.billing_entity_name.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" for="id_po_number" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">PO Number *</label>
+                        {{ form.po_number }}
+                        {% if form.po_number.errors %}
+                        <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.po_number.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" for="id_billing_email" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Billing Email *</label>
+                        {{ form.billing_email }}
+                        {% if form.billing_email.errors %}
+                        <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.billing_email.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- ACH Payment Section -->
+                <div id="ach" class="tab-content" style="display: none;">
+                    <div style="background: #f0f9ff; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #2563eb;">
+                        <p style="margin: 0; color: #1e40af; font-size: 0.9rem;">
+                            Payment will be processed via ACH. An invoice will be issued for your records.
+                        </p>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" for="id_account_holder_name" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Account Holder Name *</label>
+                        {{ form.account_holder_name }}
+                        {% if form.account_holder_name.errors %}
+                        <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.account_holder_name.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" for="id_bank_name" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Bank Name *</label>
+                        {{ form.bank_name }}
+                        {% if form.bank_name.errors %}
+                        <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.bank_name.errors }}</div>
+                        {% endif %}
+                    </div>
+
                     <div style="display: flex; gap: 1rem;">
                         <div class="form-group" style="flex: 1; margin-bottom: 1rem;">
-                            <label
-                                style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Expiry
-                                Date</label>
-                            <input type="text" placeholder="MM/YY"
-                                style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+                            <label class="form-label" for="id_routing_number" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Routing Number *</label>
+                            {{ form.routing_number }}
+                            {% if form.routing_number.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.routing_number.errors }}</div>
+                            {% endif %}
                         </div>
                         <div class="form-group" style="flex: 1; margin-bottom: 1rem;">
-                            <label
-                                style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">CVV</label>
-                            <input type="password" placeholder="123"
-                                style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+                            <label class="form-label" for="id_account_number" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Account Number *</label>
+                            {{ form.account_number }}
+                            {% if form.account_number.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.account_number.errors }}</div>
+                            {% endif %}
                         </div>
                     </div>
+
                     <div class="form-group" style="margin-bottom: 1rem;">
-                        <label
-                            style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Cardholder
-                            Name</label>
-                        <input type="text" placeholder="Name on Card"
-                            style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        <label class="form-label" for="id_billing_email_ach" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Billing Email *</label>
+                        {{ form.billing_email }}
+                        {% if form.billing_email.errors %}
+                        <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.billing_email.errors }}</div>
+                        {% endif %}
                     </div>
                 </div>
 
-                <!-- UPI Payment Section -->
-                <div id="upi" class="tab-content" style="display: none;">
+                <!-- Credit Card Payment Section -->
+                <div id="card" class="tab-content" style="display: none;">
                     <div class="form-group" style="margin-bottom: 1rem;">
-                        <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">UPI
-                            ID</label>
+                        <label class="form-label" for="id_card_number" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Card Number *</label>
                         <div style="position: relative;">
-                            <input type="text" placeholder="username@upi"
-                                style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+                            {{ form.card_number }}
+                            <i class="fa-regular fa-credit-card"
+                                style="position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; pointer-events: none;"></i>
                         </div>
-                        <p style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">Enter your VPA (Virtual
-                            Payment Address).</p>
+                        {% if form.card_number.errors %}
+                        <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.card_number.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem;">
+                        <div class="form-group" style="flex: 1; margin-bottom: 1rem;">
+                            <label class="form-label" for="id_expiry_date" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Expiry Date *</label>
+                            {{ form.expiry_date }}
+                            {% if form.expiry_date.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.expiry_date.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 1rem;">
+                            <label class="form-label" for="id_cvv" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">CVV *</label>
+                            {{ form.cvv }}
+                            {% if form.cvv.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.cvv.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" for="id_cardholder_name" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Cardholder Name *</label>
+                        {{ form.cardholder_name }}
+                        {% if form.cardholder_name.errors %}
+                        <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.cardholder_name.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" for="id_billing_address" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Billing Address *</label>
+                        {{ form.billing_address }}
+                        {% if form.billing_address.errors %}
+                        <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.billing_address.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" for="id_billing_email_card" style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #475569;">Billing Email *</label>
+                        {{ form.billing_email }}
+                        {% if form.billing_email.errors %}
+                        <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.billing_email.errors }}</div>
+                        {% endif %}
                     </div>
                 </div>
+
+                <input type="hidden" name="payment_method" id="payment_method" value="INVOICE">
 
                 <button type="submit" class="btn btn-primary" data-disable-text="Please wait..."
-                    style="width: 100%; padding: 1rem; font-size: 1rem; margin-top: 1rem;">
+                    style="width: 100%; padding: 1rem; font-size: 1rem; margin-top: 1rem; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer;">
                     Complete Payment <i class="fa-solid fa-arrow-right" style="margin-left: 0.5rem;"></i>
                 </button>
 
                 <div style="text-align: center; margin-top: 1rem;">
-                    <a href="{% url 'payment_failed' %}"
+                    <a href="{% url 'checkout' %}"
                         style="color: #64748b; font-size: 0.9rem; text-decoration: none;">
-                        Cancel or Simulate Failure
+                        Cancel
                     </a>
                 </div>
-
-                <input type="hidden" name="payment_method" id="payment_method" value="card">
             </form>
         </div>
     </div>
@@ -137,9 +234,39 @@
         evt.currentTarget.style.borderBottom = "2px solid #2563eb";
         evt.currentTarget.style.color = "#2563eb";
 
-        // Update hidden input
-        var method = (tabName === 'card') ? 'card' : 'upi';
-        document.getElementById('payment_method').value = method;
+        // Update hidden input with payment method
+        var methodMap = {
+            'invoice': 'INVOICE',
+            'ach': 'ACH',
+            'card': 'CARD'
+        };
+        document.getElementById('payment_method').value = methodMap[tabName] || 'INVOICE';
     }
+
+    // Format card number with spaces
+    document.addEventListener('DOMContentLoaded', function() {
+        var cardNumberInput = document.getElementById('id_card_number');
+        if (cardNumberInput) {
+            cardNumberInput.addEventListener('input', function(e) {
+                var value = e.target.value.replace(/\s/g, '');
+                var formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+                if (formattedValue.length <= 19) {
+                    e.target.value = formattedValue;
+                }
+            });
+        }
+
+        // Format expiry date
+        var expiryInput = document.getElementById('id_expiry_date');
+        if (expiryInput) {
+            expiryInput.addEventListener('input', function(e) {
+                var value = e.target.value.replace(/\D/g, '');
+                if (value.length >= 2) {
+                    value = value.substring(0, 2) + '/' + value.substring(2, 4);
+                }
+                e.target.value = value;
+            });
+        }
+    });
 </script>
 {% endblock %}
