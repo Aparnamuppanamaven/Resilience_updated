@@ -5,6 +5,10 @@ Enterprise-level configuration.
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 # Use PyMySQL as MySQLdb (works on Windows without C compiler)
 import pymysql
@@ -25,7 +29,7 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 # Allow external access - for development/testing, use '*' to allow all hosts
 # For production, specify exact domains: 'yourdomain.com,www.yourdomain.com'
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*', '20.157.93.134']
 
 
 
@@ -169,6 +173,11 @@ if os.environ.get('EMAIL_HOST'):
     EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() == 'true'
     EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
     EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
+# Stripe Configuration
+STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', '')
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
 # Enterprise-level security settings
 if not DEBUG:

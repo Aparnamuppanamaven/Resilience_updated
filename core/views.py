@@ -10,9 +10,14 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from datetime import timedelta
 import random
+import json
+import stripe
+from django.conf import settings
 
 from django.core.mail import send_mail
 from django.conf import settings as django_settings
@@ -20,7 +25,8 @@ from django.conf import settings as django_settings
 from .models import (
     Organization, Liaison, OperationalUpdate, 
     Decision, SystemSettings, ShiftPacket,
-    ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials
+    ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials,
+    StripePayment
 )
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
@@ -315,6 +321,7 @@ def dashboard(request):
             organization=organization,
             timestamp__gte=last_sync
         ).count(),
+        'is_admin': request.user.is_authenticated and request.user.is_staff,
     }
     
     return render(request, 'core/dashboard.html', context)
@@ -342,7 +349,10 @@ def capture(request):
     else:
         form = OperationalUpdateForm()
     
-    return render(request, 'core/capture.html', {'form': form})
+    return render(request, 'core/capture.html', {
+        'form': form,
+        'is_admin': request.user.is_authenticated and request.user.is_staff,
+    })
 
 
 @login_required
@@ -359,7 +369,10 @@ def normalize(request):
         organization=organization
     ).order_by('-timestamp')
     
-    return render(request, 'core/normalize.html', {'updates': updates})
+    return render(request, 'core/normalize.html', {
+        'updates': updates,
+        'is_admin': request.user.is_authenticated and request.user.is_staff,
+    })
 
 
 @login_required
@@ -418,6 +431,7 @@ def distribute(request):
         'updates': updates,
         'high_risk_updates': high_risk_updates,
         'packet_number': f"PKT-{random.randint(1000, 9999)}-{timezone.now().strftime('%Y%m%d')}",
+        'is_admin': request.user.is_authenticated and request.user.is_staff,
     }
     
     return render(request, 'core/distribute.html', context)
@@ -437,7 +451,10 @@ def decision_log(request):
         organization=organization
     ).order_by('-timestamp')
     
-    return render(request, 'core/decision_log.html', {'decisions': decisions})
+    return render(request, 'core/decision_log.html', {
+        'decisions': decisions,
+        'is_admin': request.user.is_authenticated and request.user.is_staff,
+    })
 
 
 @login_required
@@ -452,7 +469,8 @@ def coverage(request):
     
     return render(request, 'core/coverage.html', {
         'organization': organization,
-        'liaison': liaison
+        'liaison': liaison,
+        'is_admin': request.user.is_authenticated and request.user.is_staff,
     })
 
 
@@ -584,6 +602,7 @@ def admin_module(request):
     return render(request, 'core/admin_module.html', {
         'users_list': users_list,
         'form': form,
+        'is_admin': request.user.is_authenticated and request.user.is_staff,
     })
 
 
@@ -607,4 +626,193 @@ def setup_password(request, token):
         messages.success(request, 'Password set successfully. You can now log in.')
         return redirect('login')
     return render(request, 'core/setup_password.html', {'form': form})
+
+
+@csrf_exempt
+def create_payment_intent(request):
+    """Create a Stripe Payment Intent"""
+    if request.method != 'GET':
+        return JsonResponse({
+            'error': 'Method not allowed. This endpoint only accepts GET requests.'
+        }, status=405)
+    
+    try:
+        # Validate Stripe keys
+        if not settings.STRIPE_SECRET_KEY or settings.STRIPE_SECRET_KEY.strip() == '':
+            return JsonResponse({
+                'error': 'Stripe secret key is not configured',
+                'type': 'configuration_error'
+            }, status=500)
+        
+        # Initialize Stripe
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        
+        # Parse request data from query parameters
+        amount = int(float(request.GET.get('amount', 7500.00)) * 100)  # Convert to cents
+        currency = request.GET.get('currency', 'usd').lower()
+        user_id = request.GET.get('user_id', None)
+        description = request.GET.get('description', 'Resilience Foundation License')
+        
+        # Validate amount
+        if amount < 50:  # Minimum $0.50
+            return JsonResponse({
+                'error': 'Amount must be at least $0.50',
+                'type': 'validation_error'
+            }, status=400)
+        
+        # Create Payment Intent
+        payment_intent = stripe.PaymentIntent.create(
+            amount=amount,
+            currency=currency,
+            description=description,
+            automatic_payment_methods={
+                'enabled': True,
+            },
+        )
+        
+        # Create StripePayment record with pending status
+        StripePayment.objects.create(
+            stripe_payment_intent_id=payment_intent.id,
+            amount=amount,  # Store in cents
+            currency=currency,
+            status='pending',
+            user_id=int(user_id) if user_id else None,
+        )
+        
+        return JsonResponse({
+            'clientSecret': payment_intent.client_secret,
+            'payment_intent_id': payment_intent.id,
+        })
+        
+    except stripe.error.CardError as e:
+        # Card was declined
+        return JsonResponse({
+            'error': f'Card error: {e.user_message}',
+            'type': 'card_error',
+            'code': e.code
+        }, status=400)
+    except stripe.error.RateLimitError as e:
+        # Too many requests
+        return JsonResponse({
+            'error': 'Rate limit error. Please try again later.',
+            'type': 'rate_limit_error'
+        }, status=429)
+    except stripe.error.InvalidRequestError as e:
+        # Invalid parameters
+        return JsonResponse({
+            'error': f'Invalid request: {str(e)}',
+            'type': 'invalid_request_error'
+        }, status=400)
+    except stripe.error.AuthenticationError as e:
+        # Authentication failed
+        return JsonResponse({
+            'error': 'Authentication failed. Please check your Stripe API keys.',
+            'type': 'authentication_error'
+        }, status=401)
+    except stripe.error.APIConnectionError as e:
+        # Network error
+        return JsonResponse({
+            'error': 'Network error. Please check your internet connection.',
+            'type': 'api_connection_error'
+        }, status=503)
+    except stripe.error.APIError as e:
+        # Generic API error
+        return JsonResponse({
+            'error': f'Stripe API error: {str(e)}',
+            'type': 'api_error'
+        }, status=500)
+    except stripe.error.StripeError as e:
+        # Generic Stripe error
+        return JsonResponse({
+            'error': f'Stripe error: {str(e)}',
+            'type': 'stripe_error'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': f'Server error: {str(e)}',
+            'type': 'server_error'
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def stripe_webhook(request):
+    """Handle Stripe webhook events"""
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    
+    if not sig_header:
+        return HttpResponse('Missing Stripe signature', status=400)
+    
+    webhook_secret = settings.STRIPE_WEBHOOK_SECRET
+    if not webhook_secret:
+        return HttpResponse('Webhook secret not configured', status=500)
+    
+    try:
+        # Verify webhook signature
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, webhook_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        return HttpResponse(f'Invalid payload: {str(e)}', status=400)
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        return HttpResponse(f'Invalid signature: {str(e)}', status=400)
+    
+    # Handle the event
+    event_type = event['type']
+    event_data = event['data']['object']
+    
+    try:
+        if event_type == 'payment_intent.succeeded':
+            payment_intent_id = event_data['id']
+            
+            # Update payment status to succeeded
+            stripe_payment = StripePayment.objects.get(stripe_payment_intent_id=payment_intent_id)
+            stripe_payment.status = 'succeeded'
+            
+            # Get charge ID if available
+            charges = event_data.get('charges', {}).get('data', [])
+            if charges:
+                stripe_payment.stripe_charge_id = charges[0].get('id', '')
+                stripe_payment.receipt_url = charges[0].get('receipt_url', '')
+            
+            stripe_payment.save()
+            
+        elif event_type == 'payment_intent.payment_failed':
+            payment_intent_id = event_data['id']
+            
+            # Update payment status to failed
+            stripe_payment = StripePayment.objects.get(stripe_payment_intent_id=payment_intent_id)
+            stripe_payment.status = 'failed'
+            stripe_payment.save()
+            
+        elif event_type == 'charge.refunded':
+            # Handle refund
+            payment_intent_id = event_data.get('payment_intent')
+            if payment_intent_id:
+                stripe_payment = StripePayment.objects.get(stripe_payment_intent_id=payment_intent_id)
+                stripe_payment.status = 'refunded'
+                stripe_payment.stripe_charge_id = event_data.get('id', '')
+                stripe_payment.save()
+        
+        return HttpResponse(status=200)
+        
+    except StripePayment.DoesNotExist:
+        # Payment intent not found in database - log but don't fail
+        return HttpResponse(status=200)  # Return 200 to prevent Stripe retries
+    except Exception as e:
+        # Log error but return 200 to prevent Stripe from retrying
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Webhook processing error: {str(e)}')
+        return HttpResponse(status=200)
+
+
+def stripe_payments_page(request):
+    """Stripe payments test page"""
+    return render(request, 'core/stripepayments.html', {
+        'STRIPE_PUBLIC_KEY': settings.STRIPE_PUBLIC_KEY
+    })
 

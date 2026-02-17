@@ -27,6 +27,10 @@ urlpatterns = [
     path('complete-registration/', views.complete_registration, name='complete_registration'),
     path('payment-failed/', views.payment_failed, name='payment_failed'),
     path('setup-password/<str:token>/', views.setup_password, name='setup_password'),
+    # Stripe endpoints
+    path('create-payment-intent/', views.create_payment_intent, name='create_payment_intent'),
+    path('webhook/', views.stripe_webhook, name='stripe_webhook'),
+    path('stripe-payments/', views.stripe_payments_page, name='stripe_payments_page'),
 ]
 
 
