@@ -24,13 +24,7 @@ def ensure_unique_invoice_id():
         invoice_id = generate_invoice_id()
         if not Invoice.objects.filter(invoice_id=invoice_id).exists():
             return invoice_id
-
-from django.utils import timezone
-import random
-import string
-
-timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
-
+    timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
     random_suffix = ''.join(random.choices(string.digits, k=8))
     return f"INV-{timestamp}-{random_suffix}"
 

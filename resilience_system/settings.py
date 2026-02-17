@@ -6,6 +6,7 @@ Enterprise-level configuration.
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import pymysql
 
 # --------------------------------------------------
 # BASE DIR
@@ -13,14 +14,17 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --------------------------------------------------
-# LOAD .env (root level)
+# LOAD .env (try root level first, then resilience_system folder)
 # --------------------------------------------------
-load_dotenv(BASE_DIR / ".env")
+env_path = BASE_DIR / ".env"
+if not env_path.exists():
+    env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(env_path)
 
 # --------------------------------------------------
 # MySQL support for Windows (PyMySQL)
 # --------------------------------------------------
-import pymysql
+
 pymysql.install_as_MySQLdb()
 
 # --------------------------------------------------
@@ -90,8 +94,8 @@ DATABASES = {
         "NAME": os.getenv("DB_NAME"),
         "USER": os.getenv("DB_USER"),
         "PASSWORD": os.getenv("DB_PASSWORD"),
-        "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "3306"),
+        "HOST": os.getenv("DB_HOST"),
+        "PORT": os.getenv("DB_PORT"),
     }
 }
 
