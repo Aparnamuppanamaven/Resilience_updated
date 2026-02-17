@@ -6,16 +6,10 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-<<<<<<< HEAD
 from django.utils import timezone
 from datetime import datetime, timedelta
 import re
 from .models import OperationalUpdate, SystemSettings, UserCredentials, Payment, Invoice
-=======
-from datetime import datetime, timedelta
-from .models import OperationalUpdate, SystemSettings, UserCredentials
-import re
->>>>>>> 0d956f9 (Latest changes)
 
 
 class CheckoutForm(forms.Form):
