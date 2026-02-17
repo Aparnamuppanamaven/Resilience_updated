@@ -422,26 +422,20 @@ def dashboard(request):
     next_packet_due = last_sync + timedelta(hours=settings_obj.cadence_hours)
     time_remaining = max(0, (next_packet_due - timezone.now()).total_seconds() / 3600)
     
-    # Get recent updates (handle case where table doesn't exist yet)
-    try:
-        recent_updates = OperationalUpdate.objects.filter(
-            organization=organization
-        ).order_by('-timestamp')[:3]
-        pending_updates_count = OperationalUpdate.objects.filter(
-            organization=organization,
-            timestamp__gte=last_sync
-        ).count()
-    except Exception:
-        # Table doesn't exist yet - use empty values
-        recent_updates = []
-        pending_updates_count = 0
+    # Get recent updates
+    recent_updates = OperationalUpdate.objects.filter(
+        organization=organization
+    ).order_by('-timestamp')[:3]
     
     context = {
         'organization': organization,
         'settings': settings_obj,
         'time_remaining': round(time_remaining, 1),
         'recent_updates': recent_updates,
-        'pending_updates_count': pending_updates_count,
+        'pending_updates_count': OperationalUpdate.objects.filter(
+            organization=organization,
+            timestamp__gte=last_sync
+        ).count(),
         'is_admin': request.user.is_authenticated and request.user.is_staff,
     }
     
