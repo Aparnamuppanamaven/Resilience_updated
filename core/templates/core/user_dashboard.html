@@ -9,8 +9,18 @@
         <div class="logo">
             <i class="fa-solid fa-shield-halved" style="color: #2563eb;"></i> Resilience
         </div>
-        <a href="{% url 'logout' %}" class="btn btn-outline-danger"
-            style="text-decoration: none; padding: 0.5rem 1rem; border: 1px solid #dc2626; color: #dc2626; border-radius: 4px;">Logout</a>
+        <div class="user-menu" style="position: relative;">
+            <div class="user-menu-trigger" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem 0.75rem; border-radius: 6px; transition: background-color 0.2s;" onclick="toggleUserMenu()">
+                <i class="fa-solid fa-user" style="color: #2563eb; font-size: 1.1rem;"></i>
+                <span style="color: #1e293b; font-weight: 500;">{{ username }}</span>
+                <i class="fa-solid fa-chevron-down" style="color: #64748b; font-size: 0.75rem; margin-left: 0.25rem;"></i>
+            </div>
+            <div id="userMenuDropdown" class="user-menu-dropdown" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 0.5rem; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-width: 150px; z-index: 1000;">
+                <a href="{% url 'logout' %}" style="display: block; padding: 0.75rem 1rem; color: #dc2626; text-decoration: none; transition: background-color 0.2s; border-radius: 8px 8px 0 0;">
+                    <i class="fa-solid fa-right-from-bracket" style="margin-right: 0.5rem;"></i>Logout
+                </a>
+            </div>
+        </div>
     </div>
 </nav>
 
@@ -30,4 +40,46 @@
         </div>
     </div>
 </div>
+
+<script>
+function toggleUserMenu() {
+    const dropdown = document.getElementById('userMenuDropdown');
+    if (dropdown) {
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+    const userMenu = document.querySelector('.user-menu');
+    const dropdown = document.getElementById('userMenuDropdown');
+    if (userMenu && dropdown && !userMenu.contains(event.target)) {
+        dropdown.style.display = 'none';
+    }
+});
+
+// Add hover effect to logout link
+document.addEventListener('DOMContentLoaded', function() {
+    const logoutLink = document.querySelector('#userMenuDropdown a');
+    if (logoutLink) {
+        logoutLink.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#fef2f2';
+        });
+        logoutLink.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = 'transparent';
+        });
+    }
+    
+    // Add hover effect to user menu trigger
+    const trigger = document.querySelector('.user-menu-trigger');
+    if (trigger) {
+        trigger.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#f8fafc';
+        });
+        trigger.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = 'transparent';
+        });
+    }
+});
+</script>
 {% endblock %}

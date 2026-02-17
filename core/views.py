@@ -18,20 +18,14 @@ import random
 import json
 import stripe
 from django.conf import settings
-
 from django.core.mail import send_mail
-from django.conf import settings as django_settings
 
 from django.db import transaction
 from .models import (
     Organization, Liaison, OperationalUpdate, 
     Decision, SystemSettings, ShiftPacket,
     ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials,
-<<<<<<< HEAD
-    StripePayment
-=======
-    Payment, Invoice
->>>>>>> 0d956f9 (Latest changes)
+    Payment, Invoice, StripePayment
 )
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
@@ -322,7 +316,7 @@ def onboarding(request):
                             'If you did not request this, you can ignore this email.\n\n'
                             '— Resilience Team'
                         ),
-                        from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@resilience.example.com'),
+                        from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@resilience.example.com'),
                         recipient_list=[to_email],
                         fail_silently=True,
                     )

@@ -1,5 +1,4 @@
 """
-<<<<<<< HEAD
 Payment utilities: invoice generation and email sending
 """
 from django.db import transaction
@@ -14,6 +13,30 @@ def generate_invoice_id():
     timestamp = datetime.now().strftime('%Y%m%d')
     count = Payment.objects.filter(invoice_id__startswith=f'INV-{timestamp}').count()
     return f'INV-{timestamp}-{count + 1:04d}'
+
+
+def ensure_unique_invoice_id():
+    """Generate and ensure unique invoice ID"""
+    max_attempts = 10
+    for _ in range(max_attempts):
+        invoice_id = generate_invoice_id()
+        if not Invoice.objects.filter(invoice_id=invoice_id).exists():
+            return invoice_id
+    
+    # Fallback with longer random suffix if all attempts fail
+    from datetime import datetime
+    import random
+    import string
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    random_suffix = ''.join(random.choices(string.digits, k=8))
+    return f"INV-{timestamp}-{random_suffix}"
+
+
+def calculate_due_date(payment_terms='NET_30'):
+    """Calculate invoice due date based on payment terms"""
+    if payment_terms == 'NET_30':
+        return timezone.now().date() + timedelta(days=30)
+    return timezone.now().date() + timedelta(days=30)
 
 
 @transaction.atomic
@@ -35,7 +58,7 @@ def create_payment_and_invoice(form_data, organization, amount=7500.00):
         status = 'PENDING'
     
     # Generate invoice ID
-    invoice_id = generate_invoice_id()
+    invoice_id = ensure_unique_invoice_id()
     
     # Create Payment
     payment = Payment.objects.create(
@@ -98,8 +121,7 @@ Amount: ${payment.amount:,.2f}
 Date: {payment.created_at.strftime('%B %d, %Y')}
 Invoice ID: {invoice.invoice_id}
 Payment Method: {payment_method_display}
-{early_pay_text}
-Due Date: {invoice.due_date.strftime('%B %d, %Y')}
+{early_pay_text}Due Date: {invoice.due_date.strftime('%B %d, %Y')}
 
 What's Included:
 - Resilience Foundation License
@@ -131,41 +153,3 @@ Thank you for choosing Resilience.
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Failed to send payment confirmation email: {e}")
-=======
-Payment utility functions for invoice generation and email sending
-"""
-from django.utils import timezone
-from datetime import timedelta
-import random
-import string
-
-
-def generate_invoice_id():
-    """Generate unique invoice ID in format INV-XXXXX"""
-    timestamp = timezone.now().strftime('%Y%m%d')
-    random_suffix = ''.join(random.choices(string.digits, k=5))
-    return f"INV-{timestamp}-{random_suffix}"
-
-
-def ensure_unique_invoice_id():
-    """Generate and ensure unique invoice ID"""
-    from .models import Invoice
-    max_attempts = 10
-    for _ in range(max_attempts):
-        invoice_id = generate_invoice_id()
-        if not Invoice.objects.filter(invoice_id=invoice_id).exists():
-            return invoice_id
-    
-    # Fallback with longer random suffix if all attempts fail
-    timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
-    random_suffix = ''.join(random.choices(string.digits, k=8))
-    return f"INV-{timestamp}-{random_suffix}"
-
-
-def calculate_due_date(payment_terms='NET_30'):
-    """Calculate invoice due date based on payment terms"""
-    if payment_terms == 'NET_30':
-        return timezone.now().date() + timedelta(days=30)
-    return timezone.now().date() + timedelta(days=30)
-
->>>>>>> 0d956f9 (Latest changes)
