@@ -12,7 +12,6 @@ import re
 from .models import OperationalUpdate, SystemSettings, UserCredentials, Payment, Invoice
 
 
-
 class CheckoutForm(forms.Form):
     """Checkout form for Foundation purchase"""
     agency = forms.CharField(

@@ -4,6 +4,8 @@ Payment utilities: invoice generation and email sending
 from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
+import random
+import string
 from .models import Payment, Invoice, Organization
 
 
@@ -22,12 +24,13 @@ def ensure_unique_invoice_id():
         invoice_id = generate_invoice_id()
         if not Invoice.objects.filter(invoice_id=invoice_id).exists():
             return invoice_id
-    
-    # Fallback with longer random suffix if all attempts fail
-    from datetime import datetime
-    import random
-    import string
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+
+from django.utils import timezone
+import random
+import string
+
+timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
+
     random_suffix = ''.join(random.choices(string.digits, k=8))
     return f"INV-{timestamp}-{random_suffix}"
 

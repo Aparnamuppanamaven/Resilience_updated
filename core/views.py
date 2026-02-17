@@ -22,10 +22,12 @@ from django.core.mail import send_mail
 
 from django.db import transaction
 from .models import (
-    Organization, Liaison, OperationalUpdate, 
+    Organization, Liaison, OperationalUpdate,
     Decision, SystemSettings, ShiftPacket,
     ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials,
     Payment, Invoice, StripePayment
+    StripePayment,
+    Payment, Invoice,
 )
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
