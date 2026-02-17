@@ -31,6 +31,7 @@ urlpatterns = [
     path('create-payment-intent/', views.create_payment_intent, name='create_payment_intent'),
     path('webhook/', views.stripe_webhook, name='stripe_webhook'),
     path('stripe-payments/', views.stripe_payments_page, name='stripe_payments_page'),
+    path('stripe-invoice-pdf/', views.stripe_invoice_pdf, name='stripe_invoice_pdf'),
 ]
 
 

@@ -2,7 +2,7 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
-{% block title %}Stripe Payment Test - Resilience System{% endblock %}
+{% block title %}Stripe Payment - Resilience System{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -217,11 +217,11 @@
 <div class="payment-container">
     <h1>
         <i class="fab fa-stripe"></i>
-        <span>Stripe Payment Test</span>
+        <span>Stripe Payment </span>
     </h1>
 
-    <!-- Payment Information -->
-    <div class="payment-info">
+    <!-- Payment Information (hidden from UI) -->
+    <div class="payment-info" style="display: none;">
         <h3>Payment Details</h3>
         <div class="info-row">
             <span class="info-label">Amount:</span>
@@ -240,7 +240,6 @@
             <span class="info-value" id="payment-status">Pending</span>
         </div>
     </div>
-
     <!-- Status Messages -->
     <div id="status-message" class="status-message"></div>
 
@@ -435,11 +434,17 @@
                         <span class="info-label">Currency:</span>
                         <span class="info-value">${paymentIntent.currency.toUpperCase()}</span>
                     </div>
+                    <div style="margin-top: 1.5rem; text-align: left;">
+                        <a href="/stripe-invoice-pdf/?payment_intent_id=${encodeURIComponent(paymentIntent.id)}"
+                           style="display: inline-block; padding: 0.75rem 1.5rem; background: #1e293b; color: #ffffff; border-radius: 6px; text-decoration: none; font-weight: 600;">
+                            Download Invoice (PDF)
+                        </a>
+                    </div>
                 `;
+                // Hide form and only show result
+                form.style.display = 'none';
                 document.getElementById('payment-result').style.display = 'block';
-
-                // Reset form
-                form.reset();
+                // Clear card details for security
                 cardElement.clear();
             }
 

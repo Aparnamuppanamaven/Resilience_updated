@@ -56,8 +56,8 @@
                         style="padding: 0.75rem 1.5rem; background: none; border: none; font-weight: 600; color: #2563eb; border-bottom: 2px solid #2563eb; cursor: pointer;">Invoice - Net 30</button>
                     <button type="button" class="tab-btn" onclick="openTab(event, 'ach')"
                         style="padding: 0.75rem 1.5rem; background: none; border: none; font-weight: 600; color: #64748b; cursor: pointer;">ACH</button>
-                    <button type="button" class="tab-btn" onclick="openTab(event, 'card')"
-                        style="padding: 0.75rem 1.5rem; background: none; border: none; font-weight: 600; color: #64748b; cursor: pointer;">Credit/Debit Card</button>
+                    <a href="{% url 'stripe_payments_page' %}" class="tab-btn"
+                        style="padding: 0.75rem 1.5rem; background: none; border: none; font-weight: 600; color: #64748b; cursor: pointer; text-decoration: none;">Stripe</a>
                 </div>
 
                 <!-- Invoice Payment Section (Default) -->

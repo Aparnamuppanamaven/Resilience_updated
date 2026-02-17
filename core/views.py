@@ -14,11 +14,14 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from datetime import timedelta
+from io import BytesIO
 import random
 import json
 import stripe
 from django.conf import settings
 from django.core.mail import send_mail
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 from django.db import transaction
 from .models import (
@@ -930,4 +933,91 @@ def stripe_payments_page(request):
     return render(request, 'core/stripepayments.html', {
         'STRIPE_PUBLIC_KEY': settings.STRIPE_PUBLIC_KEY
     })
+
+
+def stripe_invoice_pdf(request):
+    """Generate a simple PDF invoice for a Stripe Payment Intent."""
+    payment_intent_id = request.GET.get('payment_intent_id')
+    if not payment_intent_id:
+        return HttpResponse('Missing payment_intent_id', status=400)
+
+    # Initialize Stripe
+    if not settings.STRIPE_SECRET_KEY or settings.STRIPE_SECRET_KEY.strip() == '':
+        return HttpResponse('Stripe secret key is not configured', status=500)
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    try:
+        payment_intent = stripe.PaymentIntent.retrieve(
+            payment_intent_id,
+            expand=['charges']
+        )
+    except stripe.error.StripeError as e:
+        return HttpResponse(f'Unable to retrieve payment from Stripe: {str(e)}', status=400)
+    except Exception as e:
+        return HttpResponse(f'Unexpected error: {str(e)}', status=500)
+
+    amount = (payment_intent.amount or 0) / 100.0
+    currency = (payment_intent.currency or 'usd').upper()
+    description = payment_intent.description or 'Resilience Foundation License'
+
+    # Prepare PDF in memory
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+
+    # Basic invoice layout
+    pdf.setTitle(f"Invoice - {payment_intent_id}")
+
+    # Header
+    pdf.setFont("Helvetica-Bold", 20)
+    pdf.drawString(50, height - 80, "INVOICE")
+
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(50, height - 110, "Resilience System")
+    pdf.drawString(50, height - 125, "www.resilience.example.com")
+
+    # Invoice details
+    y = height - 160
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(50, y, "Invoice Details")
+    pdf.setFont("Helvetica", 10)
+    y -= 18
+    pdf.drawString(50, y, f"Payment Intent ID: {payment_intent_id}")
+    y -= 14
+    pdf.drawString(50, y, f"Amount: ${amount:,.2f} {currency}")
+    y -= 14
+    pdf.drawString(50, y, f"Description: {description}")
+
+    # Simple line items section
+    y -= 30
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(50, y, "Line Items")
+    y -= 18
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawString(50, y, "Item")
+    pdf.drawString(350, y, "Amount")
+    y -= 14
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(50, y, "Resilience Foundation License")
+    pdf.drawRightString(430, y, f"${amount:,.2f}")
+
+    # Total
+    y -= 30
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(50, y, "Total")
+    pdf.drawRightString(430, y, f"${amount:,.2f} {currency}")
+
+    # Footer
+    y -= 60
+    pdf.setFont("Helvetica", 9)
+    pdf.drawString(50, y, "Thank you for your business.")
+
+    pdf.showPage()
+    pdf.save()
+
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="invoice_{payment_intent_id}.pdf"'
+    return response
 
