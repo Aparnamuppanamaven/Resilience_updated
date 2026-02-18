@@ -23,10 +23,10 @@
         </ul>
         <div class="sidebar-footer">
             <div class="user-profile">
-                <div class="avatar">{{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}</div>
+                <div class="avatar">DL</div>
                 <div class="user-info">
-                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
-                    <span class="user-role">{{ user.liaison_profile.organization.name }}</span>
+                    <span class="user-name">Designated Liaison</span>
+                    <span class="user-role">Operations</span>
                 </div>
             </div>
         </div>
@@ -35,42 +35,117 @@
     <main class="main-content">
         <header class="top-header">
             <h2>Coverage & Comms</h2>
+            <div class="header-status">
+                <div class="status-indicator">
+                    <span class="status-label">Current Status:</span>
+                    <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                </div>
+                {% if current_status == 'Normal' %}
+                <button type="button" class="btn-alert" id="activateAlertBtn" onclick="activateAlert()">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
+                </button>
+                {% endif %}
+                <div class="sync-time">
+                    <span>Last detailed sync: {{ last_sync_display }}</span>
+                </div>
+            </div>
         </header>
 
         <div class="view-container">
-            <div class="dashboard-grid">
+            <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 2rem;">
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">Resilience Scope</h3>
                     </div>
-                    <ul style="list-style: none; line-height: 2;">
-                        <li><i class="fa-solid fa-check" style="color: green; margin-right: 8px;"></i> Incidents outliving a shift</li>
-                        <li><i class="fa-solid fa-check" style="color: green; margin-right: 8px;"></i> Severe Weather Events</li>
-                        <li><i class="fa-solid fa-check" style="color: green; margin-right: 8px;"></i> Landslides / Geo-risks</li>
-                        <li><i class="fa-solid fa-check" style="color: green; margin-right: 8px;"></i> Cyber / Comms Disruption</li>
-                    </ul>
+                    <div class="card-body">
+                        <ul class="scope-list">
+                            <li class="scope-item">
+                                <i class="fa-solid fa-check scope-check"></i>
+                                <span>Incidents outliving a shift</span>
+                            </li>
+                            <li class="scope-item">
+                                <i class="fa-solid fa-check scope-check"></i>
+                                <span>Severe Weather Events</span>
+                            </li>
+                            <li class="scope-item">
+                                <i class="fa-solid fa-check scope-check"></i>
+                                <span>Landslides / Geo-risks</span>
+                            </li>
+                            <li class="scope-item">
+                                <i class="fa-solid fa-check scope-check"></i>
+                                <span>Cyber / Comms Disruption</span>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
-                 <div class="card">
+                <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">Backup Communications</h3>
                     </div>
-                    <div style="text-align: center; padding: 1rem;">
-                        <i class="fa-solid fa-tower-cell" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 1rem;"></i>
-                        <p style="margin-bottom: 1rem;">Primary Data Link: <span style="color: green; font-weight: bold;">ONLINE</span></p>
-                        <hr style="margin: 1rem 0; border: 0; border-top: 1px solid #eee;">
-                        <h5>Emergency SMS Channel</h5>
-                        <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                            <input type="password" class="form-control" placeholder="Enter Passphrase">
-                            <button class="btn btn-primary" onclick="alert('Secure SMS Link Established')">Verify</button>
+                    <div class="card-body">
+                        <div class="backup-comms-content">
+                            <div class="comms-icon">
+                                <i class="fa-solid fa-tower-broadcast"></i>
+                            </div>
+                            <div class="primary-link-status">
+                                <span class="link-label">Primary Data Link:</span>
+                                <span class="link-status online">ONLINE</span>
+                            </div>
+                            <div class="emergency-sms-section">
+                                <h5 class="sms-title">Emergency SMS Channel</h5>
+                                <div class="sms-input-group">
+                                    <input type="password" class="form-control" id="passphraseInput" placeholder="Enter Passphrase">
+                                    <button class="btn btn-primary" onclick="verifyPassphrase()">Verify</button>
+                                </div>
+                            </div>
                         </div>
-                        <p style="margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
-                            Preferred Channel: {{ liaison.preferred_channels }}
-                        </p>
                     </div>
                 </div>
             </div>
         </div>
     </main>
+
+    <script>
+    function activateAlert() {
+        if (confirm('Are you sure you want to activate the alert? This will change the system status to High Alert.')) {
+            fetch('{% url "toggle_alert" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to activate alert'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while activating the alert.');
+            });
+        }
+    }
+
+    function verifyPassphrase() {
+        const input = document.getElementById('passphraseInput');
+        const passphrase = input.value.trim();
+        if (passphrase) {
+            alert('Secure SMS Link Established');
+            input.value = '';
+        } else {
+            alert('Please enter a passphrase');
+        }
+    }
+    </script>
 </div>
 {% endblock %}
 

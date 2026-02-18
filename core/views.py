@@ -445,64 +445,201 @@ def dashboard(request):
     return render(request, 'core/dashboard.html', context)
 
 
-@login_required
 def capture(request):
     """Capture new operational update"""
-    try:
-        liaison = request.user.liaison_profile
-        organization = liaison.organization
-    except Liaison.DoesNotExist:
+    # Check authentication (Django auth or legacy session)
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return redirect('login')
+    
+    liaison = None
+    organization = None
+    
+    # Pathway 1: Standard Django Auth (Liaison)
+    if request.user.is_authenticated:
+        try:
+            liaison = request.user.liaison_profile
+            organization = liaison.organization
+        except (Liaison.DoesNotExist, AttributeError):
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    # Pathway 2: Legacy Session Auth (UserCredentials)
+    elif 'user_credentials_id' in request.session:
+        try:
+            organization = Organization.objects.first()
+            if not organization:
+                messages.error(request, 'No organization found. Please complete checkout first.')
+                return redirect('checkout')
+        except Exception:
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    if not organization:
         messages.error(request, 'Please complete checkout first.')
         return redirect('checkout')
+    
+    # Get or create system settings for status display
+    settings_obj, created = SystemSettings.objects.get_or_create(
+        organization=organization,
+        defaults={
+            'current_status': 'Normal',
+            'cadence_hours': 24,
+        }
+    )
     
     if request.method == 'POST':
         form = OperationalUpdateForm(request.POST)
         if form.is_valid():
             update = form.save(commit=False)
             update.organization = organization
-            update.owner = liaison
+            # Owner can be None for legacy users (model allows null=True)
+            update.owner = liaison if liaison else None
             update.save()
             messages.success(request, 'Update captured successfully!')
             return redirect('dashboard')
     else:
         form = OperationalUpdateForm()
     
+    # Format last sync time
+    from django.utils import timezone
+    from datetime import timedelta
+    last_sync = settings_obj.last_sync
+    now = timezone.now()
+    time_diff = now - last_sync
+    
+    if time_diff < timedelta(minutes=1):
+        sync_time_display = "Just now"
+    elif time_diff < timedelta(hours=1):
+        minutes = int(time_diff.total_seconds() / 60)
+        sync_time_display = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    elif time_diff < timedelta(days=1):
+        hours = int(time_diff.total_seconds() / 3600)
+        sync_time_display = f"{hours} hour{'s' if hours != 1 else ''} ago"
+    else:
+        sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
+    
     return render(request, 'core/capture.html', {
         'form': form,
         'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'current_status': settings_obj.current_status,
+        'last_sync_display': sync_time_display,
+        'liaison': liaison,
     })
 
 
-@login_required
 def normalize(request):
     """Normalize view - show all updates"""
-    try:
-        liaison = request.user.liaison_profile
-        organization = liaison.organization
-    except Liaison.DoesNotExist:
+    # Check authentication (Django auth or legacy session)
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return redirect('login')
+    
+    liaison = None
+    organization = None
+    
+    # Pathway 1: Standard Django Auth (Liaison)
+    if request.user.is_authenticated:
+        try:
+            liaison = request.user.liaison_profile
+            organization = liaison.organization
+        except (Liaison.DoesNotExist, AttributeError):
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    # Pathway 2: Legacy Session Auth (UserCredentials)
+    elif 'user_credentials_id' in request.session:
+        try:
+            organization = Organization.objects.first()
+            if not organization:
+                messages.error(request, 'No organization found. Please complete checkout first.')
+                return redirect('checkout')
+        except Exception:
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    if not organization:
         messages.error(request, 'Please complete checkout first.')
         return redirect('checkout')
+    
+    # Get or create system settings for status display
+    settings_obj, created = SystemSettings.objects.get_or_create(
+        organization=organization,
+        defaults={
+            'current_status': 'Normal',
+            'cadence_hours': 24,
+        }
+    )
     
     updates = OperationalUpdate.objects.filter(
         organization=organization
     ).order_by('-timestamp')
     
+    # Format last sync time
+    from django.utils import timezone
+    from datetime import timedelta
+    last_sync = settings_obj.last_sync
+    now = timezone.now()
+    time_diff = now - last_sync
+    
+    if time_diff < timedelta(minutes=1):
+        sync_time_display = "Just now"
+    elif time_diff < timedelta(hours=1):
+        minutes = int(time_diff.total_seconds() / 60)
+        sync_time_display = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    elif time_diff < timedelta(days=1):
+        hours = int(time_diff.total_seconds() / 3600)
+        sync_time_display = f"{hours} hour{'s' if hours != 1 else ''} ago"
+    else:
+        sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
+    
     return render(request, 'core/normalize.html', {
         'updates': updates,
         'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'current_status': settings_obj.current_status,
+        'last_sync_display': sync_time_display,
     })
 
 
-@login_required
 def distribute(request):
     """Distribute shift packet"""
-    try:
-        liaison = request.user.liaison_profile
-        organization = liaison.organization
-        settings_obj = organization.settings
-    except Liaison.DoesNotExist:
+    # Check authentication (Django auth or legacy session)
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return redirect('login')
+    
+    liaison = None
+    organization = None
+    
+    # Pathway 1: Standard Django Auth (Liaison)
+    if request.user.is_authenticated:
+        try:
+            liaison = request.user.liaison_profile
+            organization = liaison.organization
+        except (Liaison.DoesNotExist, AttributeError):
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    # Pathway 2: Legacy Session Auth (UserCredentials)
+    elif 'user_credentials_id' in request.session:
+        try:
+            organization = Organization.objects.first()
+            if not organization:
+                messages.error(request, 'No organization found. Please complete checkout first.')
+                return redirect('checkout')
+        except Exception:
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    if not organization:
         messages.error(request, 'Please complete checkout first.')
         return redirect('checkout')
+    
+    # Get or create system settings
+    settings_obj, created = SystemSettings.objects.get_or_create(
+        organization=organization,
+        defaults={
+            'current_status': 'Normal',
+            'cadence_hours': 24,
+        }
+    )
     
     # Get updates since last sync
     updates = OperationalUpdate.objects.filter(
@@ -543,52 +680,178 @@ def distribute(request):
         messages.success(request, f'Shift Packet #{packet_number} sent successfully!')
         return redirect('dashboard')
     
+    # Get latest packet number
+    last_packet = ShiftPacket.objects.filter(organization=organization).order_by('-generated_at').first()
+    packet_number = last_packet.packet_number if last_packet else f"PKT-{random.randint(1000, 9999)}-{timezone.now().strftime('%Y%m%d')}"
+    
+    # Format last sync time
+    last_sync = settings_obj.last_sync
+    now = timezone.now()
+    time_diff = now - last_sync
+    
+    if time_diff < timedelta(minutes=1):
+        sync_time_display = "Just now"
+    elif time_diff < timedelta(hours=1):
+        minutes = int(time_diff.total_seconds() / 60)
+        sync_time_display = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    elif time_diff < timedelta(days=1):
+        hours = int(time_diff.total_seconds() / 3600)
+        sync_time_display = f"{hours} hour{'s' if hours != 1 else ''} ago"
+    else:
+        sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
+    
     context = {
         'organization': organization,
         'settings': settings_obj,
         'updates': updates,
         'high_risk_updates': high_risk_updates,
-        'packet_number': f"PKT-{random.randint(1000, 9999)}-{timezone.now().strftime('%Y%m%d')}",
+        'packet_number': packet_number,
         'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'current_status': settings_obj.current_status,
+        'last_sync_display': sync_time_display,
     }
     
     return render(request, 'core/distribute.html', context)
 
 
-@login_required
 def decision_log(request):
     """Decision log view"""
-    try:
-        liaison = request.user.liaison_profile
-        organization = liaison.organization
-    except Liaison.DoesNotExist:
+    # Check authentication (Django auth or legacy session)
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return redirect('login')
+    
+    liaison = None
+    organization = None
+    
+    # Pathway 1: Standard Django Auth (Liaison)
+    if request.user.is_authenticated:
+        try:
+            liaison = request.user.liaison_profile
+            organization = liaison.organization
+        except (Liaison.DoesNotExist, AttributeError):
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    # Pathway 2: Legacy Session Auth (UserCredentials)
+    elif 'user_credentials_id' in request.session:
+        try:
+            organization = Organization.objects.first()
+            if not organization:
+                messages.error(request, 'No organization found. Please complete checkout first.')
+                return redirect('checkout')
+        except Exception:
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    if not organization:
         messages.error(request, 'Please complete checkout first.')
         return redirect('checkout')
+    
+    # Get or create system settings for status display
+    settings_obj, created = SystemSettings.objects.get_or_create(
+        organization=organization,
+        defaults={
+            'current_status': 'Normal',
+            'cadence_hours': 24,
+        }
+    )
     
     decisions = Decision.objects.filter(
         organization=organization
     ).order_by('-timestamp')
     
+    # Format last sync time
+    from django.utils import timezone
+    from datetime import timedelta
+    last_sync = settings_obj.last_sync
+    now = timezone.now()
+    time_diff = now - last_sync
+    
+    if time_diff < timedelta(minutes=1):
+        sync_time_display = "Just now"
+    elif time_diff < timedelta(hours=1):
+        minutes = int(time_diff.total_seconds() / 60)
+        sync_time_display = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    elif time_diff < timedelta(days=1):
+        hours = int(time_diff.total_seconds() / 3600)
+        sync_time_display = f"{hours} hour{'s' if hours != 1 else ''} ago"
+    else:
+        sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
+    
     return render(request, 'core/decision_log.html', {
         'decisions': decisions,
         'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'current_status': settings_obj.current_status,
+        'last_sync_display': sync_time_display,
     })
 
 
-@login_required
 def coverage(request):
     """Coverage & Communications view"""
-    try:
-        liaison = request.user.liaison_profile
-        organization = liaison.organization
-    except Liaison.DoesNotExist:
+    # Check authentication (Django auth or legacy session)
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return redirect('login')
+    
+    liaison = None
+    organization = None
+    
+    # Pathway 1: Standard Django Auth (Liaison)
+    if request.user.is_authenticated:
+        try:
+            liaison = request.user.liaison_profile
+            organization = liaison.organization
+        except (Liaison.DoesNotExist, AttributeError):
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    # Pathway 2: Legacy Session Auth (UserCredentials)
+    elif 'user_credentials_id' in request.session:
+        try:
+            organization = Organization.objects.first()
+            if not organization:
+                messages.error(request, 'No organization found. Please complete checkout first.')
+                return redirect('checkout')
+        except Exception:
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    if not organization:
         messages.error(request, 'Please complete checkout first.')
         return redirect('checkout')
+    
+    # Get or create system settings for status display
+    settings_obj, created = SystemSettings.objects.get_or_create(
+        organization=organization,
+        defaults={
+            'current_status': 'Normal',
+            'cadence_hours': 24,
+        }
+    )
+    
+    # Format last sync time
+    from django.utils import timezone
+    from datetime import timedelta
+    last_sync = settings_obj.last_sync
+    now = timezone.now()
+    time_diff = now - last_sync
+    
+    if time_diff < timedelta(minutes=1):
+        sync_time_display = "Just now"
+    elif time_diff < timedelta(hours=1):
+        minutes = int(time_diff.total_seconds() / 60)
+        sync_time_display = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    elif time_diff < timedelta(days=1):
+        hours = int(time_diff.total_seconds() / 3600)
+        sync_time_display = f"{hours} hour{'s' if hours != 1 else ''} ago"
+    else:
+        sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
     
     return render(request, 'core/coverage.html', {
         'organization': organization,
         'liaison': liaison,
         'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'current_status': settings_obj.current_status,
+        'last_sync_display': sync_time_display,
     })
 
 

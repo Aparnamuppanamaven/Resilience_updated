@@ -23,10 +23,10 @@
         </ul>
         <div class="sidebar-footer">
             <div class="user-profile">
-                <div class="avatar">{{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}</div>
+                <div class="avatar">DL</div>
                 <div class="user-info">
-                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
-                    <span class="user-role">{{ user.liaison_profile.organization.name }}</span>
+                    <span class="user-name">Designated Liaison</span>
+                    <span class="user-role">Operations</span>
                 </div>
             </div>
         </div>
@@ -35,6 +35,20 @@
     <main class="main-content">
         <header class="top-header">
             <h2>Capture Update</h2>
+            <div class="header-status">
+                <div class="status-indicator">
+                    <span class="status-label">Current Status:</span>
+                    <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                </div>
+                {% if current_status == 'Normal' %}
+                <button type="button" class="btn-alert" id="activateAlertBtn" onclick="activateAlert()">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
+                </button>
+                {% endif %}
+                <div class="sync-time">
+                    <span>Last detailed sync: {{ last_sync_display }}</span>
+                </div>
+            </div>
         </header>
 
         <div class="view-container">
@@ -105,6 +119,37 @@
             </div>
         </div>
     </main>
+
+    <script>
+    function activateAlert() {
+        if (confirm('Are you sure you want to activate the alert? This will change the system status to High Alert.')) {
+            fetch('{% url "toggle_alert" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to activate alert'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while activating the alert.');
+            });
+        }
+    }
+    </script>
 </div>
 {% endblock %}
 

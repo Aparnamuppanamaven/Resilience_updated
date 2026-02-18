@@ -23,10 +23,10 @@
         </ul>
         <div class="sidebar-footer">
             <div class="user-profile">
-                <div class="avatar">{{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}</div>
+                <div class="avatar">DL</div>
                 <div class="user-info">
-                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
-                    <span class="user-role">{{ user.liaison_profile.organization.name }}</span>
+                    <span class="user-name">Designated Liaison</span>
+                    <span class="user-role">Operations</span>
                 </div>
             </div>
         </div>
@@ -35,11 +35,25 @@
     <main class="main-content">
         <header class="top-header">
             <h2>Distribute Packet</h2>
+            <div class="header-status">
+                <div class="status-indicator">
+                    <span class="status-label">Current Status:</span>
+                    <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                </div>
+                {% if current_status == 'Normal' %}
+                <button type="button" class="btn-alert" id="activateAlertBtn" onclick="activateAlert()">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
+                </button>
+                {% endif %}
+                <div class="sync-time">
+                    <span>Last detailed sync: {{ last_sync_display }}</span>
+                </div>
+            </div>
         </header>
 
         <div class="view-container">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                     <h3 class="card-title">Shift Packet Draft</h3>
                     <form method="post" style="display: inline;">
                         {% csrf_token %}
@@ -57,37 +71,76 @@
                     {% endfor %}
                 {% endif %}
                 
-                <div style="background: #f8fafc; padding: 1.5rem; border: 1px solid #e2e8f0; border-radius: 8px;">
-                    <h4 style="margin-bottom: 1rem; color: var(--primary-color);">SHIFT PACKET #{{ packet_number }}</h4>
-                    
-                    <div style="margin-bottom: 1.5rem;">
-                        <strong>Status:</strong> <span class="badge badge-status-{{ settings.current_status|lower|slugify }}">{{ settings.current_status }}</span> <br>
-                        <strong>Generated:</strong> {% now "F d, Y H:i" %}
+                <div class="card-body">
+                    <div class="packet-info">
+                        <h4 class="packet-number">SHIFT PACKET #{{ packet_number }}</h4>
+                        
+                        <div class="packet-meta">
+                            <span><strong>Status:</strong> <span class="badge badge-status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span></span>
+                            <span><strong>Generated:</strong> {% now "M/d/Y g:i A" %}</span>
+                        </div>
+
+                        <div class="packet-section">
+                            <h5 class="section-number">1. Executive Summary</h5>
+                            <p class="section-content">
+                                Operations remain stable. {{ updates.count }} new updates processed in the last cycle.
+                            </p>
+                        </div>
+
+                        <div class="packet-section">
+                            <h5 class="section-number">2. Key Risks & Incidents</h5>
+                            <ul class="section-list">
+                               {% for update in high_risk_updates %}
+                                    <li>[{{ update.severity }}] {{ update.title }}: {{ update.description }}</li>
+                               {% empty %}
+                                    <li>No high risks identified.</li>
+                               {% endfor %}
+                            </ul>
+                        </div>
+
+                        <div class="packet-section">
+                            <h5 class="section-number">3. Next Actions</h5>
+                            <ul class="section-list">
+                                <li>Continue routine monitoring (Cadence: {{ settings.cadence_hours }}h).</li>
+                                <li>Verify backup comms channels at 1800h.</li>
+                            </ul>
+                        </div>
                     </div>
-
-                    <h5>1. Executive Summary</h5>
-                    <p style="margin-bottom: 1rem; color: var(--text-secondary);">
-                        Operations remain stable. {{ updates.count }} new updates processed in the last cycle.
-                    </p>
-
-                    <h5>2. Key Risks & Incidents</h5>
-                    <ul style="margin-bottom: 1rem; padding-left: 1.5rem;">
-                       {% for update in high_risk_updates %}
-                            <li>[{{ update.severity }}] {{ update.title }}: {{ update.description }}</li>
-                       {% empty %}
-                            <li>No high risks identified.</li>
-                       {% endfor %}
-                    </ul>
-
-                    <h5>3. Next Actions</h5>
-                     <ul style="padding-left: 1.5rem;">
-                        <li>Continue routine monitoring (Cadence: {{ settings.cadence_hours }}h).</li>
-                        <li>Verify backup comms channels at 1800h.</li>
-                    </ul>
                 </div>
             </div>
         </div>
     </main>
+
+    <script>
+    function activateAlert() {
+        if (confirm('Are you sure you want to activate the alert? This will change the system status to High Alert.')) {
+            fetch('{% url "toggle_alert" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to activate alert'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while activating the alert.');
+            });
+        }
+    }
+    </script>
 </div>
 {% endblock %}
 

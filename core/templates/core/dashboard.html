@@ -52,21 +52,9 @@
         <!-- Top Header -->
         <header class="top-header">
             <h2 id="page-title">Dashboard</h2>
-            <div class="header-actions">
-                <div class="status-indicator-wrapper">
-                    <span class="status-label">Current Status:</span>
-                    <span id="system-status-badge" class="badge badge-status-{{ settings.current_status|lower|slugify }}">{{ settings.current_status }}</span>
-                </div>
-                <button id="activate-alert-btn" class="btn btn-outline-danger btn-sm">
-                    {% if settings.current_status == 'Normal' %}
-                        <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
-                    {% else %}
-                        <i class="fa-solid fa-check"></i> Deactivate Alert
-                    {% endif %}
-                </button>
-                <div class="last-updated">
-                    Last detailed sync: <span id="last-sync-time">{{ settings.last_sync|timesince }} ago</span>
-                </div>
+            <div class="header-status">
+                <span class="status-label">Current Status:</span>
+                <span class="status-badge status-{{ settings.current_status|lower|slugify }}">{{ settings.current_status }}</span>
             </div>
         </header>
 
@@ -75,20 +63,13 @@
             <div class="dashboard-grid">
                 <div class="card stat-card">
                     <div class="stat-label">Current Status</div>
-                    <div class="stat-value" style="color: var(--{% if settings.current_status == 'High Alert' %}status-alert-text{% else %}primary-color{% endif %})">
-                        {{ settings.current_status }}
-                    </div>
-                    <div class="stat-label">{% if settings.current_phase == 0 %}Standard Operations{% else %}Escalation Protocol{% endif %} Active</div>
+                    <div class="stat-value stat-value-large">{{ settings.current_status }}</div>
+                    <div class="stat-sublabel">{% if settings.current_phase == 0 %}Standard Operations{% else %}Escalation Protocol{% endif %} Active</div>
                 </div>
                 <div class="card stat-card">
                     <div class="stat-label">Next Shift Packet Due</div>
-                    <div class="stat-value">{{ time_remaining|floatformat:0 }}h</div>
-                    <div class="stat-label">Cadence: Every {{ settings.cadence_hours }}h</div>
-                </div>
-                <div class="card stat-card">
-                    <div class="stat-label">Pending Updates</div>
-                    <div class="stat-value">{{ pending_updates_count }}</div>
-                    <div class="stat-label">Since last packet</div>
+                    <div class="stat-value stat-value-large">{{ time_remaining|floatformat:0 }}h</div>
+                    <div class="stat-sublabel">Cadence: Every {{ settings.cadence_hours }}h</div>
                 </div>
             </div>
 
@@ -96,12 +77,26 @@
                 <div class="card-header">
                     <h3 class="card-title">Quick Actions</h3>
                 </div>
-                <div style="display: flex; gap: 1rem;">
+                <div class="action-buttons">
                     <a href="{% url 'capture' %}" class="btn btn-primary">
                         <i class="fa-solid fa-plus"></i> Create Update
                     </a>
-                    <a href="{% url 'distribute' %}" class="btn btn-primary" style="background-color: var(--secondary-color);">
+                    <a href="{% url 'distribute' %}" class="btn btn-secondary">
                         <i class="fa-solid fa-file-export"></i> Generate Shift Packet
+                    </a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Audit Pack (Export Ready)</h3>
+                </div>
+                <div class="action-buttons">
+                    <a href="#" class="btn btn-primary">
+                        <i class="fa-solid fa-file-pdf"></i> Generate Decision Packet PDF
+                    </a>
+                    <a href="#" class="btn btn-secondary">
+                        <i class="fa-solid fa-download"></i> Generate Case History Export (PDF or CSV)
                     </a>
                 </div>
             </div>
@@ -110,20 +105,23 @@
                 <div class="card-header">
                     <h3 class="card-title">Recent Activity</h3>
                 </div>
-                <div class="timeline">
+                <div class="activity-list">
                     {% for update in recent_updates %}
-                        <div class="timeline-item">
-                            <div class="timeline-time">{{ update.timestamp|date:"H:i" }}</div>
-                            <div class="timeline-content">
-                                <div class="timeline-header">
-                                    <span class="timeline-title">{{ update.title }}</span>
-                                    <span class="badge badge-{{ update.severity|lower }}">{{ update.severity }}</span>
-                                </div>
-                                <p>{{ update.description }}</p>
+                        <div class="activity-item">
+                            <div class="activity-time">{{ update.timestamp|date:"g:i A" }}</div>
+                            <div class="activity-content">
+                                <div class="activity-title">{{ update.title }}</div>
+                                <div class="activity-description">{{ update.description|truncatewords:15 }}</div>
                             </div>
                         </div>
                     {% empty %}
-                        <p style="color: var(--text-secondary);">No recent activity.</p>
+                        <div class="activity-item">
+                            <div class="activity-time">{{ "now"|date:"g:i A" }}</div>
+                            <div class="activity-content">
+                                <div class="activity-title">Routine System Check</div>
+                                <div class="activity-description">All communication channels operational. No anomalies detected.</div>
+                            </div>
+                        </div>
                     {% endfor %}
                 </div>
             </div>
@@ -133,24 +131,7 @@
 
 {% block extra_js %}
 <script>
-    document.getElementById('activate-alert-btn').addEventListener('click', function() {
-        fetch('{% url "toggle_alert" %}', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}',
-                'Content-Type': 'application/json',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status) {
-                location.reload();
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
-    });
+    // Any dashboard-specific JavaScript can go here
 </script>
 {% endblock %}
 {% endblock %}

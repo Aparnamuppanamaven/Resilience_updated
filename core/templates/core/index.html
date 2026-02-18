@@ -41,19 +41,56 @@
 <header class="hero-section">
     <div class="container hero-content">
         <h1>Command Your Operations.</h1>
-        <p class="hero-sub">Structured Decision Continuity for Designated Liaisons.
-
-        </p>
+        <p class="hero-sub">Packaging locked (Documented Facts) for Designated Liaisons. Capture critical updates, normalize incident data, distribute perfect Shift Packets, and generate audit-ready exports—every time.</p>
         <div class="hero-actions">
             {% if request.user.is_authenticated or request.session.user_credentials_id %}
                 <a href="{% url 'dashboard' %}" class="btn btn-primary btn-lg">Go to Dashboard</a>
             {% else %}
                 <a href="{% url 'checkout' %}" class="btn btn-primary btn-lg">Initialize System</a>
             {% endif %}
-            <a href="#details" class="btn btn-outline btn-lg">Explore Capabilities</a>
+            <a href="#capabilities" class="btn btn-outline btn-lg">Explore Capabilities</a>
         </div>
     </div>
 </header>
+
+<section id="capabilities" class="capabilities-section">
+    <div class="container">
+        <div class="section-header">
+            <h2>Core Capabilities</h2>
+            <p class="section-subtitle">Everything you need to maintain operational clarity and compliance</p>
+        </div>
+        <div class="capabilities-grid">
+            <div class="capability-card" onclick="selectCapability(this)">
+                <div class="capability-icon">
+                    <i class="fa-solid fa-file-export"></i>
+                </div>
+                <h3>Shift Packets</h3>
+                <p>Automated, structured packets that capture critical updates and normalize incident data for seamless handoffs.</p>
+            </div>
+            <div class="capability-card" onclick="selectCapability(this)">
+                <div class="capability-icon">
+                    <i class="fa-solid fa-file-arrow-down"></i>
+                </div>
+                <h3>Audit Pack (Export Ready)</h3>
+                <p>Generate structured, date-stamped records of case history, decision moments, and status transitions. Export Decision Packet PDFs and Case History (PDF or CSV) for compliance and review.</p>
+            </div>
+            <div class="capability-card" onclick="selectCapability(this)">
+                <div class="capability-icon">
+                    <i class="fa-solid fa-wrench"></i>
+                </div>
+                <h3>Decision Log</h3>
+                <p>Track and document all critical decisions with rationale, timestamps, and ownership for complete audit trails.</p>
+            </div>
+            <div class="capability-card" onclick="selectCapability(this)">
+                <div class="capability-icon">
+                    <i class="fa-solid fa-filter"></i>
+                </div>
+                <h3>What Changed Analysis</h3>
+                <p>Automatically identify and highlight changes between shifts, ensuring nothing falls through the cracks.</p>
+            </div>
+        </div>
+    </div>
+</section>
 
 <section class="deliverables-section">
     <div class="container">
@@ -439,5 +476,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Capability card selection
+function selectCapability(card) {
+    // Remove selected class from all cards
+    const allCards = document.querySelectorAll('.capability-card');
+    allCards.forEach(c => c.classList.remove('selected'));
+    
+    // Add selected class to clicked card
+    card.classList.add('selected');
+}
 </script>
 {% endblock %}

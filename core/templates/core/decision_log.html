@@ -23,10 +23,10 @@
         </ul>
         <div class="sidebar-footer">
             <div class="user-profile">
-                <div class="avatar">{{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}</div>
+                <div class="avatar">DL</div>
                 <div class="user-info">
-                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
-                    <span class="user-role">{{ user.liaison_profile.organization.name }}</span>
+                    <span class="user-name">Designated Liaison</span>
+                    <span class="user-role">Operations</span>
                 </div>
             </div>
         </div>
@@ -35,6 +35,20 @@
     <main class="main-content">
         <header class="top-header">
             <h2>Decision Log</h2>
+            <div class="header-status">
+                <div class="status-indicator">
+                    <span class="status-label">Current Status:</span>
+                    <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                </div>
+                {% if current_status == 'Normal' %}
+                <button type="button" class="btn-alert" id="activateAlertBtn" onclick="activateAlert()">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
+                </button>
+                {% endif %}
+                <div class="sync-time">
+                    <span>Last detailed sync: {{ last_sync_display }}</span>
+                </div>
+            </div>
         </header>
 
         <div class="view-container">
@@ -56,15 +70,15 @@
                         <tbody>
                             {% for decision in decisions %}
                                 <tr>
-                                    <td>{{ decision.timestamp|date:"M d, Y H:i" }}</td>
+                                    <td>{{ decision.timestamp|date:"M d, Y g:i A" }}</td>
                                     <td>{{ decision.decision }}</td>
                                     <td>{{ decision.rationale }}</td>
-                                    <td>{{ decision.owner.user.get_full_name|default:decision.owner.user.username }}</td>
-                                    <td><span class="badge badge-status-normal">{{ decision.status }}</span></td>
+                                    <td>{% if decision.owner %}{{ decision.owner.user.get_full_name|default:decision.owner.user.username }}{% else %}N/A{% endif %}</td>
+                                    <td><span class="badge badge-status-{{ decision.status|lower|slugify }}">{{ decision.status|upper }}</span></td>
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="5" style="text-align: center; color: var(--text-secondary);">No decisions logged yet.</td>
+                                    <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No decisions logged yet.</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
@@ -73,6 +87,37 @@
             </div>
         </div>
     </main>
+
+    <script>
+    function activateAlert() {
+        if (confirm('Are you sure you want to activate the alert? This will change the system status to High Alert.')) {
+            fetch('{% url "toggle_alert" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to activate alert'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while activating the alert.');
+            });
+        }
+    }
+    </script>
 </div>
 {% endblock %}
 

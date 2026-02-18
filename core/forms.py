@@ -349,6 +349,13 @@ class OperationalUpdateForm(forms.ModelForm):
     class Meta:
         model = OperationalUpdate
         fields = ['title', 'severity', 'description', 'impact', 'next_action']
+        labels = {
+            'title': 'Update Title',
+            'severity': 'Severity',
+            'description': 'What Changed?',
+            'impact': 'Why it Matters (Impact)',
+            'next_action': 'Next Action',
+        }
         widgets = {
             'title': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -365,8 +372,9 @@ class OperationalUpdateForm(forms.ModelForm):
                 'rows': 2,
                 'placeholder': 'Operational impact analysis...'
             }),
-            'next_action': forms.TextInput(attrs={
+            'next_action': forms.Textarea(attrs={
                 'class': 'form-control',
+                'rows': 2,
                 'placeholder': 'e.g., Dispatch team, Monitor sensors'
             }),
         }
