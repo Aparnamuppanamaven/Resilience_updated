@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import datetime, timedelta
 import re
-from .models import OperationalUpdate, SystemSettings, UserCredentials, Payment, Invoice
+from .models import OperationalUpdate, SystemSettings, UserCredentials, Payment, Invoice, UserProfile
 
 
 class CheckoutForm(forms.Form):
@@ -434,6 +434,25 @@ class OnboardingForm(forms.ModelForm):
 
 class OperationalUpdateForm(forms.ModelForm):
     """Form for creating operational updates"""
+    start_time = forms.DateTimeField(
+        required=False,
+        widget=forms.DateTimeInput(attrs={
+            'class': 'form-control',
+            'type': 'datetime-local',
+            'placeholder': 'mm/dd/yyyy'
+        }),
+        label='Start Time'
+    )
+    end_time = forms.DateTimeField(
+        required=False,
+        widget=forms.DateTimeInput(attrs={
+            'class': 'form-control',
+            'type': 'datetime-local',
+            'placeholder': 'mm/dd/yyyy'
+        }),
+        label='End Time'
+    )
+    
     class Meta:
         model = OperationalUpdate
         fields = ['title', 'severity', 'description', 'impact', 'next_action']
@@ -533,6 +552,142 @@ class UserLoginForm(forms.Form):
         'class': 'form-control',
         'placeholder': 'Password'
     }))
+
+
+class UserCreateForm(forms.ModelForm):
+    """Form for creating users with full profile information"""
+    password = forms.CharField(
+        label='Password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter password'
+        }),
+        required=True
+    )
+    confirm_password = forms.CharField(
+        label='Confirm Password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Confirm password'
+        }),
+        required=True
+    )
+    
+    class Meta:
+        model = UserProfile
+        fields = ['full_name', 'mobile', 'email', 'role', 'department', 'shift_start_time', 'shift_end_time', 'designated_manager']
+        widgets = {
+            'full_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Full Name'
+            }),
+            'mobile': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Mobile Number'
+            }),
+            'email': forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Email Address'
+            }),
+            'role': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+            'department': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Department'
+            }),
+            'shift_start_time': forms.TimeInput(attrs={
+                'class': 'form-control',
+                'type': 'time'
+            }),
+            'shift_end_time': forms.TimeInput(attrs={
+                'class': 'form-control',
+                'type': 'time'
+            }),
+            'designated_manager': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+        }
+        labels = {
+            'full_name': 'Full Name',
+            'mobile': 'Mobile',
+            'email': 'Email',
+            'role': 'Role',
+            'department': 'Department',
+            'shift_start_time': 'Shift Start Time',
+            'shift_end_time': 'Shift End Time',
+            'designated_manager': 'Designated Manager',
+        }
+    
+    username = forms.CharField(
+        label='Username',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Username'
+        }),
+        required=True
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filter managers for designated_manager field
+        manager_queryset = UserProfile.objects.filter(role__in=['admin', 'manager'])
+        if self.instance and self.instance.pk:
+            manager_queryset = manager_queryset.exclude(pk=self.instance.pk)
+        self.fields['designated_manager'].queryset = manager_queryset
+        self.fields['designated_manager'].required = False
+        self.fields['designated_manager'].empty_label = "— No Manager —"
+    
+    def clean_username(self):
+        username = self.cleaned_data.get('username', '').strip()
+        if not username:
+            raise forms.ValidationError('Username is required.')
+        if UserCredentials.objects.filter(username=username).exists():
+            raise forms.ValidationError('This username is already taken.')
+        return username
+    
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').strip()
+        if not email:
+            raise forms.ValidationError('Email is required.')
+        if UserProfile.objects.filter(email=email).exists():
+            raise forms.ValidationError('This email is already registered.')
+        return email
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        password = cleaned_data.get("password")
+        confirm_password = cleaned_data.get("confirm_password")
+        
+        if password != confirm_password:
+            raise forms.ValidationError("Passwords do not match")
+        
+        shift_start = cleaned_data.get('shift_start_time')
+        shift_end = cleaned_data.get('shift_end_time')
+        
+        if shift_start and shift_end and shift_start >= shift_end:
+            raise forms.ValidationError("Shift end time must be after shift start time")
+        
+        return cleaned_data
+    
+    def save(self, commit=True):
+        # Create UserCredentials first
+        username = self.cleaned_data['username']
+        password = self.cleaned_data['password']
+        
+        user_credential = UserCredentials.objects.create(
+            username=username,
+            password_hash=password  # Store plain text as per existing pattern
+        )
+        
+        # Create UserProfile
+        profile = super().save(commit=False)
+        profile.user_credential = user_credential
+        
+        if commit:
+            profile.save()
+        
+        return profile
 
 
 class SetupPasswordForm(forms.Form):

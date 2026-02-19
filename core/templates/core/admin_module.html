@@ -1,7 +1,7 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
-{% block title %}Admin - Add Users - Resilience System{% endblock %}
+{% block title %}Admin - User Management - Resilience System{% endblock %}
 
 {% block content %}
 <div class="app-container">
@@ -21,6 +21,9 @@
                 <a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a>
             </li>
             <li class="nav-item">
+                <a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents</a>
+            </li>
+            <li class="nav-item">
                 <a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a>
             </li>
             <li class="nav-item">
@@ -35,9 +38,25 @@
         </ul>
         <div class="sidebar-footer">
             <div class="user-profile">
-                <div class="avatar">{{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}</div>
+                <div class="avatar">
+                    {% if user.first_name %}
+                        {{ user.first_name|first|upper }}{{ user.last_name|first|upper|default:"" }}
+                    {% elif user.username %}
+                        {{ user.username|first|upper }}
+                    {% else %}
+                        A
+                    {% endif %}
+                </div>
                 <div class="user-info">
-                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
+                    <span class="user-name">
+                        {% if user.get_full_name %}
+                            {{ user.get_full_name }}
+                        {% elif user.username %}
+                            {{ user.username }}
+                        {% else %}
+                            Admin User
+                        {% endif %}
+                    </span>
                     <span class="user-role">Admin</span>
                 </div>
             </div>
@@ -45,75 +64,490 @@
     </nav>
 
     <main class="main-content">
-        <header class="top-header">
-            <h2>Admin – Add Users</h2>
+        <header class="top-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+            <h2 style="margin: 0;">User Management</h2>
+            <button type="button" onclick="showCreateUserModal()" style="
+                padding: 0.75rem 1.5rem;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 0.95rem;
+                cursor: pointer;
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(102, 126, 234, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'">
+                <i class="fa-solid fa-user-plus"></i>
+                Create New User
+            </button>
         </header>
 
         <div class="view-container">
             {% if messages %}
-            {% for message in messages %}
-            <div class="alert alert-{{ message.tags }}" style="padding: 1rem; margin-bottom: 1rem; border-radius: 6px; background: #dcfce7; color: #166534;">
-                {{ message }}
-            </div>
-            {% endfor %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}" style="
+                        padding: 1rem 1.5rem;
+                        margin-bottom: 1.5rem;
+                        border-radius: 8px;
+                        background: {% if message.tags == 'error' %}#fee2e2{% else %}#dcfce7{% endif %};
+                        color: {% if message.tags == 'error' %}#991b1b{% else %}#166534{% endif %};
+                        border-left: 4px solid {% if message.tags == 'error' %}#ef4444{% else %}#22c55e{% endif %};
+                    ">
+                        <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %}" style="margin-right: 0.5rem;"></i>{{ message }}
+                    </div>
+                {% endfor %}
             {% endif %}
 
-            <div class="card" style="max-width: 560px; margin-bottom: 2rem;">
-                <div class="card-header">
-                    <h3 class="card-title">Add new user</h3>
+            <!-- Users List Section -->
+            <div class="card" style="background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: none; overflow: hidden; margin-bottom: 2rem;">
+                <div class="card-header" style="
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 1.5rem 2rem;
+                    border-bottom: none;
+                ">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div style="
+                                width: 48px;
+                                height: 48px;
+                                background: rgba(255,255,255,0.2);
+                                border-radius: 12px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            ">
+                                <i class="fa-solid fa-users" style="font-size: 1.5rem;"></i>
+                            </div>
+                            <div>
+                                <h3 class="card-title" style="margin: 0; font-size: 1.5rem; font-weight: 600; color: white;">Users List</h3>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem; color: rgba(255,255,255,0.9);">
+                                    {{ users_list|length }} user{{ users_list|length|pluralize }} registered
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <form method="post" action="">
-                        {% csrf_token %}
-                        <div class="form-group" style="margin-bottom: 1rem;">
-                            <label class="form-label">{{ form.username.label }}</label>
-                            {{ form.username }}
-                            {% if form.username.errors %}<ul class="errorlist" style="color: #dc2626; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.username.errors }}</ul>{% endif %}
-                        </div>
-                        <div class="form-group" style="margin-bottom: 1rem;">
-                            <label class="form-label">{{ form.password.label }}</label>
-                            {{ form.password }}
-                            {% if form.password.errors %}<ul class="errorlist" style="color: #dc2626; font-size: 0.875rem;">{{ form.password.errors }}</ul>{% endif %}
-                        </div>
-                        <div class="form-group" style="margin-bottom: 1rem;">
-                            <label class="form-label">{{ form.confirm_password.label }}</label>
-                            {{ form.confirm_password }}
-                            {% if form.confirm_password.errors %}<ul class="errorlist" style="color: #dc2626; font-size: 0.875rem;">{{ form.confirm_password.errors }}</ul>{% endif %}
-                        </div>
-                        {% if form.non_field_errors %}<ul class="errorlist" style="color: #dc2626;">{{ form.non_field_errors }}</ul>{% endif %}
-                        <button type="submit" class="btn btn-primary" data-disable-text="Adding...">Add user</button>
-                    </form>
-                </div>
-            </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Existing users</h3>
-                </div>
-                <div class="card-body">
-                    {% if users_list %}
-                    <table style="width: 100%; border-collapse: collapse;">
+                {% if users_list %}
+                <div class="table-responsive" style="overflow-x: auto; padding: 0;">
+                    <table class="users-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
                         <thead>
-                            <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">
-                                <th style="padding: 0.75rem;">Username</th>
-                                <th style="padding: 0.75rem;">Created</th>
+                            <tr style="background: linear-gradient(to right, #f8f9fa, #f1f3f5);">
+                                <th style="
+                                    padding: 1rem 2rem;
+                                    text-align: left;
+                                    font-weight: 600;
+                                    color: #495057;
+                                    font-size: 0.875rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    border-bottom: 2px solid #e9ecef;
+                                ">
+                                    <i class="fa-solid fa-building" style="margin-right: 0.5rem; color: #667eea;"></i>Agency Name
+                                </th>
+                                <th style="
+                                    padding: 1rem 2rem;
+                                    text-align: left;
+                                    font-weight: 600;
+                                    color: #495057;
+                                    font-size: 0.875rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    border-bottom: 2px solid #e9ecef;
+                                ">
+                                    <i class="fa-solid fa-user" style="margin-right: 0.5rem; color: #f5576c;"></i>Primary Liaison
+                                </th>
+                                <th style="
+                                    padding: 1rem 2rem;
+                                    text-align: left;
+                                    font-weight: 600;
+                                    color: #495057;
+                                    font-size: 0.875rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    border-bottom: 2px solid #e9ecef;
+                                ">
+                                    <i class="fa-solid fa-envelope" style="margin-right: 0.5rem; color: #4facfe;"></i>Email
+                                </th>
+                                <th style="
+                                    padding: 1rem 2rem;
+                                    text-align: left;
+                                    font-weight: 600;
+                                    color: #495057;
+                                    font-size: 0.875rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    border-bottom: 2px solid #e9ecef;
+                                ">
+                                    <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem; color: #00f2fe;"></i>Incident Types
+                                </th>
+                                <th style="
+                                    padding: 1rem 2rem;
+                                    text-align: left;
+                                    font-weight: 600;
+                                    color: #495057;
+                                    font-size: 0.875rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    border-bottom: 2px solid #e9ecef;
+                                ">
+                                    <i class="fa-solid fa-comments" style="margin-right: 0.5rem; color: #f093fb;"></i>Communication Channels
+                                </th>
+                                <th style="
+                                    padding: 1rem 2rem;
+                                    text-align: left;
+                                    font-weight: 600;
+                                    color: #495057;
+                                    font-size: 0.875rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    border-bottom: 2px solid #e9ecef;
+                                ">
+                                    <i class="fa-solid fa-calendar" style="margin-right: 0.5rem; color: #f093fb;"></i>Created At
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for u in users_list %}
-                            <tr style="border-bottom: 1px solid #e2e8f0;">
-                                <td style="padding: 0.75rem;">{{ u.username }}</td>
-                                <td style="padding: 0.75rem;">{{ u.created_at|date:"M d, Y" }}</td>
+                            {% for user in users_list %}
+                            <tr class="user-row" style="
+                                border-bottom: 1px solid #f1f3f5;
+                                transition: all 0.2s ease;
+                                background: white;
+                            ">
+                                <td style="padding: 1.25rem 2rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                        <div style="
+                                            width: 40px;
+                                            height: 40px;
+                                            border-radius: 50%;
+                                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: center;
+                                            color: white;
+                                            font-weight: 600;
+                                            font-size: 0.9rem;
+                                        ">
+                                            {{ user.agency_name|first|upper }}
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">
+                                                {{ user.agency_name }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="padding: 1.25rem 2rem;">
+                                    <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">
+                                        {{ user.primary_liaison_name }}
+                                    </div>
+                                </td>
+                                <td style="padding: 1.25rem 2rem; color: #6c757d; font-size: 0.9rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <i class="fa-solid fa-envelope" style="color: #adb5bd; font-size: 0.85rem;"></i>
+                                        <span>{{ user.liaison_email }}</span>
+                                    </div>
+                                </td>
+                                <td style="padding: 1.25rem 2rem; color: #6c757d; font-size: 0.9rem;">
+                                    {% if user.key_incident_types %}
+                                        <span style="
+                                            padding: 4px 10px;
+                                            border-radius: 12px;
+                                            background: #e3f2fd;
+                                            color: #1976d2;
+                                            font-size: 0.85rem;
+                                            font-weight: 500;
+                                        ">
+                                            {{ user.key_incident_types }}
+                                        </span>
+                                    {% else %}
+                                        <span style="color: #adb5bd; font-style: italic;">Not specified</span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 1.25rem 2rem; color: #6c757d; font-size: 0.9rem;">
+                                    {% if user.preferred_communication_channels %}
+                                        <span style="
+                                            padding: 4px 10px;
+                                            border-radius: 12px;
+                                            background: #f3e5f5;
+                                            color: #7b1fa2;
+                                            font-size: 0.85rem;
+                                            font-weight: 500;
+                                        ">
+                                            {{ user.preferred_communication_channels|title }}
+                                        </span>
+                                    {% else %}
+                                        <span style="color: #adb5bd; font-style: italic;">Not specified</span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 1.25rem 2rem; color: #6c757d; font-size: 0.9rem;">
+                                    {% if user.created_at %}
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <i class="fa-solid fa-calendar" style="color: #adb5bd; font-size: 0.85rem;"></i>
+                                            <span>{{ user.created_at|date:"M d, Y g:i A" }}</span>
+                                        </div>
+                                    {% else %}
+                                        <span style="color: #adb5bd; font-style: italic;">—</span>
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
-                    {% else %}
-                    <p style="color: #64748b;">No users yet. Add one above.</p>
-                    {% endif %}
                 </div>
+                {% else %}
+                <div style="
+                    padding: 4rem 2rem;
+                    text-align: center;
+                    color: #6c757d;
+                ">
+                    <div style="
+                        width: 120px;
+                        height: 120px;
+                        margin: 0 auto 1.5rem;
+                        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    ">
+                        <i class="fa-solid fa-users" style="font-size: 3.5rem; color: #adb5bd;"></i>
+                    </div>
+                    <h3 style="font-size: 1.5rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem;">No users found</h3>
+                    <p style="font-size: 1rem; margin: 0.5rem 0; color: #6c757d;">
+                        Create your first user using the form below
+                    </p>
+                </div>
+                {% endif %}
             </div>
+
         </div>
     </main>
 </div>
+
+<!-- Create User Modal -->
+<div id="createUserModal" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+">
+    <div style="
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    ">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="margin: 0; font-size: 1.5rem; font-weight: 600; color: #212529;">Create New User</h3>
+            <button type="button" onclick="closeCreateUserModal()" style="
+                background: none;
+                border: none;
+                font-size: 1.5rem;
+                color: #6c757d;
+                cursor: pointer;
+                padding: 0.25rem 0.5rem;
+            ">&times;</button>
+        </div>
+        
+        <form method="post" action="{% url 'admin_module' %}" id="createUserForm">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_user">
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                        Agency Name <span style="color: #ef4444;">*</span>
+                    </label>
+                    <input type="text" name="agency_name" required style="
+                        width: 100%;
+                        padding: 0.75rem;
+                        border: 1px solid #dee2e6;
+                        border-radius: 6px;
+                        font-size: 0.95rem;
+                    " placeholder="Enter agency name">
+                </div>
+                
+                <div class="form-group">
+                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                        Primary Liaison Name <span style="color: #ef4444;">*</span>
+                    </label>
+                    <input type="text" name="primary_liaison_name" required style="
+                        width: 100%;
+                        padding: 0.75rem;
+                        border: 1px solid #dee2e6;
+                        border-radius: 6px;
+                        font-size: 0.95rem;
+                    " placeholder="Enter liaison name">
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                        Email <span style="color: #ef4444;">*</span>
+                    </label>
+                    <input type="email" name="liaison_email" required style="
+                        width: 100%;
+                        padding: 0.75rem;
+                        border: 1px solid #dee2e6;
+                        border-radius: 6px;
+                        font-size: 0.95rem;
+                    " placeholder="Enter email address">
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                        Key Incident Types
+                    </label>
+                    <input type="text" name="key_incident_types" style="
+                        width: 100%;
+                        padding: 0.75rem;
+                        border: 1px solid #dee2e6;
+                        border-radius: 6px;
+                        font-size: 0.95rem;
+                    " placeholder="e.g., cyber, flooding">
+                </div>
+                
+                <div class="form-group">
+                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                        Communication Channels
+                    </label>
+                    <select name="preferred_communication_channels" style="
+                        width: 100%;
+                        padding: 0.75rem;
+                        border: 1px solid #dee2e6;
+                        border-radius: 6px;
+                        font-size: 0.95rem;
+                    ">
+                        <option value="">Select channel</option>
+                        <option value="email">Email</option>
+                        <option value="email_sms">Email + SMS</option>
+                        <option value="slack">Slack / Teams</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+                <button type="button" onclick="closeCreateUserModal()" style="
+                    padding: 0.75rem 1.5rem;
+                    background: #f8f9fa;
+                    color: #495057;
+                    border: 1px solid #dee2e6;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    cursor: pointer;
+                ">Cancel</button>
+                <button type="submit" style="
+                    padding: 0.75rem 1.5rem;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+                ">
+                    <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i>Create User
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showCreateUserModal() {
+    document.getElementById('createUserModal').style.display = 'flex';
+}
+
+function closeCreateUserModal() {
+    document.getElementById('createUserModal').style.display = 'none';
+    document.getElementById('createUserForm').reset();
+}
+
+// Close modal when clicking outside
+document.getElementById('createUserModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeCreateUserModal();
+    }
+});
+</script>
+
+<style>
+.user-row:hover {
+    background: linear-gradient(to right, #f8f9ff, #ffffff) !important;
+    transform: translateX(4px);
+    box-shadow: -4px 0 0 0 #667eea;
+}
+
+.table-responsive {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.table-responsive::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: #f1f3f5;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #adb5bd;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #868e96;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4) !important;
+}
+
+@media (max-width: 768px) {
+    .users-table th,
+    .users-table td {
+        padding: 0.75rem 1rem !important;
+        font-size: 0.85rem;
+    }
+
+    .card-header {
+        padding: 1rem 1.5rem !important;
+    }
+
+    .card-header h3 {
+        font-size: 1.25rem !important;
+    }
+
+    .card-body {
+        padding: 1.5rem !important;
+    }
+
+    .card-body form > div[style*="grid"] {
+        grid-template-columns: 1fr !important;
+    }
+}
+</style>
 {% endblock %}

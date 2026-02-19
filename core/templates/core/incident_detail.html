@@ -1,0 +1,497 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Incident Details - Resilience System{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a></li>
+            <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
+            <li class="nav-item active"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents</a></li>
+            <li class="nav-item"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
+            <li class="nav-item"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
+            <li class="nav-item"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
+            <li class="nav-item"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="avatar">DL</div>
+                <div class="user-info">
+                    <span class="user-name">Designated Liaison</span>
+                    <span class="user-role">Operations</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-header">
+            <h2>Incident Details</h2>
+            <div class="header-status">
+                <div class="status-indicator">
+                    <span class="status-label">Current Status:</span>
+                    <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                </div>
+                {% if current_status == 'Normal' %}
+                <button type="button" class="btn-alert" id="activateAlertBtn" onclick="activateAlert()">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
+                </button>
+                {% endif %}
+                <div class="sync-time">
+                    <span>Last detailed sync: {{ last_sync_display }}</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="view-container">
+            <div style="margin-bottom: 1rem;">
+                <a href="{% url 'incidents_list' %}" style="color: #6366f1; text-decoration: none;">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Incidents List
+                </a>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}" style="padding: 1rem; margin-bottom: 1.5rem; border-radius: 6px; background: #dcfce7; color: #166534;">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- Vertical Collapse Container -->
+            <div class="vertical-collapse-container" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem; max-width: 1200px; margin-left: auto; margin-right: auto;">
+                
+                <!-- Section 1: Incident Information -->
+                <div class="collapse-section active" data-section="1">
+                    <div class="collapse-header" onclick="toggleSection(1)" style="
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 1.25rem;
+                        border-radius: 12px;
+                        cursor: pointer;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    ">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-info-circle" style="font-size: 1.25rem;"></i>
+                            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Incident Information</h3>
+                        </div>
+                        <i class="fa-solid fa-chevron-down collapse-icon" id="icon-1" style="transition: transform 0.3s ease; transform: rotate(180deg);"></i>
+                    </div>
+                    <div class="collapse-content" id="content-1" style="
+                        background: white;
+                        padding: 0;
+                        border-radius: 0 0 12px 12px;
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                        margin-top: -12px;
+                        overflow: hidden;
+                        transition: max-height 0.3s ease;
+                        max-height: 2000px;
+                    ">
+                        <div style="padding: 1.75rem 1.5rem 1.5rem;">
+                        <div class="form-group" style="margin-bottom: 1.5rem;">
+                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Update Title</label>
+                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; border-left: 3px solid #667eea;">
+                                {{ incident.title }}
+                            </div>
+                        </div>
+
+                        <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                            <div class="form-group">
+                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Severity</label>
+                                <div>
+                                    <span class="badge" style="
+                                        padding: 6px 12px;
+                                        border-radius: 4px;
+                                        font-size: 0.875rem;
+                                        font-weight: 500;
+                                        {% if incident.severity == 'LOW' %}background-color: #d1ecf1; color: #0c5460;
+                                        {% elif incident.severity == 'MEDIUM' %}background-color: #fff3cd; color: #856404;
+                                        {% elif incident.severity == 'HIGH' %}background-color: #f8d7da; color: #721c24;
+                                        {% elif incident.severity == 'CRITICAL' %}background-color: #f5c6cb; color: #721c24;
+                                        {% else %}background-color: #e2e3e5; color: #383d41;{% endif %}
+                                    ">
+                                        {{ incident.get_severity_display|default:incident.severity }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Created At</label>
+                                <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                    {{ incident.timestamp|date:"M d, Y g:i A" }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.5rem;">
+                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">What Changed?</label>
+                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; white-space: pre-wrap; min-height: 60px; border-left: 3px solid #667eea;">
+                                {{ incident.description|default:"Not specified" }}
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.5rem;">
+                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Why it Matters (Impact)</label>
+                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; white-space: pre-wrap; min-height: 60px; border-left: 3px solid #667eea;">
+                                {{ incident.impact|default:"Not specified" }}
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.5rem;">
+                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Next Action</label>
+                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; white-space: pre-wrap; min-height: 60px; border-left: 3px solid #667eea;">
+                                {{ incident.next_action|default:"Not specified" }}
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: User Mapped to Incident -->
+                <div class="collapse-section" data-section="2">
+                    <div class="collapse-header" onclick="toggleSection(2)" style="
+                        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                        color: white;
+                        padding: 1.25rem;
+                        border-radius: 12px;
+                        cursor: pointer;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    ">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-user" style="font-size: 1.25rem;"></i>
+                            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Assigned User</h3>
+                        </div>
+                        <i class="fa-solid fa-chevron-down collapse-icon" id="icon-2" style="transition: transform 0.3s ease;"></i>
+                    </div>
+                    <div class="collapse-content" id="content-2" style="
+                        background: white;
+                        padding: 0;
+                        border-radius: 0;
+                        box-shadow: none;
+                        margin-top: -12px;
+                        overflow: hidden;
+                        transition: max-height 0.3s ease;
+                        max-height: 0;
+                    ">
+                        <div style="padding: 1.75rem 1.5rem 1.5rem; text-align: center;">
+                            {% if incident.owner %}
+                                <div style="margin-bottom: 1.5rem;">
+                                    <div style="
+                                        width: 80px;
+                                        height: 80px;
+                                        border-radius: 50%;
+                                        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        margin: 0 auto 1rem;
+                                        color: white;
+                                        font-size: 2rem;
+                                        font-weight: 600;
+                                        box-shadow: 0 4px 12px rgba(245, 87, 108, 0.3);
+                                    ">
+                                        {{ incident.owner.user.get_full_name|first|default:incident.owner.user.username|first|upper }}
+                                    </div>
+                                    <h4 style="margin: 0.5rem 0; color: #212529; font-size: 1.25rem;">
+                                        {{ incident.owner.user.get_full_name|default:incident.owner.user.username }}
+                                    </h4>
+                                    <p style="margin: 0; color: #6c757d; font-size: 0.9rem;">Owner</p>
+                                </div>
+                                
+                                <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; margin-top: 1.5rem; text-align: left;">
+                                    <div style="margin-bottom: 0.75rem;">
+                                        <label style="font-weight: 600; color: #495057; display: block; margin-bottom: 0.25rem;">Email</label>
+                                        <div style="color: #6c757d;">
+                                            {{ incident.owner.user.email|default:"Not available" }}
+                                        </div>
+                                    </div>
+                                    {% if incident.owner.organization %}
+                                    <div>
+                                        <label style="font-weight: 600; color: #495057; display: block; margin-bottom: 0.25rem;">Organization</label>
+                                        <div style="color: #6c757d;">
+                                            {{ incident.owner.organization.name|default:"Not available" }}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <div style="padding: 2rem;">
+                                    <i class="fa-solid fa-user-slash" style="font-size: 3rem; color: #dee2e6; margin-bottom: 1rem;"></i>
+                                    <p style="color: #6c757d; margin: 0;">No user assigned</p>
+                                    <p style="color: #6c757d; margin-top: 0.5rem; font-size: 0.9rem;">Default: Designated Liaison</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Incident Logs -->
+                <div class="collapse-section" data-section="3">
+                    <div class="collapse-header" onclick="toggleSection(3)" style="
+                        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                        color: white;
+                        padding: 1.25rem;
+                        border-radius: 12px;
+                        cursor: pointer;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    ">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-list-ul" style="font-size: 1.25rem;"></i>
+                            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">Incident Logs</h3>
+                        </div>
+                        <i class="fa-solid fa-chevron-down collapse-icon" id="icon-3" style="transition: transform 0.3s ease;"></i>
+                    </div>
+                    <div class="collapse-content" id="content-3" style="
+                        background: white;
+                        padding: 0;
+                        border-radius: 0;
+                        box-shadow: none;
+                        margin-top: -12px;
+                        overflow: hidden;
+                        transition: max-height 0.3s ease;
+                        max-height: 0;
+                    ">
+                        <div style="padding: 1.75rem 1.5rem 1.5rem;">
+                            <div style="position: relative; padding-left: 2rem;">
+                            <!-- Timeline -->
+                            <div style="
+                                position: absolute;
+                                left: 0.5rem;
+                                top: 0;
+                                bottom: 0;
+                                width: 2px;
+                                background: linear-gradient(to bottom, #4facfe, #00f2fe);
+                            "></div>
+                            
+                            <!-- Log Entry 1: Created -->
+                            <div style="position: relative; margin-bottom: 1.5rem;">
+                                <div style="
+                                    position: absolute;
+                                    left: -1.5rem;
+                                    top: 0.25rem;
+                                    width: 12px;
+                                    height: 12px;
+                                    border-radius: 50%;
+                                    background: #4facfe;
+                                    border: 2px solid white;
+                                    box-shadow: 0 0 0 2px #4facfe;
+                                "></div>
+                                <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; border-left: 3px solid #4facfe;">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                        <span style="font-weight: 600; color: #212529;">Incident Created</span>
+                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ incident.timestamp|date:"M d, Y g:i A" }}</span>
+                                    </div>
+                                    <p style="margin: 0; color: #6c757d; font-size: 0.9rem;">
+                                        Incident "{{ incident.title }}" was created with severity level {{ incident.get_severity_display|default:incident.severity }}.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Log Entry 2: Owner Assignment (if exists) -->
+                            {% if incident.owner %}
+                            <div style="position: relative; margin-bottom: 1.5rem;">
+                                <div style="
+                                    position: absolute;
+                                    left: -1.5rem;
+                                    top: 0.25rem;
+                                    width: 12px;
+                                    height: 12px;
+                                    border-radius: 50%;
+                                    background: #00f2fe;
+                                    border: 2px solid white;
+                                    box-shadow: 0 0 0 2px #00f2fe;
+                                "></div>
+                                <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; border-left: 3px solid #00f2fe;">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                        <span style="font-weight: 600; color: #212529;">Owner Assigned</span>
+                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ incident.timestamp|date:"M d, Y" }}</span>
+                                    </div>
+                                    <p style="margin: 0; color: #6c757d; font-size: 0.9rem;">
+                                        {{ incident.owner.user.get_full_name|default:incident.owner.user.username }} was assigned as the owner.
+                                    </p>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <!-- Placeholder for future log entries -->
+                            <div style="position: relative;">
+                                <div style="
+                                    position: absolute;
+                                    left: -1.5rem;
+                                    top: 0.25rem;
+                                    width: 12px;
+                                    height: 12px;
+                                    border-radius: 50%;
+                                    background: #dee2e6;
+                                    border: 2px solid white;
+                                "></div>
+                                <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; border-left: 3px solid #dee2e6; opacity: 0.6;">
+                                    <p style="margin: 0; color: #6c757d; font-size: 0.9rem; font-style: italic;">
+                                        Additional log entries will appear here as the incident is updated.
+                                    </p>
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    function activateAlert() {
+        if (confirm('Are you sure you want to activate the alert? This will change the system status to High Alert.')) {
+            fetch('{% url "toggle_alert" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to activate alert'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while activating the alert.');
+            });
+        }
+    }
+
+    // Vertical Collapse Functionality
+    function toggleSection(sectionNum) {
+        const section = document.querySelector(`[data-section="${sectionNum}"]`);
+        const content = document.getElementById(`content-${sectionNum}`);
+        const icon = document.getElementById(`icon-${sectionNum}`);
+        const isActive = section.classList.contains('active');
+
+        if (isActive) {
+            // Collapse this section
+            section.classList.remove('active');
+            content.style.maxHeight = '0';
+            content.style.overflow = 'hidden';
+            content.style.boxShadow = 'none';
+            content.style.borderRadius = '0';
+            icon.style.transform = 'rotate(0deg)';
+        } else {
+            // Expand this section
+            section.classList.add('active');
+            // Calculate actual content height or use a large value
+            const contentHeight = content.scrollHeight;
+            content.style.maxHeight = Math.max(contentHeight, 2000) + 'px';
+            content.style.overflowY = 'auto';
+            content.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            content.style.borderRadius = '0 0 12px 12px';
+            icon.style.transform = 'rotate(180deg)';
+        }
+    }
+
+    // Initialize: Expand first section by default
+    document.addEventListener('DOMContentLoaded', function() {
+        const firstSection = document.querySelector('[data-section="1"]');
+        const firstContent = document.getElementById('content-1');
+        const firstIcon = document.getElementById('icon-1');
+        
+        firstSection.classList.add('active');
+        const contentHeight = firstContent.scrollHeight;
+        firstContent.style.maxHeight = Math.max(contentHeight, 2000) + 'px';
+        firstContent.style.overflowY = 'auto';
+        firstContent.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+        firstContent.style.borderRadius = '0 0 12px 12px';
+        firstIcon.style.transform = 'rotate(180deg)';
+    });
+    </script>
+
+    <style>
+    .vertical-collapse-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .collapse-section {
+        width: 100%;
+    }
+
+    .collapse-header:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important;
+    }
+
+    .collapse-content {
+        transition: max-height 0.3s ease;
+        overflow: hidden;
+    }
+
+    .collapse-content > div {
+        transition: opacity 0.2s ease 0.1s;
+    }
+
+    .collapse-section:not(.active) .collapse-content {
+        box-shadow: none;
+        border-radius: 0;
+    }
+
+    .collapse-section:not(.active) .collapse-content > div {
+        opacity: 0;
+    }
+
+    .collapse-section.active .collapse-content {
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-radius: 0 0 12px 12px;
+    }
+
+    .collapse-section.active .collapse-content > div {
+        opacity: 1;
+    }
+
+    .collapse-content::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .collapse-content::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .collapse-content::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .collapse-content::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+    </style>
+</div>
+{% endblock %}

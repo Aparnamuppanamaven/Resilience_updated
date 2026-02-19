@@ -1,0 +1,378 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Incidents - Resilience System{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a></li>
+            <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
+            <li class="nav-item active"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents</a></li>
+            <li class="nav-item"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
+            <li class="nav-item"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
+            <li class="nav-item"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
+            <li class="nav-item"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="avatar">DL</div>
+                <div class="user-info">
+                    <span class="user-name">Designated Liaison</span>
+                    <span class="user-role">Operations</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-header">
+            <h2>Incidents</h2>
+            <div class="header-status">
+                <div class="status-indicator">
+                    <span class="status-label">Current Status:</span>
+                    <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                </div>
+                {% if current_status == 'Normal' %}
+                <button type="button" class="btn-alert" id="activateAlertBtn" onclick="activateAlert()">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
+                </button>
+                {% endif %}
+                <div class="sync-time">
+                    <span>Last detailed sync: {{ last_sync_display }}</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="view-container">
+            <div class="card" style="background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: none; overflow: hidden;">
+                <div class="card-header" style="
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 1.5rem 2rem;
+                    border-bottom: none;
+                ">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div style="
+                                width: 48px;
+                                height: 48px;
+                                background: rgba(255,255,255,0.2);
+                                border-radius: 12px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            ">
+                                <i class="fa-solid fa-list-ul" style="font-size: 1.5rem;"></i>
+                            </div>
+                            <div>
+                                <h3 class="card-title" style="margin: 0; font-size: 1.5rem; font-weight: 600; color: white;">Incidents List</h3>
+                                <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem; color: rgba(255,255,255,0.9);">
+                                    {{ incidents|length }} incident{{ incidents|length|pluralize }} total
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}" style="
+                            padding: 1rem 2rem;
+                            margin: 1.5rem 2rem 0;
+                            border-radius: 8px;
+                            background: #dcfce7;
+                            color: #166534;
+                            border-left: 4px solid #22c55e;
+                        ">
+                            <i class="fa-solid fa-circle-check" style="margin-right: 0.5rem;"></i>{{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                {% if incidents %}
+                <div class="table-responsive" style="overflow-x: auto; padding: 0;">
+                    <table class="incidents-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                        <thead>
+                            <tr style="background: linear-gradient(to right, #f8f9fa, #f1f3f5);">
+                                <th style="
+                                    padding: 1rem 2rem;
+                                    text-align: left;
+                                    font-weight: 600;
+                                    color: #495057;
+                                    font-size: 0.875rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    border-bottom: 2px solid #e9ecef;
+                                ">
+                                    <i class="fa-solid fa-file-lines" style="margin-right: 0.5rem; color: #667eea;"></i>Update Title
+                                </th>
+                                <th style="
+                                    padding: 1rem 2rem;
+                                    text-align: left;
+                                    font-weight: 600;
+                                    color: #495057;
+                                    font-size: 0.875rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    border-bottom: 2px solid #e9ecef;
+                                ">
+                                    <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem; color: #f5576c;"></i>Severity
+                                </th>
+                                <th style="
+                                    padding: 1rem 2rem;
+                                    text-align: left;
+                                    font-weight: 600;
+                                    color: #495057;
+                                    font-size: 0.875rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    border-bottom: 2px solid #e9ecef;
+                                ">
+                                    <i class="fa-solid fa-clock" style="margin-right: 0.5rem; color: #4facfe;"></i>Start Time
+                                </th>
+                                <th style="
+                                    padding: 1rem 2rem;
+                                    text-align: center;
+                                    font-weight: 600;
+                                    color: #495057;
+                                    font-size: 0.875rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                    border-bottom: 2px solid #e9ecef;
+                                    width: 60px;
+                                "></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for incident in incidents %}
+                            <tr class="incident-row" style="
+                                border-bottom: 1px solid #f1f3f5;
+                                cursor: pointer;
+                                transition: all 0.2s ease;
+                                background: white;
+                            " onclick="window.location.href='{% url 'incident_detail' incident.id %}'">
+                                <td style="padding: 1.25rem 2rem;">
+                                    <a href="{% url 'incident_detail' incident.id %}" style="
+                                        color: #6366f1;
+                                        text-decoration: none;
+                                        font-weight: 500;
+                                        font-size: 0.95rem;
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 0.75rem;
+                                        transition: color 0.2s ease;
+                                    ">
+                                        <div style="
+                                            width: 8px;
+                                            height: 8px;
+                                            border-radius: 50%;
+                                            background: #6366f1;
+                                            flex-shrink: 0;
+                                        "></div>
+                                        {{ incident.title }}
+                                    </a>
+                                </td>
+                                <td style="padding: 1.25rem 2rem;">
+                                    <span class="severity-badge" style="
+                                        padding: 6px 14px;
+                                        border-radius: 20px;
+                                        font-size: 0.8rem;
+                                        font-weight: 600;
+                                        display: inline-block;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.3px;
+                                        {% if incident.severity == 'LOW' %}
+                                            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+                                            color: #0c5460;
+                                            box-shadow: 0 2px 4px rgba(13, 84, 96, 0.1);
+                                        {% elif incident.severity == 'MEDIUM' %}
+                                            background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+                                            color: #856404;
+                                            box-shadow: 0 2px 4px rgba(133, 100, 4, 0.1);
+                                        {% elif incident.severity == 'HIGH' %}
+                                            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+                                            color: #721c24;
+                                            box-shadow: 0 2px 4px rgba(114, 28, 36, 0.15);
+                                        {% elif incident.severity == 'CRITICAL' %}
+                                            background: linear-gradient(135deg, #f5c6cb 0%, #f1aeb5 100%);
+                                            color: #721c24;
+                                            box-shadow: 0 2px 6px rgba(114, 28, 36, 0.2);
+                                        {% else %}
+                                            background: linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%);
+                                            color: #383d41;
+                                            box-shadow: 0 2px 4px rgba(56, 61, 65, 0.1);
+                                        {% endif %}
+                                    ">
+                                        {{ incident.get_severity_display|default:incident.severity }}
+                                    </span>
+                                </td>
+                                <td style="padding: 1.25rem 2rem; color: #6c757d; font-size: 0.9rem;">
+                                    {% if incident.timestamp %}
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <i class="fa-solid fa-calendar-days" style="color: #adb5bd; font-size: 0.85rem;"></i>
+                                            <span>{{ incident.timestamp|date:"M d, Y g:i A" }}</span>
+                                        </div>
+                                    {% else %}
+                                        <span style="color: #adb5bd; font-style: italic;">Not set</span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 1.25rem 2rem; text-align: center;">
+                                    <i class="fa-solid fa-chevron-right" style="color: #adb5bd; transition: all 0.2s ease;"></i>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div style="
+                    padding: 4rem 2rem;
+                    text-align: center;
+                    color: #6c757d;
+                ">
+                    <div style="
+                        width: 120px;
+                        height: 120px;
+                        margin: 0 auto 1.5rem;
+                        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    ">
+                        <i class="fa-solid fa-inbox" style="font-size: 3.5rem; color: #adb5bd;"></i>
+                    </div>
+                    <h3 style="font-size: 1.5rem; font-weight: 600; color: #495057; margin-bottom: 0.5rem;">No incidents found</h3>
+                    <p style="font-size: 1rem; margin: 0.5rem 0 1.5rem; color: #6c757d;">
+                        Get started by creating your first incident
+                    </p>
+                    <a href="{% url 'capture' %}" style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        padding: 0.75rem 1.5rem;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 8px;
+                        font-weight: 500;
+                        transition: transform 0.2s ease, box-shadow 0.2s ease;
+                        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+                    ">
+                        <i class="fa-solid fa-plus"></i>
+                        Create Incident
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+
+    <style>
+    .incident-row:hover {
+        background: linear-gradient(to right, #f8f9ff, #ffffff) !important;
+        transform: translateX(4px);
+        box-shadow: -4px 0 0 0 #667eea;
+    }
+
+    .incident-row:hover a {
+        color: #4f46e5 !important;
+    }
+
+    .incident-row:hover .fa-chevron-right {
+        color: #667eea !important;
+        transform: translateX(4px);
+    }
+
+    .incident-row:active {
+        transform: translateX(2px);
+    }
+
+    .severity-badge {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .incident-row:hover .severity-badge {
+        transform: scale(1.05);
+    }
+
+    .table-responsive {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+
+    .table-responsive::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .table-responsive::-webkit-scrollbar-track {
+        background: #f1f3f5;
+        border-radius: 4px;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb {
+        background: #adb5bd;
+        border-radius: 4px;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb:hover {
+        background: #868e96;
+    }
+
+    @media (max-width: 768px) {
+        .incidents-table th,
+        .incidents-table td {
+            padding: 0.75rem 1rem !important;
+            font-size: 0.85rem;
+        }
+
+        .card-header {
+            padding: 1rem 1.5rem !important;
+        }
+
+        .card-header h3 {
+            font-size: 1.25rem !important;
+        }
+    }
+    </style>
+
+    <script>
+    function activateAlert() {
+        if (confirm('Are you sure you want to activate the alert? This will change the system status to High Alert.')) {
+            fetch('{% url "toggle_alert" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to activate alert'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while activating the alert.');
+            });
+        }
+    }
+    </script>
+</div>
+{% endblock %}
