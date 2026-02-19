@@ -27,134 +27,13 @@ from django.db import transaction
 from .models import (
     Organization, Liaison, OperationalUpdate, Incident, IncidentEvent,
     Decision, SystemSettings, ShiftPacket,
-    ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials, UsersTable,
+    ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials, UsersTable, Shift, Department,
     Payment, Invoice,
     StripePayment, UserProfile,
 )
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
 from .payment_utils import generate_invoice_id, calculate_due_date, ensure_unique_invoice_id
-
-
-def detect_existing_user(email):
-    """
-    Check if email exists in database (User, Liaison, or ExternalUser tables).
-    Returns dict with 'exists', 'user', 'organization', 'source' keys.
-    """
-    email_lower = email.lower().strip()
-    
-    # Check User table
-    try:
-        user = User.objects.filter(email__iexact=email_lower).first()
-        if user:
-            try:
-                liaison = user.liaison_profile
-                return {
-                    'exists': True,
-                    'user': user,
-                    'organization': liaison.organization,
-                    'source': 'User'
-                }
-            except Liaison.DoesNotExist:
-                return {
-                    'exists': True,
-                    'user': user,
-                    'organization': None,
-                    'source': 'User'
-                }
-    except Exception:
-        pass
-    
-    # Check Liaison via user email
-    try:
-        liaison = Liaison.objects.filter(user__email__iexact=email_lower).first()
-        if liaison:
-            return {
-                'exists': True,
-                'user': liaison.user,
-                'organization': liaison.organization,
-                'source': 'Liaison'
-            }
-    except Exception:
-        pass
-    
-    # Check ExternalUser (legacy table)
-    try:
-        ext_user = ExternalUser.objects.filter(liaison_email__iexact=email_lower).first()
-        if ext_user:
-            # Try to find corresponding User
-            user = User.objects.filter(email__iexact=email_lower).first()
-            return {
-                'exists': True,
-                'user': user,
-                'organization': None,  # ExternalUser doesn't have direct org link
-                'source': 'ExternalUser'
-            }
-    except Exception:
-        pass
-    
-    return {
-        'exists': False,
-        'user': None,
-        'organization': None,
-        'source': None
-    }
-
-
-def resolve_login_username(value):
-    """
-    Resolve login input (Primary Liaison Name or full Liaison Email) to the Django User's username.
-    - If value contains '@', treat as full email and look up User by email.
-    - Otherwise treat as name: match User by get_full_name() or ExternalUser.primary_liaison_name -> email -> User.
-    Returns username string for authenticate(), or None if not found.
-    """
-    if not value or not isinstance(value, str):
-        return None
-    raw = value.strip()
-    if not raw:
-        return None
-    # Full email (e.g. mks@gmail.com)
-    if '@' in raw:
-        user = User.objects.filter(email__iexact=raw).first()
-        return user.username if user else None
-    # Name: match by full name or primary_liaison_name
-    for user in User.objects.all():
-        if user.get_full_name() and user.get_full_name().strip().lower() == raw.lower():
-            return user.username
-    ext = ExternalUser.objects.filter(primary_liaison_name__iexact=raw).first()
-    if ext:
-        user = User.objects.filter(email__iexact=ext.liaison_email).first()
-        return user.username if user else None
-    return None
-
-
-def user_has_active_subscription(username):
-    """
-    Return True if the user has an Active subscription with end_date >= today.
-    Used at login to allow only users with valid active subscription.
-    """
-    if not username:
-        return False
-    sub = ExternalSubscription.objects.filter(
-        username=username,
-        subscription_status='Active',
-        subscription_end_date__gte=timezone.now().date()
-    ).order_by('-subscription_end_date').first()
-    return sub is not None
-
-
-def calculate_new_subscription_end_date(subscription):
-    """
-    Calculate new subscription end date for renewal.
-    If expired: start from today + 365 days
-    If active: extend from current end_date + 365 days
-    """
-    if subscription.subscription_end_date < timezone.now().date():
-        # Expired: start from today
-        return timezone.now().date() + timedelta(days=365)
-    else:
-        # Active: extend from current end date
-        return subscription.subscription_end_date + timedelta(days=365)
 
 
 def index(request):
@@ -167,173 +46,28 @@ def checkout(request):
     if request.method == 'POST':
         form = CheckoutForm(request.POST)
         if form.is_valid():
-            liaison_email = form.cleaned_data['liaison_email']
+            # Store data in session
+            request.session['checkout_data'] = form.cleaned_data
+            # Convert UUIDs/Models to strings/IDs if necessary (Django forms clean data usually returns objects)
+            # However, for CharFields/ChoiceFields it's fine. 
+            # Check if any fields need serialization. Warning: valid form data might contain custom objects.
+            # Here it seems standard.
             
-            # Check if user already exists
-            user_check = detect_existing_user(liaison_email)
-            
-            if user_check['exists']:
-                # Existing user detected
-                request.session['checkout_data'] = form.cleaned_data
-                request.session['is_existing_user'] = True
-                request.session['existing_user_email'] = liaison_email
-                
-                # Add form error
-                form.add_error('liaison_email', 'This email/account already exists.')
-                
-                # Render with error and login button
-                return render(request, 'core/checkout.html', {
-                    'form': form,
-                    'show_login_button': True,
-                    'existing_email': liaison_email
-                })
-            else:
-                # New user - create account now (at Proceed to Payment), then redirect to payment
-                liaison_email = form.cleaned_data['liaison_email']
-                agency = form.cleaned_data['agency']
-                liaison_name = form.cleaned_data['liaison_name']
-                password = form.cleaned_data.get('password', 'resilience2024!')
-                channels = form.cleaned_data['channels']
-                incidents = form.cleaned_data['incidents']
-                role = form.cleaned_data.get('role', '')
-                dept = form.cleaned_data.get('dept', '')
-                countee = form.cleaned_data.get('countee', '')
-                # Username = full liaison email (e.g. mks@gmail.com); uniquify if needed
-                username = liaison_email.strip()
-                n = 0
-                while User.objects.filter(username=username).exists():
-                    n += 1
-                    username = f"{liaison_email.strip()}{n}"
-
-                with transaction.atomic():
-                    org = Organization.objects.create(
-                        name=agency,
-                        license_type='foundation',
-                        foundation_purchase_date=timezone.now()
-                    )
-                    user = User.objects.create(
-                        username=username,
-                        email=liaison_email,
-                        first_name=liaison_name.split()[0] if liaison_name.split() else '',
-                        last_name=' '.join(liaison_name.split()[1:]) if len(liaison_name.split()) > 1 else '',
-                    )
-                    user.set_password(password)
-                    user.save()
-                    Liaison.objects.update_or_create(
-                        user=user,
-                        defaults={
-                            'organization': org,
-                            'preferred_channels': channels,
-                            'incident_types': incidents,
-                            'role': role,
-                            'dept': dept,
-                            'countee': countee,
-                        }
-                    )
-                    SystemSettings.objects.get_or_create(
-                        organization=org,
-                        defaults={'cadence_hours': 24}
-                    )
-                    try:
-                        ExternalUser.objects.create(
-                            agency_name=agency,
-                            primary_liaison_name=liaison_name,
-                            liaison_email=liaison_email,
-                            key_incident_types=incidents,
-                            preferred_communication_channels=channels,
-                            created_at=timezone.now()
-                        )
-                    except Exception as e:
-                        print(f"Error creating legacy user: {e}")
-
-                # Placeholder subscription outside atomic so its failure doesn't roll back user creation.
-                # DB may require NOT NULL on duration/start/end - use placeholders; we update on payment.
-                try:
-                    placeholder_payment = ExternalPayment.objects.create(
-                        username=username,
-                        payment_status='Pending',
-                        payment_method='N/A',
-                        amount=0,
-                        payment_time=timezone.now()
-                    )
-                    ExternalSubscription.objects.create(
-                        username=username,
-                        payment=placeholder_payment,
-                        subscription_type='Foundation',
-                        duration=0,
-                        subscription_start_date=timezone.now().date(),
-                        subscription_end_date=timezone.now().date(),
-                        subscription_status='Inactive',
-                        created_at=timezone.now()
-                    )
-                except Exception as e:
-                    print(f"Error creating placeholder subscription: {e}")
-
-                # Do not auto-login; user must use login page to enter
-                request.session['checkout_data'] = form.cleaned_data
-                request.session['is_existing_user'] = False
-                request.session['checkout_user_id'] = user.id
-                request.session.pop('existing_user_email', None)
-                return redirect('payment')
+            # Simple direct redirect to payment
+            return redirect('payment')
     else:
         form = CheckoutForm()
-        # Pre-fill form from session if returning
-        checkout_data = request.session.get('checkout_data')
-        if checkout_data:
-            for field in form.fields:
-                if field in checkout_data:
-                    form.fields[field].initial = checkout_data[field]
     
     return render(request, 'core/checkout.html', {'form': form})
 
 
 @transaction.atomic
 def payment(request):
-    """Payment page - handles both new users and existing users (renewal)"""
+    """Payment page with support for Invoice, ACH, and Credit Card"""
     checkout_data = request.session.get('checkout_data')
     if not checkout_data:
         messages.error(request, 'Session expired or invalid. Please checkout again.')
         return redirect('checkout')
-    
-    # Determine if this is renewal (existing user) or new user
-    is_existing_user = request.session.get('is_existing_user', False)
-    is_logged_in = request.user.is_authenticated
-    
-    # If existing user but not logged in, redirect to login
-    if is_existing_user and not is_logged_in:
-        messages.info(request, 'Please login to renew your subscription.')
-        return redirect('login')
-    
-    # Load existing user data if renewal
-    existing_user = None
-    existing_org = None
-    existing_subscription = None
-    renewal_info = None
-    
-    if is_existing_user and is_logged_in:
-        try:
-            existing_user = request.user
-            liaison = existing_user.liaison_profile
-            existing_org = liaison.organization
-            
-            # Find most recent paid (Active) subscription for renewal
-            username = existing_user.username
-            existing_subscription = ExternalSubscription.objects.filter(
-                username=username,
-                subscription_status='Active'
-            ).order_by('-subscription_end_date').first()
-            
-            if existing_subscription:
-                new_end_date = calculate_new_subscription_end_date(existing_subscription)
-                renewal_info = {
-                    'org_name': existing_org.name,
-                    'current_end_date': existing_subscription.subscription_end_date,
-                    'new_end_date': new_end_date,
-                    'amount': 7500.00
-                }
-        except Exception as e:
-            messages.error(request, 'Error loading subscription information.')
-            return redirect('checkout')
 
     if request.method == 'POST':
         form = PaymentForm(request.POST)
@@ -341,184 +75,165 @@ def payment(request):
             payment_method = form.cleaned_data['payment_method']
             amount = 7500.00  # Fixed Foundation price
             
-            # For Stripe payments, redirect to Stripe payment page (user already created at checkout)
-            if payment_method == 'CARD':
-                request.session['payment_pending'] = True
-                request.session['is_renewal'] = is_existing_user
-                return redirect('stripe_payments_page')
+            # Retrieve checkout data
+            agency = checkout_data['agency']
+            liaison_name = checkout_data['liaison_name']
+            liaison_email = checkout_data['liaison_email']
+            channels = checkout_data['channels']
+            incidents = checkout_data['incidents']
             
-            # Handle Invoice and ACH payments (non-Stripe)
-            if is_existing_user and is_logged_in:
-                # RENEWAL FLOW - Update existing subscription
-                # Note: Invoice/ACH renewal handled here, Stripe handled in webhook
-                payment_status = 'INVOICED' if payment_method == 'INVOICE' else 'PROCESSING'
-                invoice_id = None
-                
-                if payment_method == 'INVOICE':
-                    invoice_id = ensure_unique_invoice_id()
-                
-                # Create Payment record linked to existing organization
-                payment_obj = Payment.objects.create(
-                    amount=amount,
-                    payment_method=payment_method,
-                    status=payment_status,
+            # Create organization
+            org = Organization.objects.create(
+                name=agency,
+                license_type='foundation',
+                foundation_purchase_date=timezone.now()
+            )
+            
+            # Create user account
+            username = liaison_email.split('@')[0]  # Use email prefix as username
+            
+            # Check if user already exists
+            user, created = User.objects.get_or_create(
+                username=username,
+                defaults={
+                    'email': liaison_email,
+                    'first_name': liaison_name.split()[0] if liaison_name.split() else '',
+                    'last_name': ' '.join(liaison_name.split()[1:]) if len(liaison_name.split()) > 1 else '',
+                }
+            )
+            
+            if not created:
+                # User exists, update email
+                user.email = liaison_email
+                user.save()
+            
+            # Set a default password (in production, send password reset email)
+            user.set_password('resilience2024!')
+            user.save()
+            
+            # Create or update liaison profile
+            Liaison.objects.update_or_create(
+                user=user,
+                defaults={
+                    'organization': org,
+                    'preferred_channels': channels,
+                    'incident_types': incidents
+                }
+            )
+            
+            # Create default settings
+            SystemSettings.objects.get_or_create(
+                organization=org,
+                defaults={'cadence_hours': 24}
+            )
+            
+            # Create Payment record
+            payment_status = 'INVOICED' if payment_method == 'INVOICE' else ('PROCESSING' if payment_method == 'ACH' else 'PAID')
+            invoice_id = None
+            
+            if payment_method == 'INVOICE':
+                invoice_id = ensure_unique_invoice_id()
+            
+            payment_obj = Payment.objects.create(
+                amount=amount,
+                payment_method=payment_method,
+                status=payment_status,
+                invoice_id=invoice_id,
+                organization=org
+            )
+            
+            # Create Invoice if payment method is INVOICE
+            if payment_method == 'INVOICE':
+                Invoice.objects.create(
                     invoice_id=invoice_id,
-                    organization=existing_org
+                    payment=payment_obj,
+                    billing_entity_name=form.cleaned_data['billing_entity_name'],
+                    billing_email=form.cleaned_data['billing_email'],
+                    po_number=form.cleaned_data['po_number'],
+                    payment_terms='NET_30',
+                    early_pay_terms='2% / 10, Net 30',
+                    due_date=calculate_due_date('NET_30')
+                )
+            
+            # --- Populate Legacy Tables ---
+            try:
+                # 1. Users
+                ext_user = ExternalUser.objects.create(
+                    agency_name=agency,
+                    primary_liaison_name=liaison_name,
+                    liaison_email=liaison_email,
+                    key_incident_types=incidents,
+                    preferred_communication_channels=channels,
+                    created_at=timezone.now()
                 )
                 
-                # Create Invoice if needed
-                if payment_method == 'INVOICE':
-                    Invoice.objects.create(
-                        invoice_id=invoice_id,
-                        payment=payment_obj,
-                        billing_entity_name=form.cleaned_data['billing_entity_name'],
-                        billing_email=form.cleaned_data['billing_email'],
-                        po_number=form.cleaned_data['po_number'],
-                        payment_terms='NET_30',
-                        early_pay_terms='2% / 10, Net 30',
-                        due_date=calculate_due_date('NET_30')
-                    )
+                # 2. Payments
+                payment_method_legacy = {
+                    'INVOICE': 'Invoice',
+                    'ACH': 'ACH',
+                    'CARD': 'Credit Card'
+                }.get(payment_method, 'Credit Card')
                 
-                # Update existing subscription
-                if existing_subscription:
-                    new_end_date = calculate_new_subscription_end_date(existing_subscription)
-                    # Update subscription using raw SQL (since managed=False)
-                    from django.db import connection
-                    with connection.cursor() as cursor:
-                        cursor.execute(
-                            """
-                            UPDATE subscriptions 
-                            SET subscription_end_date = %s,
-                                subscription_status = 'Active',
-                                duration = 365
-                            WHERE subscription_id = %s
-                            """,
-                            [new_end_date, existing_subscription.subscription_id]
-                        )
+                ext_payment = ExternalPayment.objects.create(
+                    username=username,
+                    payment_status='Completed',
+                    payment_method=payment_method_legacy,
+                    amount=amount,
+                    payment_time=timezone.now()
+                )
                 
-                # Create ExternalPayment record
-                try:
-                    payment_method_legacy = {
-                        'INVOICE': 'Invoice',
-                        'ACH': 'ACH',
-                        'CARD': 'Credit Card'
-                    }.get(payment_method, 'Credit Card')
-                    
-                    ExternalPayment.objects.create(
-                        username=existing_user.username,
-                        payment_status='Completed',
-                        payment_method=payment_method_legacy,
-                        amount=amount,
-                        payment_time=timezone.now()
-                    )
-                except Exception as e:
-                    print(f"Error creating legacy payment: {e}")
-                
+                # 3. Subscriptions
+                ExternalSubscription.objects.create(
+                    username=username,
+                    payment=ext_payment,
+                    subscription_type='Foundation',
+                    duration=365,
+                    subscription_start_date=timezone.now().date(),
+                    subscription_end_date=timezone.now().date() + timedelta(days=365),
+                    subscription_status='Active',
+                    created_at=timezone.now()
+                )
+            except Exception as e:
+                # Log error but don't fail the main flow
+                print(f"Error populating legacy tables: {e}") 
+            # -----------------------------
+            
+            # Send confirmation email
+            try:
+                send_payment_confirmation_email(
+                    user=user,
+                    payment_obj=payment_obj,
+                    billing_email=form.cleaned_data['billing_email'],
+                    payment_method=payment_method,
+                    amount=amount,
+                    invoice_id=invoice_id
+                )
+            except Exception as e:
+                print(f"Error sending email: {e}")
+            
+            # Auto-login user
+            user = authenticate(username=username, password='resilience2024!')
+            if user:
+                login(request, user)
                 # Clear session
                 request.session.pop('checkout_data', None)
-                request.session.pop('is_existing_user', None)
-                request.session.pop('existing_user_email', None)
                 
-                # Redirect to payment success page
-                return redirect('payment_success', is_renewal='true')
-            else:
-                # NEW USER FLOW - User/org/liaison already created at checkout; user may not be logged in
-                uid = request.session.get('checkout_user_id')
-                if request.user.is_authenticated:
-                    user = request.user
-                elif uid:
-                    user = get_object_or_404(User, id=uid)
+                # Set appropriate success message based on payment method
+                if payment_method == 'INVOICE':
+                    messages.success(request, 'Invoice generated successfully. Account created.')
+                elif payment_method == 'ACH':
+                    messages.success(request, 'Payment will be processed via ACH. An invoice will be issued for your records. Account created.')
                 else:
-                    messages.error(request, 'Session expired. Please checkout again.')
-                    return redirect('checkout')
-                liaison = user.liaison_profile
-                org = liaison.organization
-                username = user.username
-
-                payment_status = 'INVOICED' if payment_method == 'INVOICE' else ('PROCESSING' if payment_method == 'ACH' else 'PAID')
-                invoice_id = None
-                if payment_method == 'INVOICE':
-                    invoice_id = ensure_unique_invoice_id()
-
-                payment_obj = Payment.objects.create(
-                    amount=amount,
-                    payment_method=payment_method,
-                    status=payment_status,
-                    invoice_id=invoice_id,
-                    organization=org
-                )
-                if payment_method == 'INVOICE':
-                    Invoice.objects.create(
-                        invoice_id=invoice_id,
-                        payment=payment_obj,
-                        billing_entity_name=form.cleaned_data['billing_entity_name'],
-                        billing_email=form.cleaned_data['billing_email'],
-                        po_number=form.cleaned_data['po_number'],
-                        payment_terms='NET_30',
-                        early_pay_terms='2% / 10, Net 30',
-                        due_date=calculate_due_date('NET_30')
-                    )
-
-                try:
-                    payment_method_legacy = {
-                        'INVOICE': 'Invoice',
-                        'ACH': 'ACH',
-                        'CARD': 'Credit Card'
-                    }.get(payment_method, 'Credit Card')
-                    ext_payment = ExternalPayment.objects.create(
-                        username=username,
-                        payment_status='Completed',
-                        payment_method=payment_method_legacy,
-                        amount=amount,
-                        payment_time=timezone.now()
-                    )
-                    # Activate existing Inactive subscription from checkout, or create new
-                    inactive_sub = ExternalSubscription.objects.filter(
-                        username=username,
-                        subscription_status='Inactive'
-                    ).order_by('-created_at').first()
-                    if inactive_sub:
-                        inactive_sub.payment = ext_payment
-                        inactive_sub.subscription_status = 'Active'
-                        inactive_sub.subscription_start_date = timezone.now().date()
-                        inactive_sub.subscription_end_date = timezone.now().date() + timedelta(days=365)
-                        inactive_sub.duration = 365
-                        inactive_sub.save()
-                    else:
-                        ExternalSubscription.objects.create(
-                            username=username,
-                            payment=ext_payment,
-                            subscription_type='Foundation',
-                            duration=365,
-                            subscription_start_date=timezone.now().date(),
-                            subscription_end_date=timezone.now().date() + timedelta(days=365),
-                            subscription_status='Active',
-                            created_at=timezone.now()
-                        )
-                except Exception as e:
-                    print(f"Error populating legacy tables: {e}")
-
-                request.session.pop('checkout_data', None)
-                request.session.pop('is_existing_user', None)
-                request.session.pop('checkout_user_id', None)
-                return redirect('payment_success', is_renewal='false')
+                    messages.success(request, 'Payment successful! Account created.')
+                
+                return redirect('onboarding')
         else:
             # Form validation failed
-            return render(request, 'core/payment.html', {
-                'form': form,
-                'checkout_data': checkout_data,
-                'is_renewal': is_existing_user and is_logged_in,
-                'renewal_info': renewal_info
-            })
+            return render(request, 'core/payment.html', {'form': form, 'checkout_data': checkout_data})
     else:
-        form = PaymentForm()
+        form = PaymentForm()  # Default to INVOICE
     
-    return render(request, 'core/payment.html', {
-        'form': form,
-        'checkout_data': checkout_data,
-        'is_renewal': is_existing_user and is_logged_in,
-        'renewal_info': renewal_info
-    })
+    return render(request, 'core/payment.html', {'form': form, 'checkout_data': checkout_data})
 
 
 def send_payment_confirmation_email(user, payment_obj, billing_email, payment_method, amount, invoice_id=None):
@@ -565,7 +280,7 @@ If you have any questions, please contact our support team.
     send_mail(
         subject=subject,
         message=email_body,
-        from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@resilience.example.com'),
+        from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@resilience.example.com'),
         recipient_list=[billing_email],
         fail_silently=True,
     )
@@ -1232,62 +947,29 @@ def login_view(request):
     """User login: UserCredentials (legacy) or Django auth (Liaison after setup password)."""
     # Already logged in: do not show Sign In page; redirect so UI reflects logged-in status
     if request.user.is_authenticated or request.session.get('user_credentials_id'):
-        # Check if coming from renewal flow
-        if request.session.get('is_existing_user'):
-            return redirect('payment')
         return redirect('dashboard')
-    
-    # Check if coming from renewal flow (for pre-filling email)
-    is_renewal_flow = request.session.get('is_existing_user', False)
-    existing_email = request.session.get('existing_user_email', '')
-    
     if request.method == 'POST':
         form = UserLoginForm(request.POST)
         if form.is_valid():
-            login_input = form.cleaned_data['username'].strip()
+            username = form.cleaned_data['username']
             password = form.cleaned_data['password']
-            # 1) Try UserCredentials (legacy table) by exact username
+            # 1) Try UserCredentials (legacy table)
             try:
-                user_cred = UserCredentials.objects.get(username=login_input, password_hash=password)
-                # Require Active subscription unless logging in to renew (renewal flow)
-                if not request.session.get('is_existing_user') and not user_has_active_subscription(user_cred.username):
-                    messages.error(request, 'Your subscription is inactive or has expired. Please renew to log in.')
-                    return render(request, 'core/login.html', {
-                        'form': form,
-                        'existing_email': existing_email if is_renewal_flow else None
-                    })
+                user_cred = UserCredentials.objects.get(username=username, password_hash=password)
                 request.session['user_credentials_id'] = user_cred.user_id
                 request.session['user_credentials_username'] = user_cred.username
                 return redirect('dashboard')
             except UserCredentials.DoesNotExist:
                 pass
-            # 2) Django auth: accept Primary Liaison Name or full Liaison Email; resolve to username then authenticate
-            auth_username = resolve_login_username(login_input)
-            if auth_username is None:
-                auth_username = login_input  # fallback: try raw input as username (e.g. old mks-style)
-            user = authenticate(request, username=auth_username, password=password)
+            # 2) Try Django auth (Liaison users who set password via email link)
+            user = authenticate(request, username=username, password=password)
             if user is not None:
-                # Require Active subscription unless logging in to renew (renewal flow)
-                if not request.session.get('is_existing_user') and not user_has_active_subscription(user.username):
-                    messages.error(request, 'Your subscription is inactive or has expired. Please renew to log in.')
-                    return render(request, 'core/login.html', {
-                        'form': form,
-                        'existing_email': existing_email if is_renewal_flow else None
-                    })
                 login(request, user)
-
                 return redirect('dashboard')
-            messages.error(request, 'Username, email or password is incorrect. Please try again.')
+            messages.error(request, 'Invalid username or password.')
     else:
         form = UserLoginForm()
-        # Pre-fill email/username if coming from renewal flow
-        if is_renewal_flow and existing_email:
-            form.fields['username'].initial = existing_email
-    
-    return render(request, 'core/login.html', {
-        'form': form,
-        'existing_email': existing_email if is_renewal_flow else None
-    })
+    return render(request, 'core/login.html', {'form': form})
 
 
 def user_dashboard(request):
@@ -1333,26 +1015,87 @@ def admin_module(request):
     # Handle create user form submission
     if request.method == 'POST' and request.POST.get('action') == 'create_user':
         try:
+            # New fields
+            name = request.POST.get('name', '').strip()
+            mobile_no = request.POST.get('mobile_no', '').strip()
+            email_id = request.POST.get('email_id', '').strip()
+            department = request.POST.get('department', '').strip()
+            sub_department = request.POST.get('sub_department', '').strip()
+            shift_id = request.POST.get('shift_id', '').strip()
+            role = request.POST.get('role', '').strip()
+            
+            # Flexible shift fields (only if flexible shift is selected)
+            flexible_start_datetime = request.POST.get('flexible_start_datetime', '').strip()
+            flexible_end_datetime = request.POST.get('flexible_end_datetime', '').strip()
+            
+            # Existing fields
             agency_name = request.POST.get('agency_name', '').strip()
             primary_liaison_name = request.POST.get('primary_liaison_name', '').strip()
             liaison_email = request.POST.get('liaison_email', '').strip()
             key_incident_types = request.POST.get('key_incident_types', '').strip() or None
             preferred_communication_channels = request.POST.get('preferred_communication_channels', '').strip() or None
             
-            if not agency_name or not primary_liaison_name or not liaison_email:
-                messages.error(request, 'Agency Name, Primary Liaison Name, and Email are required.')
+            # Validation
+            required_fields = {
+                'name': name,
+                'mobile_no': mobile_no,
+                'email_id': email_id,
+                'department': department,
+                'sub_department': sub_department,
+                'role': role,
+                'shift_id': shift_id,
+                'agency_name': agency_name,
+                'primary_liaison_name': primary_liaison_name,
+                'liaison_email': liaison_email,
+            }
+            
+            # Check if shift is flexible and validate flexible shift fields
+            shift_obj = None
+            if shift_id:
+                try:
+                    shift_obj = Shift.objects.get(shift_id=int(shift_id))
+                    if shift_obj.shift_type == 'flexible':
+                        if not flexible_start_datetime or not flexible_end_datetime:
+                            messages.error(request, 'Start date/time and End date/time are required for flexible shifts.')
+                            return redirect('admin_module')
+                except Shift.DoesNotExist:
+                    messages.error(request, 'Invalid shift selected.')
+                    return redirect('admin_module')
+            
+            missing_fields = [field for field, value in required_fields.items() if not value]
+            
+            if missing_fields:
+                messages.error(request, f'Required fields missing: {", ".join(missing_fields)}')
             else:
+                # Parse flexible shift date/times if provided
+                flexible_start_datetime_obj = None
+                flexible_end_datetime_obj = None
+                if shift_obj and shift_obj.shift_type == 'flexible':
+                    try:
+                        from datetime import datetime
+                        flexible_start_datetime_obj = datetime.strptime(flexible_start_datetime, '%Y-%m-%dT%H:%M')
+                        flexible_end_datetime_obj = datetime.strptime(flexible_end_datetime, '%Y-%m-%dT%H:%M')
+                    except ValueError:
+                        messages.error(request, 'Invalid flexible shift date/time format.')
+                        return redirect('admin_module')
+                
                 # Create new user in users table
-                # Note: created_at will be set automatically by MySQL CURRENT_TIMESTAMP default
                 UsersTable.objects.create(
+                    name=name or None,
+                    mobile_no=mobile_no or None,
+                    email_id=email_id or None,
+                    department=department or None,
+                    sub_department=sub_department or None,
+                    shift_id=int(shift_id) if shift_id else None,
+                    role=role or None,
                     agency_name=agency_name,
                     primary_liaison_name=primary_liaison_name,
                     liaison_email=liaison_email,
                     key_incident_types=key_incident_types,
                     preferred_communication_channels=preferred_communication_channels,
-                    created_at=timezone.now(),  # Explicitly set created_at
+                    created_at=timezone.now(),
                 )
-                messages.success(request, f'User "{primary_liaison_name}" from "{agency_name}" created successfully!')
+                messages.success(request, f'User "{name}" from "{agency_name}" created successfully!')
                 return redirect('admin_module')
         except Exception as e:
             messages.error(request, f'Error creating user: {str(e)}')
@@ -1360,8 +1103,61 @@ def admin_module(request):
     # Get all users from the users table
     users_list = UsersTable.objects.all().order_by('-created_at')
     
+    # Get all shifts from core_shifts table
+    shifts = list(Shift.objects.all().order_by('shift_type', 'shift_start_time'))
+    
+    # Map shift_incharge id to a human-readable name from users table
+    users_by_id = {u.id: u for u in users_list}
+    for shift in shifts:
+        incharge_user = users_by_id.get(shift.shift_incharge)
+        if incharge_user:
+            shift.incharge_name = incharge_user.primary_liaison_name
+        else:
+            shift.incharge_name = None
+    
+    # Get all departments from core_department table
+    departments = Department.objects.all().order_by('category', 'service_name')
+    
+    # Group departments by category for easier template rendering
+    departments_by_category = {}
+    for dept in departments:
+        category = dept.category
+        if category not in departments_by_category:
+            departments_by_category[category] = []
+        departments_by_category[category].append(dept.service_name)
+    
+    # Get logged-in user's data from UsersTable for pre-populating Agency & Contact Information
+    logged_in_user_data = None
+    if 'user_credentials_id' in request.session:
+        # Try to find user by username from UserCredentials
+        username = request.session.get('user_credentials_username', '')
+        try:
+            # Try to find by primary_liaison_name or liaison_email matching username
+            logged_in_user_data = UsersTable.objects.filter(
+                Q(primary_liaison_name__icontains=username) | 
+                Q(liaison_email__icontains=username)
+            ).first()
+        except:
+            pass
+    elif request.user.is_authenticated:
+        # Try to find by Django User's email or username
+        try:
+            user_email = getattr(request.user, 'email', '')
+            user_username = getattr(request.user, 'username', '')
+            logged_in_user_data = UsersTable.objects.filter(
+                Q(liaison_email__icontains=user_email) | 
+                Q(primary_liaison_name__icontains=user_username) |
+                Q(liaison_email__icontains=user_username)
+            ).first()
+        except:
+            pass
+    
     return render(request, 'core/admin_module.html', {
         'users_list': users_list,
+        'shifts': shifts,
+        'departments': departments,
+        'departments_by_category': departments_by_category,
+        'logged_in_user_data': logged_in_user_data,
         'is_admin': True,
         'user': request.user,
     })
@@ -1412,11 +1208,6 @@ def create_payment_intent(request):
         amount = int(float(request.GET.get('amount', 7500.00)) * 100)  # Convert to cents
         currency = request.GET.get('currency', 'usd').lower()
         user_id = request.GET.get('user_id', None)
-        # If user_id not in query, check session (logged-in or checkout flow)
-        if not user_id and hasattr(request, 'user') and request.user.is_authenticated:
-            user_id = request.user.id
-        if not user_id:
-            user_id = request.session.get('checkout_user_id')
         description = request.GET.get('description', 'Resilience Foundation License')
         
         # Validate amount
@@ -1546,115 +1337,6 @@ def stripe_webhook(request):
             
             stripe_payment.save()
             
-            # Handle subscription update/create based on user_id
-            if stripe_payment.user_id:
-                try:
-                    user = User.objects.get(pk=stripe_payment.user_id)
-                    username = user.username
-                    
-                    # Check if user has existing Active subscription (renewal)
-                    existing_subscription = ExternalSubscription.objects.filter(
-                        username=username,
-                        subscription_status='Active'
-                    ).order_by('-subscription_end_date').first()
-                    
-                    if existing_subscription:
-                        # RENEWAL: Update existing subscription
-                        new_end_date = calculate_new_subscription_end_date(existing_subscription)
-                        
-                        # Update subscription using raw SQL (since managed=False)
-                        from django.db import connection
-                        with connection.cursor() as cursor:
-                            cursor.execute(
-                                """
-                                UPDATE subscriptions 
-                                SET subscription_end_date = %s,
-                                    subscription_status = 'Active',
-                                    duration = 365
-                                WHERE subscription_id = %s
-                                """,
-                                [new_end_date, existing_subscription.subscription_id]
-                            )
-                        
-                        # Create Payment record linked to existing organization
-                        try:
-                            liaison = user.liaison_profile
-                            org = liaison.organization
-                            
-                            Payment.objects.create(
-                                amount=stripe_payment.amount / 100.0,  # Convert cents to dollars
-                                payment_method='CARD',
-                                status='PAID',
-                                organization=org
-                            )
-                            
-                            # Create ExternalPayment
-                            ExternalPayment.objects.create(
-                                username=username,
-                                payment_status='Completed',
-                                payment_method='Credit Card',
-                                amount=stripe_payment.amount / 100.0,
-                                payment_time=timezone.now()
-                            )
-                        except Exception as e:
-                            import logging
-                            logger = logging.getLogger(__name__)
-                            logger.error(f'Error creating payment records in webhook: {e}')
-                    else:
-                        # NEW USER: Activate existing Inactive subscription from checkout, or create new
-                        try:
-                            liaison = user.liaison_profile
-                            org = liaison.organization
-                            
-                            Payment.objects.create(
-                                amount=stripe_payment.amount / 100.0,
-                                payment_method='CARD',
-                                status='PAID',
-                                organization=org
-                            )
-                            ext_payment = ExternalPayment.objects.create(
-                                username=username,
-                                payment_status='Completed',
-                                payment_method='Credit Card',
-                                amount=stripe_payment.amount / 100.0,
-                                payment_time=timezone.now()
-                            )
-                            inactive_sub = ExternalSubscription.objects.filter(
-                                username=username,
-                                subscription_status='Inactive'
-                            ).order_by('-created_at').first()
-                            if inactive_sub:
-                                inactive_sub.payment = ext_payment
-                                inactive_sub.subscription_status = 'Active'
-                                inactive_sub.subscription_start_date = timezone.now().date()
-                                inactive_sub.subscription_end_date = timezone.now().date() + timedelta(days=365)
-                                inactive_sub.duration = 365
-                                inactive_sub.save()
-                            else:
-                                ExternalSubscription.objects.create(
-                                    username=username,
-                                    payment=ext_payment,
-                                    subscription_type='Foundation',
-                                    duration=365,
-                                    subscription_start_date=timezone.now().date(),
-                                    subscription_end_date=timezone.now().date() + timedelta(days=365),
-                                    subscription_status='Active',
-                                    created_at=timezone.now()
-                                )
-                        except Exception as e:
-                            import logging
-                            logger = logging.getLogger(__name__)
-                            logger.error(f'Error creating subscription in webhook: {e}')
-                except User.DoesNotExist:
-                    # User not found - log but don't fail
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.warning(f'User {stripe_payment.user_id} not found for payment {payment_intent_id}')
-                except Exception as e:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.error(f'Error processing subscription in webhook: {e}')
-            
         elif event_type == 'payment_intent.payment_failed':
             payment_intent_id = event_data['id']
             
@@ -1685,56 +1367,8 @@ def stripe_webhook(request):
         return HttpResponse(status=200)
 
 
-def payment_success(request, is_renewal='false'):
-    """
-    Payment success page - shown after successful payment.
-    Shows download PDF button and login button with auto-redirect.
-    """
-    is_renewal_bool = is_renewal.lower() == 'true'
-    
-    # Get payment intent ID from session or query parameter
-    payment_intent_id = request.GET.get('payment_intent_id') or request.session.get('last_payment_intent_id')
-    
-    # Get subscription info if renewal
-    renewal_info = None
-    if is_renewal_bool and request.user.is_authenticated:
-        try:
-            user = request.user
-            username = user.username
-            subscription = ExternalSubscription.objects.filter(
-                username=username,
-                subscription_status='Active'
-            ).order_by('-subscription_end_date').first()
-            
-            if subscription:
-                renewal_info = {
-                    'new_end_date': subscription.subscription_end_date
-                }
-        except Exception:
-            pass
-    
-    # Clear payment and checkout session flags
-    request.session.pop('payment_pending', None)
-    request.session.pop('last_payment_intent_id', None)
-    request.session.pop('checkout_user_id', None)
-    request.session.pop('checkout_data', None)
-    request.session.pop('is_existing_user', None)
-
-    return render(request, 'core/payment_success.html', {
-        'is_renewal': is_renewal_bool,
-        'payment_intent_id': payment_intent_id,
-        'renewal_info': renewal_info
-    })
-
-
 def stripe_payments_page(request):
     """Stripe payments test page"""
-    # Store user_id in session for webhook (logged-in or checkout flow)
-    if request.user.is_authenticated:
-        request.session['stripe_user_id'] = request.user.id
-    elif request.session.get('checkout_user_id'):
-        request.session['stripe_user_id'] = request.session['checkout_user_id']
-
     return render(request, 'core/stripepayments.html', {
         'STRIPE_PUBLIC_KEY': settings.STRIPE_PUBLIC_KEY
     })

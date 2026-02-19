@@ -9,7 +9,6 @@ urlpatterns = [
     path('', views.index, name='index'),
     path('checkout/', views.checkout, name='checkout'),
     path('payment/', views.payment, name='payment'),
-    path('payment-success/<str:is_renewal>/', views.payment_success, name='payment_success'),
     path('onboarding/', views.onboarding, name='onboarding'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('admin-module/', views.admin_module, name='admin_module'),

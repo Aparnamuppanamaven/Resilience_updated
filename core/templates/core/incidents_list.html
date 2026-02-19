@@ -32,51 +32,59 @@
     </nav>
 
     <main class="main-content">
-        <header class="top-header">
+        <header class="top-header" style="display: flex; align-items: center; justify-content: space-between;">
             <h2>Incidents</h2>
-            <div class="header-status">
-                <div class="status-indicator">
-                    <span class="status-label">Current Status:</span>
-                    <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="header-status">
+                    <div class="status-indicator">
+                        <span class="status-label">Current Status:</span>
+                        <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                    </div>
+                    {% if current_status == 'Normal' %}
+                    <button type="button" class="btn-alert" id="activateAlertBtn" onclick="activateAlert()">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
+                    </button>
+                    {% endif %}
+                    <div class="sync-time">
+                        <span>Last detailed sync: {{ last_sync_display }}</span>
+                    </div>
                 </div>
-                {% if current_status == 'Normal' %}
-                <button type="button" class="btn-alert" id="activateAlertBtn" onclick="activateAlert()">
-                    <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
+                <button type="button" onclick="confirmLogout()" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.25rem;
+                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(239, 68, 68, 0.4)'" 
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.3)'"
+                   title="Logout">
+                    <i class="fa-solid fa-sign-out-alt"></i>
+                    <span>Logout</span>
                 </button>
-                {% endif %}
-                <div class="sync-time">
-                    <span>Last detailed sync: {{ last_sync_display }}</span>
-                </div>
             </div>
         </header>
 
         <div class="view-container">
-            <div class="card" style="background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: none; overflow: hidden;">
+            <div class="card" style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; overflow: hidden;">
                 <div class="card-header" style="
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 1.5rem 2rem;
-                    border-bottom: none;
+                    background: #f9fafb;
+                    color: #111827;
+                    padding: 0.75rem 1rem;
+                    border-bottom: 1px solid #e5e7eb;
                 ">
                     <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div style="display: flex; align-items: center; gap: 1rem;">
-                            <div style="
-                                width: 48px;
-                                height: 48px;
-                                background: rgba(255,255,255,0.2);
-                                border-radius: 12px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            ">
-                                <i class="fa-solid fa-list-ul" style="font-size: 1.5rem;"></i>
-                            </div>
-                            <div>
-                                <h3 class="card-title" style="margin: 0; font-size: 1.5rem; font-weight: 600; color: white;">Incidents List</h3>
-                                <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem; color: rgba(255,255,255,0.9);">
-                                    {{ incidents|length }} incident{{ incidents|length|pluralize }} total
-                                </p>
-                            </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fa-solid fa-list-ul" style="font-size: 1rem; color: #667eea;"></i>
+                            <h3 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; color: #111827;">Incidents</h3>
+                            <span style="font-size: 0.875rem; color: #6b7280; margin-left: 0.5rem;">({{ incidents|length }})</span>
                         </div>
                     </div>
                 </div>
@@ -100,52 +108,55 @@
                 <div class="table-responsive" style="overflow-x: auto; padding: 0;">
                     <table class="incidents-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
                         <thead>
-                            <tr style="background: linear-gradient(to right, #f8f9fa, #f1f3f5);">
+                            <tr style="background: #f9fafb;">
                                 <th style="
-                                    padding: 1rem 2rem;
+                                    padding: 0.625rem 1rem;
                                     text-align: left;
                                     font-weight: 600;
-                                    color: #495057;
-                                    font-size: 0.875rem;
+                                    color: #374151;
+                                    font-size: 0.75rem;
                                     text-transform: uppercase;
-                                    letter-spacing: 0.5px;
-                                    border-bottom: 2px solid #e9ecef;
+                                    letter-spacing: 0.025em;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    white-space: nowrap;
                                 ">
-                                    <i class="fa-solid fa-file-lines" style="margin-right: 0.5rem; color: #667eea;"></i>Update Title
+                                    Update Title
                                 </th>
                                 <th style="
-                                    padding: 1rem 2rem;
+                                    padding: 0.625rem 1rem;
                                     text-align: left;
                                     font-weight: 600;
-                                    color: #495057;
-                                    font-size: 0.875rem;
+                                    color: #374151;
+                                    font-size: 0.75rem;
                                     text-transform: uppercase;
-                                    letter-spacing: 0.5px;
-                                    border-bottom: 2px solid #e9ecef;
+                                    letter-spacing: 0.025em;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    white-space: nowrap;
                                 ">
-                                    <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem; color: #f5576c;"></i>Severity
+                                    Severity
                                 </th>
                                 <th style="
-                                    padding: 1rem 2rem;
+                                    padding: 0.625rem 1rem;
                                     text-align: left;
                                     font-weight: 600;
-                                    color: #495057;
-                                    font-size: 0.875rem;
+                                    color: #374151;
+                                    font-size: 0.75rem;
                                     text-transform: uppercase;
-                                    letter-spacing: 0.5px;
-                                    border-bottom: 2px solid #e9ecef;
+                                    letter-spacing: 0.025em;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    white-space: nowrap;
                                 ">
-                                    <i class="fa-solid fa-clock" style="margin-right: 0.5rem; color: #4facfe;"></i>Start Time
+                                    Start Time
                                 </th>
                                 <th style="
-                                    padding: 1rem 2rem;
+                                    padding: 0.625rem 1rem;
                                     text-align: center;
                                     font-weight: 600;
-                                    color: #495057;
-                                    font-size: 0.875rem;
+                                    color: #374151;
+                                    font-size: 0.75rem;
                                     text-transform: uppercase;
-                                    letter-spacing: 0.5px;
-                                    border-bottom: 2px solid #e9ecef;
+                                    letter-spacing: 0.025em;
+                                    border-bottom: 1px solid #e5e7eb;
                                     width: 60px;
                                 "></th>
                             </tr>
@@ -153,25 +164,24 @@
                         <tbody>
                             {% for incident in incidents %}
                             <tr class="incident-row" style="
-                                border-bottom: 1px solid #f1f3f5;
+                                border-bottom: 1px solid #e5e7eb;
                                 cursor: pointer;
-                                transition: all 0.2s ease;
+                                transition: background-color 0.15s ease;
                                 background: white;
-                            " data-incident-url="{% url 'incident_detail' incident.id %}">
-                                <td style="padding: 1.25rem 2rem;">
+
                                     <a href="{% url 'incident_detail' incident.id %}" style="
                                         color: #6366f1;
                                         text-decoration: none;
                                         font-weight: 500;
-                                        font-size: 0.95rem;
+                                        font-size: 0.875rem;
                                         display: flex;
                                         align-items: center;
-                                        gap: 0.75rem;
-                                        transition: color 0.2s ease;
-                                    ">
+                                        gap: 0.5rem;
+                                        transition: color 0.15s ease;
+                                    " onmouseover="this.style.color='#4f46e5'" onmouseout="this.style.color='#6366f1'">
                                         <div style="
-                                            width: 8px;
-                                            height: 8px;
+                                            width: 6px;
+                                            height: 6px;
                                             border-radius: 50%;
                                             background: #6366f1;
                                             flex-shrink: 0;
@@ -179,19 +189,7 @@
                                         {{ incident.title }}
                                     </a>
                                 </td>
-                                <td style="padding: 1.25rem 2rem;">
-                                    {% if incident.severity == 'LOW' %}
-                                    <span class="severity-badge severity-low" style="
-                                        padding: 6px 14px;
-                                        border-radius: 20px;
-                                        font-size: 0.8rem;
-                                        font-weight: 600;
-                                        display: inline-block;
-                                        text-transform: uppercase;
-                                        letter-spacing: 0.3px;
-                                        background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
-                                        color: #0c5460;
-                                        box-shadow: 0 2px 4px rgba(13, 84, 96, 0.1);
+
                                     ">
                                         {{ incident.get_severity_display|default:incident.severity }}
                                     </span>
@@ -257,18 +255,18 @@
                                     </span>
                                     {% endif %}
                                 </td>
-                                <td style="padding: 1.25rem 2rem; color: #6c757d; font-size: 0.9rem;">
+                                <td style="padding: 0.75rem 1rem;">
                                     {% if incident.timestamp %}
-                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <i class="fa-solid fa-calendar-days" style="color: #adb5bd; font-size: 0.85rem;"></i>
-                                            <span>{{ incident.timestamp|date:"M d, Y g:i A" }}</span>
+                                        <div style="color: #6b7280; font-size: 0.875rem; line-height: 1.25rem;">
+                                            {{ incident.timestamp|date:"M d, Y" }}<br>
+                                            <span style="font-size: 0.75rem; color: #9ca3af;">{{ incident.timestamp|date:"g:i A" }}</span>
                                         </div>
                                     {% else %}
-                                        <span style="color: #adb5bd; font-style: italic;">Not set</span>
+                                        <span style="color: #9ca3af; font-size: 0.875rem;">—</span>
                                     {% endif %}
                                 </td>
-                                <td style="padding: 1.25rem 2rem; text-align: center;">
-                                    <i class="fa-solid fa-chevron-right" style="color: #adb5bd; transition: all 0.2s ease;"></i>
+                                <td style="padding: 0.75rem 1rem; text-align: center;">
+                                    <i class="fa-solid fa-chevron-right" style="color: #9ca3af; font-size: 0.75rem;"></i>
                                 </td>
                             </tr>
                             {% endfor %}
