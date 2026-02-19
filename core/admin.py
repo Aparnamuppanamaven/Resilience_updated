@@ -29,8 +29,8 @@ class LiaisonAdmin(admin.ModelAdmin):
 
 @admin.register(OperationalUpdate)
 class OperationalUpdateAdmin(admin.ModelAdmin):
-    list_display = ['title', 'organization', 'severity', 'owner', 'timestamp', 'is_synthesized']
-    list_filter = ['severity', 'is_synthesized', 'timestamp', 'organization']
+    list_display = ['title', 'organization', 'severity', 'owner', 'timestamp']
+    list_filter = ['severity', 'timestamp', 'organization']
     search_fields = ['title', 'description']
     readonly_fields = ['timestamp']
     date_hierarchy = 'timestamp'

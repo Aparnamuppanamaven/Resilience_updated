@@ -51,26 +51,59 @@ class Liaison(models.Model):
         return f"{self.user.get_full_name()} - {self.organization.name}"
 
 
-class OperationalUpdate(models.Model):
-    """Operational updates/incidents"""
+class Incident(models.Model):
+    """Incidents - maps to existing core_operationalupdate table"""
     SEVERITY_CHOICES = [
-        ('Low', 'Low - Informational'),
-        ('Medium', 'Medium - Potential Impact'),
-        ('High', 'High - Critical Incident'),
+        ('LOW', 'Low - Informational'),
+        ('MEDIUM', 'Medium - Potential Impact'),
+        ('HIGH', 'High - Critical Incident'),
+        ('CRITICAL', 'Critical'),
     ]
     
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='updates')
+    id = models.BigAutoField(primary_key=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='incidents', db_column='organization_id')
     title = models.CharField(max_length=255)
-    description = models.TextField()
-    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='Low')
-    owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, related_name='owned_updates')
+    description = models.TextField(blank=True)
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='LOW')
+    impact = models.TextField(blank=True, help_text="Why it matters - operational impact analysis")
+    next_action = models.CharField(max_length=255, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, blank=True, db_column='owner_id')
+    is_synthesized = models.BooleanField(default=False)
+    
+    class Meta:
+        db_table = 'core_operationalupdate'
+        ordering = ['-timestamp']
+        managed = False  # Don't let Django manage this table - it already exists
+    
+    def __str__(self):
+        return f"{self.title} ({self.severity})"
+
+
+class OperationalUpdate(models.Model):
+    """Operational updates/incidents - maps to existing core_operationalupdate table"""
+    SEVERITY_CHOICES = [
+        ('LOW', 'Low - Informational'),
+        ('MEDIUM', 'Medium - Potential Impact'),
+        ('HIGH', 'High - Critical Incident'),
+        ('CRITICAL', 'Critical'),
+    ]
+    
+    id = models.BigAutoField(primary_key=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='updates', db_column='organization_id')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='LOW')
+    owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, blank=True, related_name='owned_updates', db_column='owner_id')
     impact = models.TextField(blank=True, help_text="Why it matters - operational impact analysis")
     next_action = models.CharField(max_length=255, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     is_synthesized = models.BooleanField(default=False)
     
     class Meta:
+        db_table = 'core_operationalupdate'
         ordering = ['-timestamp']
+        managed = False  # Don't let Django manage this table - it already exists
     
     def __str__(self):
         return f"{self.title} ({self.severity})"
@@ -268,6 +301,67 @@ class UserCredentials(models.Model):
 
     def __str__(self):
         return self.username
+
+
+class UsersTable(models.Model):
+    """Users table from database - maps to existing users table"""
+    id = models.AutoField(primary_key=True)
+    agency_name = models.CharField(max_length=150)
+    primary_liaison_name = models.CharField(max_length=100)
+    liaison_email = models.CharField(max_length=150)
+    key_incident_types = models.CharField(max_length=255, blank=True, null=True)
+    preferred_communication_channels = models.CharField(max_length=100, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=False, null=True, blank=True)
+    
+    class Meta:
+        db_table = 'users'
+        managed = False  # Don't let Django manage this table - it already exists
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.primary_liaison_name} ({self.agency_name})"
+
+
+class UserProfile(models.Model):
+    """Extended user profile with additional fields"""
+    ROLE_CHOICES = [
+        ('admin', 'Administrator'),
+        ('manager', 'Manager'),
+        ('operator', 'Operator'),
+        ('analyst', 'Analyst'),
+        ('liaison', 'Liaison'),
+        ('viewer', 'Viewer'),
+    ]
+    
+    user_credential = models.OneToOneField(
+        UserCredentials, 
+        on_delete=models.CASCADE, 
+        related_name='profile',
+        primary_key=True
+    )
+    full_name = models.CharField(max_length=255)
+    mobile = models.CharField(max_length=20, blank=True)
+    email = models.EmailField()
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='viewer')
+    department = models.CharField(max_length=255, blank=True)
+    shift_start_time = models.TimeField(null=True, blank=True, help_text="Shift start time (HH:MM format)")
+    shift_end_time = models.TimeField(null=True, blank=True, help_text="Shift end time (HH:MM format)")
+    designated_manager = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='subordinates',
+        help_text="Manager assigned to this user"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.full_name} ({self.user_credential.username})"
 
 
 class Payment(models.Model):

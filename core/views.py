@@ -25,13 +25,13 @@ from reportlab.pdfgen import canvas
 
 from django.db import transaction
 from .models import (
-    Organization, Liaison, OperationalUpdate,
+    Organization, Liaison, OperationalUpdate, Incident,
     Decision, SystemSettings, ShiftPacket,
-    ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials,
+    ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials, UsersTable,
     Payment, Invoice,
-    StripePayment,
+    StripePayment, UserProfile,
 )
-from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm
+from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
 from .payment_utils import generate_invoice_id, calculate_due_date, ensure_unique_invoice_id
 
@@ -439,7 +439,7 @@ def dashboard(request):
             organization=organization,
             timestamp__gte=last_sync
         ).count(),
-        'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'is_admin': True,  # Always show admin link - access controlled by view decorator
     }
     
     return render(request, 'core/dashboard.html', context)
@@ -490,19 +490,27 @@ def capture(request):
     if request.method == 'POST':
         form = OperationalUpdateForm(request.POST)
         if form.is_valid():
-            update = form.save(commit=False)
-            update.organization = organization
-            # Owner can be None for legacy users (model allows null=True)
-            update.owner = liaison if liaison else None
-            update.save()
+            # Save to core_operationalupdate table
+            incident = Incident.objects.create(
+                organization=organization,
+                title=form.cleaned_data['title'],
+                severity=form.cleaned_data['severity'],
+                description=form.cleaned_data['description'] or '',  # Required field, use empty string if blank
+                impact=form.cleaned_data['impact'] or '',  # Required field
+                next_action=form.cleaned_data['next_action'] or '',  # Required field
+                owner=liaison if liaison else None,
+                is_synthesized=False,  # Required field, default to False
+            )
             messages.success(request, 'Update captured successfully!')
             return redirect('dashboard')
     else:
         form = OperationalUpdateForm()
+        # Set default start_time to current time (formatted for datetime-local input)
+        now = timezone.now()
+        # Format: YYYY-MM-DDTHH:MM for datetime-local input
+        form.fields['start_time'].initial = now.strftime('%Y-%m-%dT%H:%M')
     
     # Format last sync time
-    from django.utils import timezone
-    from datetime import timedelta
     last_sync = settings_obj.last_sync
     now = timezone.now()
     time_diff = now - last_sync
@@ -518,9 +526,21 @@ def capture(request):
     else:
         sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
     
+    # Check if user is admin (Django staff or UserProfile admin role)
+    is_admin_user = False
+    if request.user.is_authenticated:
+        is_admin_user = request.user.is_staff
+    elif 'user_credentials_id' in request.session:
+        try:
+            user_cred = UserCredentials.objects.get(user_id=request.session['user_credentials_id'])
+            if hasattr(user_cred, 'profile'):
+                is_admin_user = user_cred.profile.role in ['admin', 'manager']
+        except:
+            pass
+    
     return render(request, 'core/capture.html', {
         'form': form,
-        'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'is_admin': True,  # Always show admin link - access controlled by view decorator
         'current_status': settings_obj.current_status,
         'last_sync_display': sync_time_display,
         'liaison': liaison,
@@ -593,7 +613,7 @@ def normalize(request):
     
     return render(request, 'core/normalize.html', {
         'updates': updates,
-        'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'is_admin': True,  # Always show admin link - access controlled by view decorator
         'current_status': settings_obj.current_status,
         'last_sync_display': sync_time_display,
     })
@@ -706,7 +726,7 @@ def distribute(request):
         'updates': updates,
         'high_risk_updates': high_risk_updates,
         'packet_number': packet_number,
-        'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'is_admin': True,  # Always show admin link - access controlled by view decorator
         'current_status': settings_obj.current_status,
         'last_sync_display': sync_time_display,
     }
@@ -780,7 +800,7 @@ def decision_log(request):
     
     return render(request, 'core/decision_log.html', {
         'decisions': decisions,
-        'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'is_admin': True,  # Always show admin link - access controlled by view decorator
         'current_status': settings_obj.current_status,
         'last_sync_display': sync_time_display,
     })
@@ -849,7 +869,7 @@ def coverage(request):
     return render(request, 'core/coverage.html', {
         'organization': organization,
         'liaison': liaison,
-        'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'is_admin': True,  # Always show admin link - access controlled by view decorator
         'current_status': settings_obj.current_status,
         'last_sync_display': sync_time_display,
     })
@@ -938,7 +958,6 @@ def login_view(request):
                 user_cred = UserCredentials.objects.get(username=username, password_hash=password)
                 request.session['user_credentials_id'] = user_cred.user_id
                 request.session['user_credentials_username'] = user_cred.username
-                messages.success(request, f'Welcome back, {user_cred.username}!')
                 return redirect('dashboard')
             except UserCredentials.DoesNotExist:
                 pass
@@ -946,7 +965,6 @@ def login_view(request):
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
-                messages.success(request, f'Welcome back, {user.get_full_name() or user.username}!')
                 return redirect('dashboard')
             messages.error(request, 'Invalid username or password.')
     else:
@@ -970,20 +988,64 @@ def _staff_required(user):
     return user.is_authenticated and user.is_staff
 
 
-@login_required
-@user_passes_test(_staff_required, login_url='/login/')
 def admin_module(request):
-    """Admin page: add and list users (UserCredentials). Staff only."""
-    users_list = UserCredentials.objects.all().order_by('username')
-    form = UserSignupForm(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        messages.success(request, f'User "{form.cleaned_data["username"]}" added successfully.')
-        return redirect('admin_module')
+    """Admin page: list users from users table."""
+    # Check authentication (Django auth or legacy session)
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        messages.error(request, 'Please login first.')
+        return redirect('login')
+    
+    # Handle UserCredentials (legacy session auth) - create mock user object
+    if not request.user.is_authenticated and 'user_credentials_id' in request.session:
+        username_value = request.session.get('user_credentials_username', 'Admin')
+        
+        class MockUser:
+            def __init__(self, username):
+                self.username = username
+                self.first_name = username
+                self.last_name = ""
+                self.is_authenticated = True
+                self.is_staff = False
+            
+            def get_full_name(self):
+                return self.username
+        
+        request.user = MockUser(username_value)
+    
+    # Handle create user form submission
+    if request.method == 'POST' and request.POST.get('action') == 'create_user':
+        try:
+            agency_name = request.POST.get('agency_name', '').strip()
+            primary_liaison_name = request.POST.get('primary_liaison_name', '').strip()
+            liaison_email = request.POST.get('liaison_email', '').strip()
+            key_incident_types = request.POST.get('key_incident_types', '').strip() or None
+            preferred_communication_channels = request.POST.get('preferred_communication_channels', '').strip() or None
+            
+            if not agency_name or not primary_liaison_name or not liaison_email:
+                messages.error(request, 'Agency Name, Primary Liaison Name, and Email are required.')
+            else:
+                # Create new user in users table
+                # Note: created_at will be set automatically by MySQL CURRENT_TIMESTAMP default
+                UsersTable.objects.create(
+                    agency_name=agency_name,
+                    primary_liaison_name=primary_liaison_name,
+                    liaison_email=liaison_email,
+                    key_incident_types=key_incident_types,
+                    preferred_communication_channels=preferred_communication_channels,
+                    created_at=timezone.now(),  # Explicitly set created_at
+                )
+                messages.success(request, f'User "{primary_liaison_name}" from "{agency_name}" created successfully!')
+                return redirect('admin_module')
+        except Exception as e:
+            messages.error(request, f'Error creating user: {str(e)}')
+    
+    # Get all users from the users table
+    users_list = UsersTable.objects.all().order_by('-created_at')
+    
     return render(request, 'core/admin_module.html', {
         'users_list': users_list,
-        'form': form,
-        'is_admin': request.user.is_authenticated and request.user.is_staff,
+        'is_admin': True,
+        'user': request.user,
     })
 
 
@@ -1283,4 +1345,148 @@ def stripe_invoice_pdf(request):
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="invoice_{payment_intent_id}.pdf"'
     return response
+
+
+def incidents_list(request):
+    """List all incidents - shows Update Title, Severity, Start Time"""
+    # Check authentication (Django auth or legacy session)
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return redirect('login')
+    
+    liaison = None
+    organization = None
+    
+    # Pathway 1: Standard Django Auth (Liaison)
+    if request.user.is_authenticated:
+        try:
+            liaison = request.user.liaison_profile
+            organization = liaison.organization
+        except (Liaison.DoesNotExist, AttributeError):
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    # Pathway 2: Legacy Session Auth (UserCredentials)
+    elif 'user_credentials_id' in request.session:
+        try:
+            organization = Organization.objects.first()
+            if not organization:
+                messages.error(request, 'No organization found. Please complete checkout first.')
+                return redirect('checkout')
+        except Exception:
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    if not organization:
+        messages.error(request, 'Please complete checkout first.')
+        return redirect('checkout')
+    
+    # Get all incidents for this organization
+    incidents = Incident.objects.filter(organization=organization).order_by('-timestamp')
+    
+    # Get or create system settings for status display
+    settings_obj, created = SystemSettings.objects.get_or_create(
+        organization=organization,
+        defaults={
+            'current_status': 'Normal',
+            'cadence_hours': 24,
+        }
+    )
+    
+    # Format last sync time
+    last_sync = settings_obj.last_sync
+    now = timezone.now()
+    time_diff = now - last_sync
+    
+    if time_diff < timedelta(minutes=1):
+        sync_time_display = "Just now"
+    elif time_diff < timedelta(hours=1):
+        minutes = int(time_diff.total_seconds() / 60)
+        sync_time_display = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    elif time_diff < timedelta(days=1):
+        hours = int(time_diff.total_seconds() / 3600)
+        sync_time_display = f"{hours} hour{'s' if hours != 1 else ''} ago"
+    else:
+        sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
+    
+    return render(request, 'core/incidents_list.html', {
+        'incidents': incidents,
+        'organization': organization,
+        'is_admin': True,  # Always show admin link - access controlled by view decorator
+        'current_status': settings_obj.current_status,
+        'last_sync_display': sync_time_display,
+    })
+
+
+def incident_detail(request, incident_id):
+    """Show detailed view of a single incident"""
+    # Check authentication (Django auth or legacy session)
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return redirect('login')
+    
+    liaison = None
+    organization = None
+    
+    # Pathway 1: Standard Django Auth (Liaison)
+    if request.user.is_authenticated:
+        try:
+            liaison = request.user.liaison_profile
+            organization = liaison.organization
+        except (Liaison.DoesNotExist, AttributeError):
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    # Pathway 2: Legacy Session Auth (UserCredentials)
+    elif 'user_credentials_id' in request.session:
+        try:
+            organization = Organization.objects.first()
+            if not organization:
+                messages.error(request, 'No organization found. Please complete checkout first.')
+                return redirect('checkout')
+        except Exception:
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    
+    if not organization:
+        messages.error(request, 'Please complete checkout first.')
+        return redirect('checkout')
+    
+    # Get the incident
+    try:
+        incident = Incident.objects.get(id=incident_id, organization=organization)
+    except Incident.DoesNotExist:
+        messages.error(request, 'Incident not found.')
+        return redirect('incidents_list')
+    
+    # Get or create system settings for status display
+    settings_obj, created = SystemSettings.objects.get_or_create(
+        organization=organization,
+        defaults={
+            'current_status': 'Normal',
+            'cadence_hours': 24,
+        }
+    )
+    
+    # Format last sync time
+    last_sync = settings_obj.last_sync
+    now = timezone.now()
+    time_diff = now - last_sync
+    
+    if time_diff < timedelta(minutes=1):
+        sync_time_display = "Just now"
+    elif time_diff < timedelta(hours=1):
+        minutes = int(time_diff.total_seconds() / 60)
+        sync_time_display = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    elif time_diff < timedelta(days=1):
+        hours = int(time_diff.total_seconds() / 3600)
+        sync_time_display = f"{hours} hour{'s' if hours != 1 else ''} ago"
+    else:
+        sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
+    
+    return render(request, 'core/incident_detail.html', {
+        'incident': incident,
+        'organization': organization,
+        'is_admin': True,  # Always show admin link - access controlled by view decorator
+        'current_status': settings_obj.current_status,
+        'last_sync_display': sync_time_display,
+    })
 
