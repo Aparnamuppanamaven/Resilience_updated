@@ -110,7 +110,11 @@
 
         <div class="form-group">
             <label class="form-label">Username</label>
+            {% if existing_email %}
+            <input type="text" name="username" value="{{ existing_email }}" class="form-control" required>
+            {% else %}
             {{ form.username }}
+            {% endif %}
         </div>
 
         <div class="form-group">
