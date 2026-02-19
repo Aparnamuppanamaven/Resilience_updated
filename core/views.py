@@ -34,6 +34,7 @@ from .models import (
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
 from .payment_utils import generate_invoice_id, calculate_due_date, ensure_unique_invoice_id
+from .email_utils import send_checkout_confirmation_email, send_new_user_notification_email
 
 
 def index(request):
@@ -52,6 +53,25 @@ def checkout(request):
             # However, for CharFields/ChoiceFields it's fine. 
             # Check if any fields need serialization. Warning: valid form data might contain custom objects.
             # Here it seems standard.
+            
+            # Send notification email to admin/SaaS person when new user clicks "Proceed to Payment"
+            try:
+                liaison_email = form.cleaned_data.get('liaison_email', '')
+                liaison_name = form.cleaned_data.get('liaison_name', '')
+                agency_name = form.cleaned_data.get('agency', '')
+                
+                if liaison_email:
+                    success, message = send_new_user_notification_email(
+                        liaison_email=liaison_email,
+                        liaison_name=liaison_name,
+                        agency_name=agency_name
+                    )
+                    if not success:
+                        # Log error but don't block the checkout process
+                        print(f"Error sending new user notification email: {message}")
+            except Exception as e:
+                # Log error but don't block the checkout process
+                print(f"Exception sending new user notification email: {str(e)}")
             
             # Simple direct redirect to payment
             return redirect('payment')
@@ -280,7 +300,7 @@ If you have any questions, please contact our support team.
     send_mail(
         subject=subject,
         message=email_body,
-        from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@resilience.example.com'),
+        from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@resilience.example.com'),
         recipient_list=[billing_email],
         fail_silently=True,
     )

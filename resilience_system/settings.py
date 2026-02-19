@@ -169,6 +169,20 @@ STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 
 # --------------------------------------------------
+# AZURE EMAIL CONFIG (Microsoft Graph API)
+# --------------------------------------------------
+AZURE_TENANT_ID = os.getenv("AZURE_TENANT_ID")
+AZURE_CLIENT_ID = os.getenv("AZURE_CLIENT_ID")
+AZURE_CLIENT_SECRET = os.getenv("AZURE_CLIENT_SECRET")
+MAIL_SENDER = os.getenv("MAIL_SENDER")
+
+# Admin/Notification email for new user signups
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL") or os.getenv("NOTIFICATION_EMAIL")
+
+# Admin/Notification email for new user signups
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL") or os.getenv("NOTIFICATION_EMAIL")
+
+# --------------------------------------------------
 # ENTERPRISE SECURITY (DEV-SAFE OVERRIDES)
 # --------------------------------------------------
 if not DEBUG:
