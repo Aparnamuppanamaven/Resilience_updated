@@ -61,6 +61,13 @@
     {% endfor %}
     {% endif %}
 
+    {% if show_login_button %}
+    <div style="background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+        <strong>⚠️ This email/account already exists.</strong>
+        <p style="margin-top: 0.5rem; margin-bottom: 0;">Email: {{ existing_email }}</p>
+    </div>
+    {% endif %}
+
     <form method="post" id="checkout-form">
         {% csrf_token %}
 
@@ -85,6 +92,57 @@
             {{ form.liaison_email }}
             {% if form.liaison_email.errors %}
             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.liaison_email.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.password.label }}</label>
+            {{ form.password }}
+            {% if form.password.help_text %}
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">{{ form.password.help_text }}</div>
+            {% endif %}
+            {% if form.password.errors %}
+            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">
+                {% for error in form.password.errors %}
+                <div>❗️ {{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.confirm_password.label }}</label>
+            {{ form.confirm_password }}
+            {% if form.confirm_password.errors %}
+            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">
+                {% for error in form.confirm_password.errors %}
+                <div>❗️ {{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.role.label }}</label>
+            {{ form.role }}
+            {% if form.role.errors %}
+            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.role.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.dept.label }}</label>
+            {{ form.dept }}
+            {% if form.dept.errors %}
+            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.dept.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">{{ form.countee.label }}</label>
+            {{ form.countee }}
+            {% if form.countee.errors %}
+            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.countee.errors }}</div>
             {% endif %}
         </div>
 
@@ -114,6 +172,12 @@
 
         <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #e2e8f0;">
 
+        {% if show_login_button %}
+        <a href="{% url 'login' %}" class="btn btn-primary" style="display: block; width: 100%; margin-bottom: 1rem; text-align: center; padding: 1rem; text-decoration: none; background-color: #2563eb; color: white; border-radius: 6px; font-weight: 600;">
+            Login to Renew
+        </a>
+        {% endif %}
+
         <div class="payment-summary"
             style="background: #f8fafc; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
@@ -125,8 +189,10 @@
                 90 days.</div>
         </div>
 
+        {% if not show_login_button %}
         <button type="submit" class="btn btn-submit" data-disable-text="Please wait...">Proceed to Payment <i class="fa-solid fa-lock"
                 style="font-size: 0.75rem;"></i></button>
+        {% endif %}
     </form>
 </div>
 {% endblock %}

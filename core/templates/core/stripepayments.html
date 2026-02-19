@@ -409,43 +409,14 @@
             }
 
             if (paymentIntent.status === 'succeeded') {
-                // Payment succeeded
-                document.getElementById('payment-status').textContent = 'Succeeded';
-                document.getElementById('payment-status').style.color = '#10b981';
+                // Payment succeeded - redirect to payment success page
+                // Determine if this is a renewal (user_id exists or session flag)
+                // Check session flag first (set by payment view), then user_id
+                const isRenewal = user_id && user_id !== '';
                 
-                showStatusMessage('Payment successful! Your payment has been processed.', 'success');
-                
-                // Show payment result
-                const resultContent = document.getElementById('result-content');
-                resultContent.innerHTML = `
-                    <div class="info-row">
-                        <span class="info-label">Payment Intent ID:</span>
-                        <span class="info-value">${paymentIntent.id}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Status:</span>
-                        <span class="info-value" style="color: #10b981; text-transform: capitalize;">${paymentIntent.status}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Amount:</span>
-                        <span class="info-value">$${(paymentIntent.amount / 100).toFixed(2)}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Currency:</span>
-                        <span class="info-value">${paymentIntent.currency.toUpperCase()}</span>
-                    </div>
-                    <div style="margin-top: 1.5rem; text-align: left;">
-                        <a href="/stripe-invoice-pdf/?payment_intent_id=${encodeURIComponent(paymentIntent.id)}"
-                           style="display: inline-block; padding: 0.75rem 1.5rem; background: #1e293b; color: #ffffff; border-radius: 6px; text-decoration: none; font-weight: 600;">
-                            Download Invoice (PDF)
-                        </a>
-                    </div>
-                `;
-                // Hide form and only show result
-                form.style.display = 'none';
-                document.getElementById('payment-result').style.display = 'block';
-                // Clear card details for security
-                cardElement.clear();
+                // Redirect to payment success page
+                const redirectUrl = `/payment-success/${isRenewal ? 'true' : 'false'}/?payment_intent_id=${encodeURIComponent(paymentIntent.id)}`;
+                window.location.href = redirectUrl;
             }
 
         } catch (error) {

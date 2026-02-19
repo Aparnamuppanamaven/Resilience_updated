@@ -37,6 +37,50 @@ class CheckoutForm(forms.Form):
             'placeholder': 'email@agency.com'
         })
     )
+    password = forms.CharField(
+        label="Password",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter password',
+            'id': 'id_password'
+        }),
+        help_text="Must contain uppercase, lowercase, number, special character, and be at least 6 characters"
+    )
+    confirm_password = forms.CharField(
+        label="Confirm Password",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Confirm password',
+            'id': 'id_confirm_password'
+        })
+    )
+    role = forms.CharField(
+        max_length=100,
+        label="Role",
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g. Operations Manager'
+        })
+    )
+    dept = forms.CharField(
+        max_length=100,
+        label="Department",
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g. Emergency Management'
+        })
+    )
+    countee = forms.CharField(
+        max_length=100,
+        label="Countee",
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Countee information'
+        })
+    )
     incidents = forms.CharField(
         label="Key Incident Types of Concern",
         widget=forms.TextInput(attrs={
@@ -62,6 +106,50 @@ class CheckoutForm(forms.Form):
             'placeholder': 'e.g. 10'
         })
     )
+    
+    def clean_password(self):
+        """Validate password requirements"""
+        password = self.cleaned_data.get('password')
+        if password:
+            errors = []
+            
+            # Check minimum length
+            if len(password) < 6:
+                errors.append('Password must be at least 6 characters long.')
+            
+            # Check for uppercase
+            if not any(c.isupper() for c in password):
+                errors.append('Password must contain at least one uppercase letter.')
+            
+            # Check for lowercase
+            if not any(c.islower() for c in password):
+                errors.append('Password must contain at least one lowercase letter.')
+            
+            # Check for number
+            if not any(c.isdigit() for c in password):
+                errors.append('Password must contain at least one number.')
+            
+            # Check for special character
+            special_chars = '!@#$%^&*()_+-=[]{}|;:,.<>?'
+            if not any(c in special_chars for c in password):
+                errors.append('Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?).')
+            
+            if errors:
+                raise ValidationError(errors)
+        
+        return password
+    
+    def clean(self):
+        """Validate that passwords match"""
+        cleaned_data = super().clean()
+        password = cleaned_data.get('password')
+        confirm_password = cleaned_data.get('confirm_password')
+        
+        if password and confirm_password:
+            if password != confirm_password:
+                raise ValidationError({'confirm_password': 'Passwords do not match.'})
+        
+        return cleaned_data
 
 
 def luhn_algorithm(card_number):

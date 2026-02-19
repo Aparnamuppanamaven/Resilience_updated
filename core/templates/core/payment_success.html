@@ -1,0 +1,139 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Payment Successful - Resilience Foundation{% endblock %}
+{% block body_class %}public-page{% endblock %}
+
+{% block extra_css %}
+<style>
+    .success-container {
+        max-width: 600px;
+        margin: 4rem auto;
+        padding: 3rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        text-align: center;
+    }
+
+    .success-icon {
+        font-size: 4rem;
+        color: #10b981;
+        margin-bottom: 1.5rem;
+    }
+
+    .countdown-timer {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background: #f0f9ff;
+        border-radius: 6px;
+        color: #0369a1;
+        font-weight: 600;
+    }
+
+    .btn-group {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    .btn {
+        flex: 1;
+        padding: 1rem;
+        border-radius: 6px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+        transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+        background-color: #2563eb;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background-color: #1d4ed8;
+    }
+
+    .btn-outline {
+        background-color: white;
+        color: #2563eb;
+        border: 2px solid #2563eb;
+    }
+
+    .btn-outline:hover {
+        background-color: #eff6ff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav class="landing-nav">
+    <div class="container nav-container">
+        <div class="logo">
+            <i class="fa-solid fa-shield-halved"></i> Resilience
+        </div>
+    </div>
+</nav>
+
+<div class="success-container">
+    <div class="success-icon">
+        <i class="fa-solid fa-circle-check"></i>
+    </div>
+
+    <h1 style="margin-bottom: 1rem; color: #0f172a;">Payment Successful!</h1>
+
+    {% if is_renewal %}
+    <p style="font-size: 1.125rem; color: #475569; margin-bottom: 0.5rem;">
+        Your subscription has been renewed.
+    </p>
+    {% if renewal_info %}
+    <p style="color: #64748b; margin-bottom: 1.5rem;">
+        Your subscription is now active until <strong>{{ renewal_info.new_end_date|date:"F d, Y" }}</strong>.
+    </p>
+    {% endif %}
+    {% else %}
+    <p style="font-size: 1.125rem; color: #475569; margin-bottom: 0.5rem;">
+        Your account has been created.
+    </p>
+    <p style="color: #64748b; margin-bottom: 1.5rem;">
+        Welcome to Resilience Foundation!
+    </p>
+    {% endif %}
+
+    <div class="btn-group">
+        {% if payment_intent_id %}
+        <a href="{% url 'stripe_invoice_pdf' %}?payment_intent_id={{ payment_intent_id }}" 
+           class="btn btn-outline" 
+           target="_blank">
+            <i class="fa-solid fa-download"></i> Download PDF
+        </a>
+        {% endif %}
+        <a href="{% url 'login' %}" class="btn btn-primary">
+            <i class="fa-solid fa-right-to-bracket"></i> Login
+        </a>
+    </div>
+
+    <div class="countdown-timer" id="countdown">
+        Redirecting to login in <span id="timer">30</span> seconds...
+    </div>
+</div>
+
+<script>
+    let timeLeft = 30;
+    const timerElement = document.getElementById('timer');
+    const countdownElement = document.getElementById('countdown');
+
+    const countdown = setInterval(function() {
+        timeLeft--;
+        timerElement.textContent = timeLeft;
+
+        if (timeLeft <= 0) {
+            clearInterval(countdown);
+            window.location.href = "{% url 'login' %}";
+        }
+    }, 1000);
+</script>
+{% endblock %}

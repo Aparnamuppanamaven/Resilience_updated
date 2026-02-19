@@ -45,6 +45,9 @@ class Liaison(models.Model):
         default='email'
     )
     incident_types = models.TextField(help_text="Key incident types of concern")
+    role = models.CharField(max_length=100, blank=True, help_text="User role")
+    dept = models.CharField(max_length=100, blank=True, help_text="Department")
+    countee = models.CharField(max_length=100, blank=True, help_text="Countee")
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
@@ -211,7 +214,7 @@ class ExternalUser(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'Users'
+        db_table = 'users'
         
     def __str__(self):
         return self.agency_name
@@ -240,9 +243,9 @@ class ExternalSubscription(models.Model):
     username = models.CharField(max_length=100)
     payment = models.ForeignKey(ExternalPayment, models.DO_NOTHING)
     subscription_type = models.CharField(max_length=50)
-    duration = models.IntegerField()
-    subscription_start_date = models.DateField()
-    subscription_end_date = models.DateField()
+    duration = models.IntegerField(null=True, blank=True)  # set when user pays
+    subscription_start_date = models.DateField(null=True, blank=True)  # set when user pays
+    subscription_end_date = models.DateField(null=True, blank=True)  # set when user pays
     subscription_status = models.CharField(max_length=30)
     created_at = models.DateTimeField(blank=True, null=True)
 
