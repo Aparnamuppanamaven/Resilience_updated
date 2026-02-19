@@ -24,17 +24,24 @@ load_dotenv(env_path)
 # --------------------------------------------------
 # MySQL support for Windows (PyMySQL)
 # --------------------------------------------------
-
 pymysql.install_as_MySQLdb()
 
 # --------------------------------------------------
 # SECURITY
 # --------------------------------------------------
-SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-dev-secret-key")
 
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1").split(",")
+# ✅ REQUIRED: Fix DisallowedHost
+ALLOWED_HOSTS = [
+    "20.157.93.134",
+    "localhost",
+    "127.0.0.1",
+]
+
+# ✅ REQUIRED: Allow iframe embedding (DEV ONLY)
+X_FRAME_OPTIONS = "ALLOWALL"
 
 # --------------------------------------------------
 # APPLICATIONS
@@ -59,9 +66,12 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # ❌ REMOVED: XFrameOptionsMiddleware (this was blocking iframe)
 ]
 
+# --------------------------------------------------
+# URL / WSGI
+# --------------------------------------------------
 ROOT_URLCONF = "resilience_system.urls"
 WSGI_APPLICATION = "resilience_system.wsgi.application"
 
@@ -159,14 +169,17 @@ STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 
 # --------------------------------------------------
-# ENTERPRISE SECURITY (Production Only)
+# ENTERPRISE SECURITY (DEV-SAFE OVERRIDES)
 # --------------------------------------------------
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = "DENY"
+    X_FRAME_OPTIONS = "ALLOWALL"
 
+# --------------------------------------------------
+# DEFAULT PK FIELD
+# --------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

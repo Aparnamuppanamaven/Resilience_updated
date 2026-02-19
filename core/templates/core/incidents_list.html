@@ -163,12 +163,13 @@
                         </thead>
                         <tbody>
                             {% for incident in incidents %}
-                            <tr class="incident-row" style="
+                            <tr class="incident-row" data-incident-url="{% url 'incident_detail' incident.id %}" style="
                                 border-bottom: 1px solid #e5e7eb;
                                 cursor: pointer;
                                 transition: background-color 0.15s ease;
                                 background: white;
-
+                            ">
+                                <td style="padding: 0.75rem 1rem;">
                                     <a href="{% url 'incident_detail' incident.id %}" style="
                                         color: #6366f1;
                                         text-decoration: none;
@@ -189,7 +190,19 @@
                                         {{ incident.title }}
                                     </a>
                                 </td>
-
+                                <td style="padding: 0.75rem 1rem;">
+                                    {% if incident.severity == 'LOW' %}
+                                    <span class="severity-badge severity-low" style="
+                                        padding: 6px 14px;
+                                        border-radius: 20px;
+                                        font-size: 0.8rem;
+                                        font-weight: 600;
+                                        display: inline-block;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.3px;
+                                        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+                                        color: #065f46;
+                                        box-shadow: 0 2px 4px rgba(6, 95, 70, 0.1);
                                     ">
                                         {{ incident.get_severity_display|default:incident.severity }}
                                     </span>
