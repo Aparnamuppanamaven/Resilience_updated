@@ -280,7 +280,7 @@ If you have any questions, please contact our support team.
     send_mail(
         subject=subject,
         message=email_body,
-        from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@resilience.example.com'),
+        from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@resilience.example.com'),
         recipient_list=[billing_email],
         fail_silently=True,
     )
