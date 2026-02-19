@@ -25,7 +25,7 @@ from reportlab.pdfgen import canvas
 
 from django.db import transaction
 from .models import (
-    Organization, Liaison, OperationalUpdate, Incident,
+    Organization, Liaison, OperationalUpdate, Incident, IncidentEvent,
     Decision, SystemSettings, ShiftPacket,
     ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials, UsersTable, Shift, Department,
     Payment, Invoice,
@@ -1596,11 +1596,329 @@ def incident_detail(request, incident_id):
     else:
         sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
     
+    # Get all users from UsersTable (same as admin page)
+    all_users = UsersTable.objects.all().order_by('-created_at')
+    
+    # Ensure mapping table exists (create if not exists)
+    from django.db import connection
+    try:
+        with connection.cursor() as cursor:
+            # Check if table exists
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.tables 
+                WHERE table_schema = DATABASE() 
+                AND table_name = 'core_incidents_mapping'
+            """)
+            table_exists = cursor.fetchone()[0] > 0
+            
+            if not table_exists:
+                cursor.execute("""
+                    CREATE TABLE core_incidents_mapping (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        user_id INT NOT NULL,
+                        incident_id BIGINT NOT NULL,
+                        mapped_user_id INT NULL,
+                        is_active TINYINT(1) NOT NULL DEFAULT 1,
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_incident_active (incident_id, is_active),
+                        INDEX idx_user_active (user_id, is_active)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """)
+    except Exception as e:
+        # Table might already exist or error - continue anyway
+        pass
+    
+    # Get currently assigned users (Liaisons) - only active assignments
+    assigned_liaisons = []
+    assigned_users_data = []  # List of dicts with liaison + UsersTable data
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT l.id FROM core_liaison l
+                INNER JOIN core_incidents_mapping m ON l.id = m.user_id
+                WHERE m.incident_id = %s AND m.is_active = 1
+                """,
+                [incident.id]
+            )
+            liaison_ids = [row[0] for row in cursor.fetchall()]
+            assigned_liaisons = Liaison.objects.filter(id__in=liaison_ids) if liaison_ids else []
+            
+            # Get UsersTable data for each assigned liaison
+            for liaison in assigned_liaisons:
+                user_table = UsersTable.objects.filter(liaison_email__iexact=liaison.user.email).first()
+                assigned_users_data.append({
+                    'liaison': liaison,
+                    'user_table': user_table,  # Can be None if not found in UsersTable
+                })
+    except Exception as e:
+        # If table doesn't exist yet or error, return empty list
+        assigned_liaisons = []
+        assigned_users_data = []
+    
+    # Get incident event logs
+    try:
+        incident_logs = IncidentEvent.objects.filter(incident=incident).order_by('-created_time')
+    except Exception:
+        incident_logs = []
+    
     return render(request, 'core/incident_detail.html', {
         'incident': incident,
         'organization': organization,
         'is_admin': True,  # Always show admin link - access controlled by view decorator
         'current_status': settings_obj.current_status,
         'last_sync_display': sync_time_display,
+        'all_users': all_users,
+        'assigned_liaisons': assigned_liaisons,
+        'assigned_users_data': assigned_users_data,  # Liaison + UsersTable data combined
+        'incident_logs': incident_logs,
     })
+
+
+@csrf_exempt
+def search_users_for_assignment(request):
+    """AJAX endpoint to search users from ExternalUser (users table) for incident assignment"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    # Check authentication
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+    
+    query = request.GET.get('q', '').strip()
+    if not query:
+        return JsonResponse({'users': []})
+    
+    # Search ExternalUser table by name or email
+    users = ExternalUser.objects.filter(
+        Q(primary_liaison_name__icontains=query) | Q(liaison_email__icontains=query)
+    )[:20]  # Limit to 20 results
+    
+    results = []
+    for ext_user in users:
+        results.append({
+            'id': ext_user.id,
+            'name': ext_user.primary_liaison_name,
+            'email': ext_user.liaison_email,
+            'agency': ext_user.agency_name,
+        })
+    
+    return JsonResponse({'users': results})
+
+
+@csrf_exempt
+def assign_users_to_incident(request, incident_id):
+    """Assign multiple users to an incident by mapping UsersTable → Liaison"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    # Check authentication
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+    
+    try:
+        # Get organization
+        organization = None
+        if request.user.is_authenticated:
+            try:
+                liaison = request.user.liaison_profile
+                organization = liaison.organization
+            except (Liaison.DoesNotExist, AttributeError):
+                return JsonResponse({'error': 'Organization not found'}, status=400)
+        elif 'user_credentials_id' in request.session:
+            organization = Organization.objects.first()
+        
+        if not organization:
+            return JsonResponse({'error': 'Organization not found'}, status=400)
+        
+        # Get incident
+        incident = Incident.objects.get(id=incident_id, organization=organization)
+        
+        # Get user IDs from POST data (list of UsersTable IDs)
+        data = json.loads(request.body)
+        user_ids = data.get('user_ids', [])
+        
+        if not user_ids or not isinstance(user_ids, list):
+            return JsonResponse({'error': 'User IDs list required'}, status=400)
+        
+        # Map each UsersTable → User (by email) → Liaison
+        assigned_liaisons = []
+        errors = []
+        
+        for user_table_id in user_ids:
+            try:
+                user_table = UsersTable.objects.get(id=user_table_id)
+            except UsersTable.DoesNotExist:
+                errors.append(f'User ID {user_table_id} not found')
+                continue
+            
+            # Map UsersTable → User (by email) → Liaison
+            user = User.objects.filter(email__iexact=user_table.liaison_email).first()
+            if not user:
+                errors.append(f'No Django User found for email {user_table.liaison_email}')
+                continue
+            
+            # Find Liaison for this user in the same organization
+            liaison = Liaison.objects.filter(user=user, organization=organization).first()
+            if not liaison:
+                errors.append(f'No Liaison found for user {user_table.liaison_email} in this organization')
+                continue
+            
+            assigned_liaisons.append(liaison)
+        
+        if not assigned_liaisons:
+            return JsonResponse({'error': 'No valid users could be assigned. ' + '; '.join(errors)}, status=400)
+        
+        # Get logged-in user ID (who is making the assignment)
+        mapped_user_id = None
+        if request.user.is_authenticated:
+            mapped_user_id = request.user.id
+        elif 'user_credentials_id' in request.session:
+            # For legacy UserCredentials, we don't have a direct User.id
+            # Could map to a default user or leave NULL
+            mapped_user_id = None
+        
+        # Ensure mapping table exists (create if not exists)
+        from django.db import connection
+        try:
+            with connection.cursor() as cursor:
+                # Check if table exists
+                cursor.execute("""
+                    SELECT COUNT(*) FROM information_schema.tables 
+                    WHERE table_schema = DATABASE() 
+                    AND table_name = 'core_incidents_mapping'
+                """)
+                table_exists = cursor.fetchone()[0] > 0
+                
+                if not table_exists:
+                    cursor.execute("""
+                        CREATE TABLE core_incidents_mapping (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            user_id INT NOT NULL,
+                            incident_id BIGINT NOT NULL,
+                            mapped_user_id INT NULL,
+                            is_active TINYINT(1) NOT NULL DEFAULT 1,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            INDEX idx_incident_active (incident_id, is_active),
+                            INDEX idx_user_active (user_id, is_active)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                    """)
+        except Exception:
+            pass  # Table might already exist or error - continue anyway
+        
+        # Mark existing assignments as inactive (for history)
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute(
+                    "UPDATE core_incidents_mapping SET is_active = 0 WHERE incident_id = %s",
+                    [incident.id]
+                )
+            except Exception:
+                pass  # Table might not exist yet
+        
+        # Insert new active assignments (create new row each time for history)
+        assignment_errors = []
+        for liaison in assigned_liaisons:
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO core_incidents_mapping 
+                        (user_id, incident_id, mapped_user_id, is_active, created_at) 
+                        VALUES (%s, %s, %s, 1, NOW())
+                        """,
+                        [liaison.id, incident.id, mapped_user_id]
+                    )
+            except Exception as e:
+                assignment_errors.append(f'Error assigning {liaison.user.email}: {str(e)}')
+        
+        if assignment_errors:
+            errors.extend(assignment_errors)
+        
+        # Also set the first one as owner for backward compatibility
+        if assigned_liaisons:
+            incident.owner = assigned_liaisons[0]
+            incident.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{len(assigned_liaisons)} user(s) assigned successfully',
+            'assigned_users': [
+                {
+                    'name': l.user.get_full_name() or l.user.username,
+                    'email': l.user.email,
+                }
+                for l in assigned_liaisons
+            ]
+        })
+        
+    except Incident.DoesNotExist:
+        return JsonResponse({'error': 'Incident not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def add_incident_event_log(request, incident_id):
+    """Add a new incident event log entry"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    # Check authentication
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+    
+    try:
+        # Get organization
+        organization = None
+        if request.user.is_authenticated:
+            try:
+                liaison = request.user.liaison_profile
+                organization = liaison.organization
+            except (Liaison.DoesNotExist, AttributeError):
+                return JsonResponse({'error': 'Organization not found'}, status=400)
+        elif 'user_credentials_id' in request.session:
+            organization = Organization.objects.first()
+        
+        if not organization:
+            return JsonResponse({'error': 'Organization not found'}, status=400)
+        
+        # Get incident
+        incident = Incident.objects.get(id=incident_id, organization=organization)
+        
+        # Get log description from POST data
+        data = json.loads(request.body)
+        log_description = data.get('log_description', '').strip()
+        
+        if not log_description:
+            return JsonResponse({'error': 'Log description is required'}, status=400)
+        
+        # Get logged-in user ID
+        user_log_id = None
+        if request.user.is_authenticated:
+            user_log_id = request.user.id
+        
+        # Create incident event log
+        log_entry = IncidentEvent.objects.create(
+            incident=incident,
+            log_description=log_description,
+            user_log_id=user_log_id,
+            created_time=timezone.now()
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Log entry added successfully',
+            'log': {
+                'id': log_entry.log_id,
+                'description': log_entry.log_description,
+                'user': log_entry.user_log.get_full_name() if log_entry.user_log else 'System',
+                'created_time': log_entry.created_time.strftime('%b %d, %Y %I:%M %p')
+            }
+        })
+        
+    except Incident.DoesNotExist:
+        return JsonResponse({'error': 'Incident not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 

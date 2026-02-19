@@ -168,9 +168,7 @@
                                 cursor: pointer;
                                 transition: background-color 0.15s ease;
                                 background: white;
-                            " onclick="window.location.href='{% url 'incident_detail' incident.id %}'" 
-                            onmouseover="this.style.backgroundColor='#f9fafb'" onmouseout="this.style.backgroundColor='white'">
-                                <td style="padding: 0.75rem 1rem;">
+
                                     <a href="{% url 'incident_detail' incident.id %}" style="
                                         color: #6366f1;
                                         text-decoration: none;
@@ -191,39 +189,71 @@
                                         {{ incident.title }}
                                     </a>
                                 </td>
-                                <td style="padding: 0.75rem 1rem;">
-                                    <span class="severity-badge" style="
-                                        padding: 0.25rem 0.5rem;
-                                        border-radius: 4px;
-                                        font-size: 0.75rem;
-                                        font-weight: 600;
-                                        display: inline-block;
-                                        text-transform: uppercase;
-                                        letter-spacing: 0.025em;
-                                        {% if incident.severity == 'LOW' %}
-                                            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
-                                            color: #0c5460;
-                                            box-shadow: 0 2px 4px rgba(13, 84, 96, 0.1);
-                                        {% elif incident.severity == 'MEDIUM' %}
-                                            background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
-                                            color: #856404;
-                                            box-shadow: 0 2px 4px rgba(133, 100, 4, 0.1);
-                                        {% elif incident.severity == 'HIGH' %}
-                                            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-                                            color: #721c24;
-                                            box-shadow: 0 2px 4px rgba(114, 28, 36, 0.15);
-                                        {% elif incident.severity == 'CRITICAL' %}
-                                            background: linear-gradient(135deg, #f5c6cb 0%, #f1aeb5 100%);
-                                            color: #721c24;
-                                            box-shadow: 0 2px 6px rgba(114, 28, 36, 0.2);
-                                        {% else %}
-                                            background: linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%);
-                                            color: #383d41;
-                                            box-shadow: 0 2px 4px rgba(56, 61, 65, 0.1);
-                                        {% endif %}
+
                                     ">
                                         {{ incident.get_severity_display|default:incident.severity }}
                                     </span>
+                                    {% elif incident.severity == 'MEDIUM' %}
+                                    <span class="severity-badge severity-medium" style="
+                                        padding: 6px 14px;
+                                        border-radius: 20px;
+                                        font-size: 0.8rem;
+                                        font-weight: 600;
+                                        display: inline-block;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.3px;
+                                        background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+                                        color: #856404;
+                                        box-shadow: 0 2px 4px rgba(133, 100, 4, 0.1);
+                                    ">
+                                        {{ incident.get_severity_display|default:incident.severity }}
+                                    </span>
+                                    {% elif incident.severity == 'HIGH' %}
+                                    <span class="severity-badge severity-high" style="
+                                        padding: 6px 14px;
+                                        border-radius: 20px;
+                                        font-size: 0.8rem;
+                                        font-weight: 600;
+                                        display: inline-block;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.3px;
+                                        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+                                        color: #721c24;
+                                        box-shadow: 0 2px 4px rgba(114, 28, 36, 0.15);
+                                    ">
+                                        {{ incident.get_severity_display|default:incident.severity }}
+                                    </span>
+                                    {% elif incident.severity == 'CRITICAL' %}
+                                    <span class="severity-badge severity-critical" style="
+                                        padding: 6px 14px;
+                                        border-radius: 20px;
+                                        font-size: 0.8rem;
+                                        font-weight: 600;
+                                        display: inline-block;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.3px;
+                                        background: linear-gradient(135deg, #f5c6cb 0%, #f1aeb5 100%);
+                                        color: #721c24;
+                                        box-shadow: 0 2px 6px rgba(114, 28, 36, 0.2);
+                                    ">
+                                        {{ incident.get_severity_display|default:incident.severity }}
+                                    </span>
+                                    {% else %}
+                                    <span class="severity-badge severity-default" style="
+                                        padding: 6px 14px;
+                                        border-radius: 20px;
+                                        font-size: 0.8rem;
+                                        font-weight: 600;
+                                        display: inline-block;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.3px;
+                                        background: linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%);
+                                        color: #383d41;
+                                        box-shadow: 0 2px 4px rgba(56, 61, 65, 0.1);
+                                    ">
+                                        {{ incident.get_severity_display|default:incident.severity }}
+                                    </span>
+                                    {% endif %}
                                 </td>
                                 <td style="padding: 0.75rem 1rem;">
                                     {% if incident.timestamp %}
@@ -357,6 +387,23 @@
     </style>
 
     <script>
+    // Make incident rows clickable
+    document.addEventListener('DOMContentLoaded', function() {
+        const rows = document.querySelectorAll('.incident-row');
+        rows.forEach(function(row) {
+            row.addEventListener('click', function(e) {
+                // Don't navigate if clicking on a link
+                if (e.target.tagName === 'A' || e.target.closest('a')) {
+                    return;
+                }
+                const url = this.getAttribute('data-incident-url');
+                if (url) {
+                    window.location.href = url;
+                }
+            });
+        });
+    });
+
     function activateAlert() {
         if (confirm('Are you sure you want to activate the alert? This will change the system status to High Alert.')) {
             fetch('{% url "toggle_alert" %}', {

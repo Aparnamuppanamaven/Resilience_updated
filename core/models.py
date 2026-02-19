@@ -51,6 +51,24 @@ class Liaison(models.Model):
         return f"{self.user.get_full_name()} - {self.organization.name}"
 
 
+class IncidentAssignedUser(models.Model):
+    """Mapping table for Incident assigned users - tracks assignment history with who assigned and when"""
+    id = models.AutoField(primary_key=True)
+    user_id = models.ForeignKey(Liaison, on_delete=models.CASCADE, db_column='user_id', related_name='incident_assignments')
+    incident_id = models.ForeignKey('Incident', on_delete=models.CASCADE, db_column='incident_id', related_name='user_assignments')
+    mapped_user_id = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, db_column='mapped_user_id', related_name='assignments_made', help_text="Logged-in user who made this assignment")
+    is_active = models.BooleanField(default=True, db_column='is_active')  # True for current assignments, False for historical
+    created_at = models.DateTimeField(auto_now_add=True, db_column='created_at')
+    
+    class Meta:
+        db_table = 'core_incidents_mapping'
+        ordering = ['-created_at']
+        managed = True  # Django can manage this table
+    
+    def __str__(self):
+        return f"Incident {self.incident_id_id} - User {self.user_id_id} (assigned by {self.mapped_user_id_id if self.mapped_user_id else 'System'})"
+
+
 class Incident(models.Model):
     """Incidents - maps to existing core_operationalupdate table"""
     SEVERITY_CHOICES = [
@@ -69,6 +87,7 @@ class Incident(models.Model):
     next_action = models.CharField(max_length=255, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, blank=True, db_column='owner_id')
+    assigned_users = models.ManyToManyField(Liaison, through='IncidentAssignedUser', related_name='assigned_incidents', blank=True)
     is_synthesized = models.BooleanField(default=False)
     
     class Meta:
@@ -78,6 +97,23 @@ class Incident(models.Model):
     
     def __str__(self):
         return f"{self.title} ({self.severity})"
+
+
+class IncidentEvent(models.Model):
+    """Incident event logs - tracks log entries for incidents"""
+    log_id = models.AutoField(primary_key=True, db_column='log_id')
+    incident = models.ForeignKey(Incident, on_delete=models.CASCADE, db_column='incident_id', related_name='event_logs')
+    log_description = models.TextField(db_column='log_description')
+    user_log = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, db_column='user_log_id', related_name='incident_logs_created')
+    created_time = models.DateTimeField(auto_now_add=True, db_column='created_time')
+    
+    class Meta:
+        db_table = 'core_incident_event'
+        ordering = ['-created_time']
+        managed = True  # Django can manage this table
+    
+    def __str__(self):
+        return f"Log #{self.log_id} - Incident {self.incident_id} - {self.created_time}"
 
 
 class OperationalUpdate(models.Model):
