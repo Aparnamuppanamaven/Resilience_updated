@@ -187,54 +187,224 @@
                         transition: max-height 0.3s ease;
                         max-height: 0;
                     ">
-                        <div style="padding: 1.75rem 1.5rem 1.5rem; text-align: center;">
-                            {% if incident.owner %}
-                                <div style="margin-bottom: 1.5rem;">
-                                    <div style="
-                                        width: 80px;
-                                        height: 80px;
-                                        border-radius: 50%;
-                                        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-                                        display: flex;
-                                        align-items: center;
-                                        justify-content: center;
-                                        margin: 0 auto 1rem;
-                                        color: white;
-                                        font-size: 2rem;
-                                        font-weight: 600;
-                                        box-shadow: 0 4px 12px rgba(245, 87, 108, 0.3);
-                                    ">
-                                        {{ incident.owner.user.get_full_name|first|default:incident.owner.user.username|first|upper }}
+                        <div style="padding: 1.75rem 1.5rem 1.5rem;">
+                            <!-- Currently Assigned Users -->
+                            <div style="margin-bottom: 2rem;">
+                                <h4 style="margin: 0 0 1rem 0; color: #212529; font-size: 1rem; font-weight: 600;">Assigned Users</h4>
+                                {% if assigned_users_data %}
+                                    <div class="table-responsive" style="overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                        <table class="users-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                                            <thead>
+                                                <tr style="background: linear-gradient(to right, #f8f9fa, #f1f3f5);">
+                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-building" style="margin-right: 0.5rem; color: #667eea;"></i>Agency Name
+                                                    </th>
+                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-user" style="margin-right: 0.5rem; color: #f5576c;"></i>Primary Liaison
+                                                    </th>
+                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-envelope" style="margin-right: 0.5rem; color: #4facfe;"></i>Email
+                                                    </th>
+                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem; color: #00f2fe;"></i>Incident Types
+                                                    </th>
+                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-comments" style="margin-right: 0.5rem; color: #f093fb;"></i>Communication Channels
+                                                    </th>
+                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-calendar" style="margin-right: 0.5rem; color: #f093fb;"></i>Created At
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in assigned_users_data %}
+                                                {% with liaison=item.liaison user_table=item.user_table %}
+                                                <tr class="user-row" style="border-bottom: 1px solid #f1f3f5; background: white;">
+                                                    <td style="padding: 1.25rem 1.5rem;">
+                                                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                                            <div style="
+                                                                width: 40px;
+                                                                height: 40px;
+                                                                border-radius: 50%;
+                                                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                                                display: flex;
+                                                                align-items: center;
+                                                                justify-content: center;
+                                                                color: white;
+                                                                font-weight: 600;
+                                                                font-size: 0.9rem;
+                                                            ">
+                                                                {% if user_table %}
+                                                                    {{ user_table.agency_name|first|upper }}
+                                                                {% else %}
+                                                                    {{ liaison.user.get_full_name|first|default:liaison.user.username|first|upper }}
+                                                                {% endif %}
+                                                            </div>
+                                                            <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">
+                                                                {% if user_table %}{{ user_table.agency_name }}{% else %}N/A{% endif %}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td style="padding: 1.25rem 1.5rem;">
+                                                        <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">
+                                                            {% if user_table %}{{ user_table.primary_liaison_name }}{% else %}{{ liaison.user.get_full_name|default:liaison.user.username }}{% endif %}
+                                                        </div>
+                                                    </td>
+                                                    <td style="padding: 1.25rem 1.5rem; color: #6c757d; font-size: 0.9rem;">
+                                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                            <i class="fa-solid fa-envelope" style="color: #adb5bd; font-size: 0.85rem;"></i>
+                                                            <span>{% if user_table %}{{ user_table.liaison_email }}{% else %}{{ liaison.user.email|default:"Not available" }}{% endif %}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td style="padding: 1.25rem 1.5rem; color: #6c757d; font-size: 0.9rem;">
+                                                        {% if user_table and user_table.key_incident_types %}
+                                                            <span style="
+                                                                padding: 4px 10px;
+                                                                border-radius: 12px;
+                                                                background: #e3f2fd;
+                                                                color: #1976d2;
+                                                                font-size: 0.85rem;
+                                                                font-weight: 500;
+                                                            ">
+                                                                {{ user_table.key_incident_types }}
+                                                            </span>
+                                                        {% else %}
+                                                            <span style="color: #adb5bd; font-style: italic;">Not specified</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td style="padding: 1.25rem 1.5rem; color: #6c757d; font-size: 0.9rem;">
+                                                        {% if user_table and user_table.preferred_communication_channels %}
+                                                            <span style="
+                                                                padding: 4px 10px;
+                                                                border-radius: 12px;
+                                                                background: #f3e8ff;
+                                                                color: #7c3aed;
+                                                                font-size: 0.85rem;
+                                                                font-weight: 500;
+                                                            ">
+                                                                {{ user_table.preferred_communication_channels }}
+                                                            </span>
+                                                        {% else %}
+                                                            <span style="color: #adb5bd; font-style: italic;">Not specified</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td style="padding: 1.25rem 1.5rem; color: #6c757d; font-size: 0.9rem;">
+                                                        {% if user_table and user_table.created_at %}
+                                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                                <i class="fa-solid fa-calendar" style="color: #adb5bd; font-size: 0.85rem;"></i>
+                                                                <span>{{ user_table.created_at|date:"M d, Y g:i A" }}</span>
+                                                            </div>
+                                                        {% else %}
+                                                            <span style="color: #adb5bd; font-style: italic;">Not available</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endwith %}
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
                                     </div>
-                                    <h4 style="margin: 0.5rem 0; color: #212529; font-size: 1.25rem;">
-                                        {{ incident.owner.user.get_full_name|default:incident.owner.user.username }}
-                                    </h4>
-                                    <p style="margin: 0; color: #6c757d; font-size: 0.9rem;">Owner</p>
-                                </div>
-                                
-                                <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; margin-top: 1.5rem; text-align: left;">
-                                    <div style="margin-bottom: 0.75rem;">
-                                        <label style="font-weight: 600; color: #495057; display: block; margin-bottom: 0.25rem;">Email</label>
-                                        <div style="color: #6c757d;">
-                                            {{ incident.owner.user.email|default:"Not available" }}
-                                        </div>
+                                {% else %}
+                                    <div style="text-align: center; padding: 2rem;">
+                                        <i class="fa-solid fa-user-slash" style="font-size: 2rem; color: #dee2e6; margin-bottom: 0.5rem;"></i>
+                                        <p style="color: #6c757d; margin: 0; font-size: 0.9rem;">No users assigned</p>
                                     </div>
-                                    {% if incident.owner.organization %}
-                                    <div>
-                                        <label style="font-weight: 600; color: #495057; display: block; margin-bottom: 0.25rem;">Organization</label>
-                                        <div style="color: #6c757d;">
-                                            {{ incident.owner.organization.name|default:"Not available" }}
-                                        </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Add/Change Users Button -->
+                            <div id="assignButtonContainer" style="margin-bottom: 1.5rem;">
+                                <button onclick="toggleUserSelection()" id="assignUsersBtn" style="
+                                    width: 100%;
+                                    padding: 0.75rem 1.5rem;
+                                    background: #667eea;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 8px;
+                                    font-weight: 600;
+                                    cursor: pointer;
+                                    transition: background 0.2s;
+                                " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#667eea'">
+                                    <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i>
+                                    <span id="assignBtnText">{% if assigned_liaisons %}Change Users{% else %}Assign Users{% endif %}</span>
+                                </button>
+                            </div>
+
+                            <!-- Users Table (shown when selecting) -->
+                            <div id="usersTableContainer" style="display: none;">
+                                {% if all_users %}
+                                <div style="margin-bottom: 1rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                        <h4 style="margin: 0; color: #212529; font-size: 1rem; font-weight: 600;">Select Users</h4>
+                                        <button onclick="saveSelectedUsers()" style="
+                                            padding: 0.5rem 1rem;
+                                            background: #10b981;
+                                            color: white;
+                                            border: none;
+                                            border-radius: 6px;
+                                            font-weight: 600;
+                                            cursor: pointer;
+                                            font-size: 0.875rem;
+                                        ">Add Selected</button>
                                     </div>
-                                    {% endif %}
-                                </div>
-                            {% else %}
-                                <div style="padding: 2rem;">
-                                    <i class="fa-solid fa-user-slash" style="font-size: 3rem; color: #dee2e6; margin-bottom: 1rem;"></i>
-                                    <p style="color: #6c757d; margin: 0;">No user assigned</p>
-                                    <p style="color: #6c757d; margin-top: 0.5rem; font-size: 0.9rem;">Default: Designated Liaison</p>
-                                </div>
-                            {% endif %}
+                                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                        <table class="users-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                                            <thead>
+                                                <tr style="background: linear-gradient(to right, #f8f9fa, #f1f3f5); position: sticky; top: 0; z-index: 10;">
+                                                    <th style="padding: 0.75rem 1rem; width: 40px; text-align: center;">
+                                                        <input type="checkbox" id="selectAllUsers" onchange="toggleAllUsers(this)">
+                                                    </th>
+                                                    <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-building" style="margin-right: 0.5rem; color: #667eea;"></i>Agency
+                                                    </th>
+                                                    <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-user" style="margin-right: 0.5rem; color: #f5576c;"></i>Name
+                                                    </th>
+                                                    <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-envelope" style="margin-right: 0.5rem; color: #4facfe;"></i>Email
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for user in all_users %}
+                                                <tr class="user-select-row" style="border-bottom: 1px solid #f1f3f5; background: white;">
+                                                    <td style="padding: 0.75rem 1rem; text-align: center;">
+                                                        <input type="checkbox" class="user-checkbox" value="{{ user.id }}" data-user-name="{{ user.primary_liaison_name }}" data-user-email="{{ user.liaison_email }}" {% for liaison in assigned_liaisons %}{% if liaison.user.email|lower == user.liaison_email|lower %}checked{% endif %}{% endfor %}>
+                                                    </td>
+                                                    <td style="padding: 0.75rem 1rem;">
+                                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                            <div style="
+                                                                width: 32px;
+                                                                height: 32px;
+                                                                border-radius: 50%;
+                                                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                                                display: flex;
+                                                                align-items: center;
+                                                                justify-content: center;
+                                                                color: white;
+                                                                font-weight: 600;
+                                                                font-size: 0.8rem;
+                                                            ">
+                                                                {{ user.agency_name|first|upper }}
+                                                            </div>
+                                                            <span style="font-weight: 500; color: #212529; font-size: 0.9rem;">{{ user.agency_name }}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td style="padding: 0.75rem 1rem; font-weight: 500; color: #212529; font-size: 0.9rem;">
+                                                        {{ user.primary_liaison_name }}
+                                                    </td>
+                                                    <td style="padding: 0.75rem 1rem; color: #6c757d; font-size: 0.875rem;">
+                                                        {{ user.liaison_email }}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <p style="text-align: center; color: #6c757d; padding: 2rem;">No users available.</p>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -270,6 +440,54 @@
                         max-height: 0;
                     ">
                         <div style="padding: 1.75rem 1.5rem 1.5rem;">
+                            <!-- Incident Event Form -->
+                            <div style="margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #4facfe;">
+                                <h4 style="margin: 0 0 1rem 0; color: #212529; font-size: 1rem; font-weight: 600;">
+                                    <i class="fa-solid fa-pen" style="margin-right: 0.5rem; color: #4facfe;"></i>Incident Event
+                                </h4>
+                                <form id="incidentEventForm" onsubmit="submitIncidentEvent(event)" style="display: flex; gap: 0.75rem; align-items: flex-start;">
+                                    {% csrf_token %}
+                                    <textarea 
+                                        id="logDescription" 
+                                        name="log_description" 
+                                        placeholder="Enter incident event log description..." 
+                                        required
+                                        style="
+                                            flex: 1;
+                                            padding: 0.75rem;
+                                            border: 2px solid #e2e8f0;
+                                            border-radius: 8px;
+                                            font-size: 0.9rem;
+                                            font-family: inherit;
+                                            resize: vertical;
+                                            min-height: 80px;
+                                            transition: border-color 0.2s;
+                                        "
+                                        onfocus="this.style.borderColor='#4facfe'"
+                                        onblur="this.style.borderColor='#e2e8f0'"
+                                    ></textarea>
+                                    <button 
+                                        type="submit" 
+                                        style="
+                                            padding: 0.75rem 1.5rem;
+                                            background: #4facfe;
+                                            color: white;
+                                            border: none;
+                                            border-radius: 8px;
+                                            font-weight: 600;
+                                            cursor: pointer;
+                                            font-size: 0.9rem;
+                                            white-space: nowrap;
+                                            transition: background 0.2s;
+                                        "
+                                        onmouseover="this.style.background='#3d9ce8'"
+                                        onmouseout="this.style.background='#4facfe'"
+                                    >
+                                        <i class="fa-solid fa-paper-plane" style="margin-right: 0.5rem;"></i>Submit
+                                    </button>
+                                </form>
+                            </div>
+
                             <div style="position: relative; padding-left: 2rem;">
                             <!-- Timeline -->
                             <div style="
@@ -331,8 +549,9 @@
                             </div>
                             {% endif %}
 
-                            <!-- Placeholder for future log entries -->
-                            <div style="position: relative;">
+                            <!-- Incident Event Logs from core_incident_event -->
+                            {% for log in incident_logs %}
+                            <div style="position: relative; margin-bottom: 1.5rem;">
                                 <div style="
                                     position: absolute;
                                     left: -1.5rem;
@@ -340,15 +559,25 @@
                                     width: 12px;
                                     height: 12px;
                                     border-radius: 50%;
-                                    background: #dee2e6;
+                                    background: #10b981;
                                     border: 2px solid white;
+                                    box-shadow: 0 0 0 2px #10b981;
                                 "></div>
-                                <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; border-left: 3px solid #dee2e6; opacity: 0.6;">
-                                    <p style="margin: 0; color: #6c757d; font-size: 0.9rem; font-style: italic;">
-                                        Additional log entries will appear here as the incident is updated.
-                                    </p>
+                                <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; border-left: 3px solid #10b981;">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                        <span style="font-weight: 600; color: #212529;">
+                                            {% if log.user_log %}
+                                                {{ log.user_log.get_full_name|default:log.user_log.username }}
+                                            {% else %}
+                                                System
+                                            {% endif %}
+                                        </span>
+                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ log.created_time|date:"M d, Y g:i A" }}</span>
+                                    </div>
+                                    <p style="margin: 0; color: #6c757d; font-size: 0.9rem; white-space: pre-wrap;">{{ log.log_description }}</p>
                                 </div>
                             </div>
+                            {% endfor %}
                             </div>
                         </div>
                     </div>
@@ -356,6 +585,80 @@
             </div>
         </div>
     </main>
+
+    <!-- User Assignment Modal -->
+    <div id="assignUserModal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    ">
+        <div style="
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        ">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0; font-size: 1.5rem; color: #212529;">Assign User</h3>
+                <button onclick="closeAssignUserModal()" style="
+                    background: none;
+                    border: none;
+                    font-size: 1.5rem;
+                    color: #6c757d;
+                    cursor: pointer;
+                    padding: 0;
+                    width: 30px;
+                    height: 30px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                ">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #495057;">Search Users</label>
+                <input type="text" id="userSearchInput" placeholder="Search by name or email..." style="
+                    width: 100%;
+                    padding: 0.75rem;
+                    border: 2px solid #e2e8f0;
+                    border-radius: 8px;
+                    font-size: 1rem;
+                    transition: border-color 0.2s;
+                " onkeyup="searchUsers()" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+            
+            <div id="userSearchResults" style="
+                max-height: 400px;
+                overflow-y: auto;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 0.5rem;
+            ">
+                <p style="text-align: center; color: #6c757d; padding: 2rem;">Start typing to search for users...</p>
+            </div>
+            
+            <div id="assignUserError" style="
+                display: none;
+                margin-top: 1rem;
+                padding: 0.75rem;
+                background: #fee2e2;
+                color: #991b1b;
+                border-radius: 8px;
+                font-size: 0.9rem;
+            "></div>
+        </div>
+    </div>
 
     <script>
     function activateAlert() {
@@ -429,7 +732,315 @@
         firstContent.style.borderRadius = '0 0 12px 12px';
         firstIcon.style.transform = 'rotate(180deg)';
     });
+
+    // User Assignment Functions
+    const incidentId = {{ incident.id }};
+
+    function toggleUserSelection() {
+        const container = document.getElementById('usersTableContainer');
+        const btn = document.getElementById('assignUsersBtn');
+        const btnText = document.getElementById('assignBtnText');
+        
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+            btnText.textContent = 'Cancel';
+            btn.style.background = '#6c757d';
+        } else {
+            container.style.display = 'none';
+            btnText.textContent = '{% if assigned_liaisons %}Change Users{% else %}Assign Users{% endif %}';
+            btn.style.background = '#667eea';
+        }
+    }
+
+    function toggleAllUsers(checkbox) {
+        const checkboxes = document.querySelectorAll('.user-checkbox');
+        checkboxes.forEach(cb => cb.checked = checkbox.checked);
+    }
+
+    function saveSelectedUsers() {
+        const checkboxes = document.querySelectorAll('.user-checkbox:checked');
+        const userIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        
+        if (userIds.length === 0) {
+            alert('Please select at least one user.');
+            return;
+        }
+
+        if (!confirm(`Assign ${userIds.length} user(s) to this incident?`)) {
+            return;
+        }
+
+        fetch(`/api/incidents/${incidentId}/assign-users/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_ids: userIds
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+
+            if (data.success) {
+                location.reload();
+            }
+        })
+        .catch(error => {
+            alert('Error assigning users. Please try again.');
+            console.error('Error:', error);
+        });
+    }
+
+    // Submit incident event log
+    function submitIncidentEvent(event) {
+        event.preventDefault();
+        
+        const form = document.getElementById('incidentEventForm');
+        const textarea = document.getElementById('logDescription');
+        const logDescription = textarea.value.trim();
+        
+        if (!logDescription) {
+            alert('Please enter a log description.');
+            return;
+        }
+        
+        const incidentId = {{ incident.id }};
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Disable form while submitting
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i>Submitting...';
+        
+        fetch(`/api/incidents/${incidentId}/add-event-log/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify({
+                log_description: logDescription
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Clear the textarea
+                textarea.value = '';
+                // Reload the page to show the new log entry
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to submit log entry.'));
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error submitting log entry. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        });
+    }
+
+    // Legacy modal functions (keep for backward compatibility if needed)
+    function openAssignUserModal() {
+        toggleUserSelection();
+    }
+
+    function searchUsers() {
+        clearTimeout(searchTimeout);
+        const query = document.getElementById('userSearchInput').value.trim();
+        const resultsDiv = document.getElementById('userSearchResults');
+        const errorDiv = document.getElementById('assignUserError');
+        errorDiv.style.display = 'none';
+
+        if (query.length < 2) {
+            resultsDiv.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 2rem;">Type at least 2 characters to search...</p>';
+            return;
+        }
+
+        searchTimeout = setTimeout(() => {
+            resultsDiv.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 2rem;">Searching...</p>';
+            
+            fetch(`{% url 'search_users_for_assignment' %}?q=${encodeURIComponent(query)}`, {
+                method: 'GET',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    resultsDiv.innerHTML = `<p style="text-align: center; color: #ef4444; padding: 2rem;">${data.error}</p>`;
+                    return;
+                }
+
+                if (data.users.length === 0) {
+                    resultsDiv.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 2rem;">No users found.</p>';
+                    return;
+                }
+
+                let html = '<div style="display: flex; flex-direction: column; gap: 0.5rem;">';
+                data.users.forEach(user => {
+                    const safeName = user.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const safeEmail = user.email.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    html += `
+                        <div onclick="assignUser(${user.id}, '${safeName}', '${safeEmail}')" style="
+                            padding: 1rem;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                            background: white;
+                        " onmouseover="this.style.background='#f8f9fa'; this.style.borderColor='#667eea';" onmouseout="this.style.background='white'; this.style.borderColor='#e2e8f0';">
+                            <div style="font-weight: 600; color: #212529; margin-bottom: 0.25rem;">${user.name}</div>
+                            <div style="font-size: 0.875rem; color: #6c757d;">${user.email}</div>
+                            ${user.agency ? `<div style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem;">${user.agency}</div>` : ''}
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                resultsDiv.innerHTML = html;
+            })
+            .catch(error => {
+                resultsDiv.innerHTML = '<p style="text-align: center; color: #ef4444; padding: 2rem;">Error searching users. Please try again.</p>';
+                console.error('Error:', error);
+            });
+        }, 300);
+    }
+
+    function assignUser(externalUserId, userName, userEmail) {
+        const errorDiv = document.getElementById('assignUserError');
+        errorDiv.style.display = 'none';
+        
+        if (!confirm(`Assign ${userName} (${userEmail}) to this incident?`)) {
+            return;
+        }
+
+        fetch(`/api/incidents/${incidentId}/assign-user/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                external_user_id: externalUserId
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                errorDiv.textContent = data.error;
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            if (data.success) {
+                closeAssignUserModal();
+                location.reload();
+            }
+        })
+        .catch(error => {
+            errorDiv.textContent = 'Error assigning user. Please try again.';
+            errorDiv.style.display = 'block';
+            console.error('Error:', error);
+        });
+    }
+
+    // Close modal when clicking outside
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = document.getElementById('assignUserModal');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeAssignUserModal();
+                }
+            });
+        }
+    });
     </script>
+
+    <!-- User Assignment Modal -->
+    <div id="assignUserModal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    ">
+        <div style="
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        ">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0; font-size: 1.5rem; color: #212529;">Assign User</h3>
+                <button onclick="closeAssignUserModal()" style="
+                    background: none;
+                    border: none;
+                    font-size: 1.5rem;
+                    color: #6c757d;
+                    cursor: pointer;
+                    padding: 0;
+                    width: 30px;
+                    height: 30px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                ">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #495057;">Search Users</label>
+                <input type="text" id="userSearchInput" placeholder="Search by name or email..." style="
+                    width: 100%;
+                    padding: 0.75rem;
+                    border: 2px solid #e2e8f0;
+                    border-radius: 8px;
+                    font-size: 1rem;
+                    transition: border-color 0.2s;
+                " onkeyup="searchUsers()" onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+            
+            <div id="userSearchResults" style="
+                max-height: 400px;
+                overflow-y: auto;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 0.5rem;
+            ">
+                <p style="text-align: center; color: #6c757d; padding: 2rem;">Start typing to search for users...</p>
+            </div>
+            
+            <div id="assignUserError" style="
+                display: none;
+                margin-top: 1rem;
+                padding: 0.75rem;
+                background: #fee2e2;
+                color: #991b1b;
+                border-radius: 8px;
+                font-size: 0.9rem;
+            "></div>
+        </div>
+    </div>
 
     <style>
     .vertical-collapse-container {
