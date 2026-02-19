@@ -45,9 +45,6 @@ class Liaison(models.Model):
         default='email'
     )
     incident_types = models.TextField(help_text="Key incident types of concern")
-    role = models.CharField(max_length=100, blank=True, help_text="User role")
-    dept = models.CharField(max_length=100, blank=True, help_text="Department")
-    countee = models.CharField(max_length=100, blank=True, help_text="Countee")
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
@@ -247,7 +244,7 @@ class ExternalUser(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'users'
+        db_table = 'Users'
         
     def __str__(self):
         return self.agency_name
@@ -276,9 +273,9 @@ class ExternalSubscription(models.Model):
     username = models.CharField(max_length=100)
     payment = models.ForeignKey(ExternalPayment, models.DO_NOTHING)
     subscription_type = models.CharField(max_length=50)
-    duration = models.IntegerField(null=True, blank=True)  # set when user pays
-    subscription_start_date = models.DateField(null=True, blank=True)  # set when user pays
-    subscription_end_date = models.DateField(null=True, blank=True)  # set when user pays
+    duration = models.IntegerField()
+    subscription_start_date = models.DateField()
+    subscription_end_date = models.DateField()
     subscription_status = models.CharField(max_length=30)
     created_at = models.DateTimeField(blank=True, null=True)
 
@@ -306,15 +303,56 @@ class UserCredentials(models.Model):
         return self.username
 
 
+class Shift(models.Model):
+    """Shift model - maps to existing core_shifts table"""
+    shift_id = models.AutoField(primary_key=True, db_column='shift_id')
+    tenant_id = models.BigIntegerField(db_column='tenant_id')
+    shift_type = models.CharField(max_length=20, db_column='shift_type')  # morning, afternoon, evening, flexible
+    shift_start_time = models.TimeField(db_column='shift_start_time')
+    shift_end_time = models.TimeField(db_column='shift_end_time')
+    shift_incharge = models.IntegerField(blank=True, null=True, db_column='shift_incharge')
+    created_at = models.DateTimeField(auto_now_add=False, db_column='created_at')
+    
+    class Meta:
+        db_table = 'core_shifts'
+        managed = False  # Don't let Django manage this table - it already exists
+    
+    def __str__(self):
+        return f"{self.shift_type.title()} Shift ({self.shift_start_time} - {self.shift_end_time})"
+
+
+class Department(models.Model):
+    """Department model - maps to existing core_department table"""
+    id = models.BigIntegerField(primary_key=True, db_column='id')
+    category = models.CharField(max_length=100, db_column='category')
+    service_name = models.CharField(max_length=255, db_column='service_name')
+    organization_id = models.BigIntegerField(db_column='organization_id')
+    
+    class Meta:
+        db_table = 'core_department'
+        managed = False  # Don't let Django manage this table - it already exists
+    
+    def __str__(self):
+        return f"{self.category} - {self.service_name}"
+
+
 class UsersTable(models.Model):
     """Users table from database - maps to existing users table"""
     id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=150, blank=True, null=True)
+    mobile_no = models.CharField(max_length=20, blank=True, null=True)
+    email_id = models.CharField(max_length=150, blank=True, null=True)
+    department = models.CharField(max_length=200, blank=True, null=True)
+    sub_department = models.CharField(max_length=200, blank=True, null=True)
+    shift_start_time = models.TimeField(blank=True, null=True)
     agency_name = models.CharField(max_length=150)
     primary_liaison_name = models.CharField(max_length=100)
     liaison_email = models.CharField(max_length=150)
     key_incident_types = models.CharField(max_length=255, blank=True, null=True)
     preferred_communication_channels = models.CharField(max_length=100, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=False, null=True, blank=True)
+    shift_id = models.IntegerField(blank=True, null=True)
+    role = models.CharField(max_length=20, blank=True, null=True, db_column='role')
     
     class Meta:
         db_table = 'users'

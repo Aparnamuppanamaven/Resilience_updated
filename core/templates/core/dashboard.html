@@ -51,11 +51,33 @@
     <!-- Main Content Area -->
     <main class="main-content">
         <!-- Top Header -->
-        <header class="top-header">
+        <header class="top-header" style="display: flex; align-items: center; justify-content: space-between;">
             <h2 id="page-title">Dashboard</h2>
-            <div class="header-status">
-                <span class="status-label">Current Status:</span>
-                <span class="status-badge status-{{ settings.current_status|lower|slugify }}">{{ settings.current_status }}</span>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="header-status">
+                    <span class="status-label">Current Status:</span>
+                    <span class="status-badge status-{{ settings.current_status|lower|slugify }}">{{ settings.current_status }}</span>
+                </div>
+                <button type="button" onclick="confirmLogout()" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.25rem;
+                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(239, 68, 68, 0.4)'" 
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.3)'"
+                   title="Logout">
+                    <i class="fa-solid fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
             </div>
         </header>
 

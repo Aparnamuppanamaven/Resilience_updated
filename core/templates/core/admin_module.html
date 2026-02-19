@@ -66,24 +66,46 @@
     <main class="main-content">
         <header class="top-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
             <h2 style="margin: 0;">User Management</h2>
-            <button type="button" onclick="showCreateUserModal()" style="
-                padding: 0.75rem 1.5rem;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border: none;
-                border-radius: 8px;
-                font-weight: 600;
-                font-size: 0.95rem;
-                cursor: pointer;
-                transition: transform 0.2s ease, box-shadow 0.2s ease;
-                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(102, 126, 234, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'">
-                <i class="fa-solid fa-user-plus"></i>
-                Create New User
-            </button>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <button type="button" onclick="showCreateUserModal()" style="
+                    padding: 0.75rem 1.5rem;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 0.95rem;
+                    cursor: pointer;
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(102, 126, 234, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'">
+                    <i class="fa-solid fa-user-plus"></i>
+                    Create New User
+                </button>
+                <button type="button" onclick="confirmLogout()" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.25rem;
+                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(239, 68, 68, 0.4)'" 
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.3)'"
+                   title="Logout">
+                    <i class="fa-solid fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
         </header>
 
         <div class="view-container">
@@ -103,32 +125,18 @@
             {% endif %}
 
             <!-- Users List Section -->
-            <div class="card" style="background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: none; overflow: hidden; margin-bottom: 2rem;">
+            <div class="card" style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; overflow: hidden; margin-bottom: 1.5rem;">
                 <div class="card-header" style="
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 1.5rem 2rem;
-                    border-bottom: none;
+                    background: #f9fafb;
+                    color: #111827;
+                    padding: 0.75rem 1rem;
+                    border-bottom: 1px solid #e5e7eb;
                 ">
                     <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div style="display: flex; align-items: center; gap: 1rem;">
-                            <div style="
-                                width: 48px;
-                                height: 48px;
-                                background: rgba(255,255,255,0.2);
-                                border-radius: 12px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            ">
-                                <i class="fa-solid fa-users" style="font-size: 1.5rem;"></i>
-                            </div>
-                            <div>
-                                <h3 class="card-title" style="margin: 0; font-size: 1.5rem; font-weight: 600; color: white;">Users List</h3>
-                                <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem; color: rgba(255,255,255,0.9);">
-                                    {{ users_list|length }} user{{ users_list|length|pluralize }} registered
-                                </p>
-                            </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fa-solid fa-users" style="font-size: 1rem; color: #667eea;"></i>
+                            <h3 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; color: #111827;">Users</h3>
+                            <span style="font-size: 0.875rem; color: #6b7280; margin-left: 0.5rem;">({{ users_list|length }})</span>
                         </div>
                     </div>
                 </div>
@@ -137,162 +145,199 @@
                 <div class="table-responsive" style="overflow-x: auto; padding: 0;">
                     <table class="users-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
                         <thead>
-                            <tr style="background: linear-gradient(to right, #f8f9fa, #f1f3f5);">
+                            <tr style="background: #f9fafb;">
                                 <th style="
-                                    padding: 1rem 2rem;
+                                    padding: 0.625rem 1rem;
                                     text-align: left;
                                     font-weight: 600;
-                                    color: #495057;
-                                    font-size: 0.875rem;
+                                    color: #374151;
+                                    font-size: 0.75rem;
                                     text-transform: uppercase;
-                                    letter-spacing: 0.5px;
-                                    border-bottom: 2px solid #e9ecef;
+                                    letter-spacing: 0.025em;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    white-space: nowrap;
                                 ">
-                                    <i class="fa-solid fa-building" style="margin-right: 0.5rem; color: #667eea;"></i>Agency Name
+                                    Agency Name
                                 </th>
                                 <th style="
-                                    padding: 1rem 2rem;
+                                    padding: 0.625rem 1rem;
                                     text-align: left;
                                     font-weight: 600;
-                                    color: #495057;
-                                    font-size: 0.875rem;
+                                    color: #374151;
+                                    font-size: 0.75rem;
                                     text-transform: uppercase;
-                                    letter-spacing: 0.5px;
-                                    border-bottom: 2px solid #e9ecef;
+                                    letter-spacing: 0.025em;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    white-space: nowrap;
                                 ">
-                                    <i class="fa-solid fa-user" style="margin-right: 0.5rem; color: #f5576c;"></i>Primary Liaison
+                                    Primary Liaison
                                 </th>
                                 <th style="
-                                    padding: 1rem 2rem;
+                                    padding: 0.625rem 1rem;
                                     text-align: left;
                                     font-weight: 600;
-                                    color: #495057;
-                                    font-size: 0.875rem;
+                                    color: #374151;
+                                    font-size: 0.75rem;
                                     text-transform: uppercase;
-                                    letter-spacing: 0.5px;
-                                    border-bottom: 2px solid #e9ecef;
+                                    letter-spacing: 0.025em;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    white-space: nowrap;
                                 ">
-                                    <i class="fa-solid fa-envelope" style="margin-right: 0.5rem; color: #4facfe;"></i>Email
+                                    Role
                                 </th>
                                 <th style="
-                                    padding: 1rem 2rem;
+                                    padding: 0.625rem 1rem;
                                     text-align: left;
                                     font-weight: 600;
-                                    color: #495057;
-                                    font-size: 0.875rem;
+                                    color: #374151;
+                                    font-size: 0.75rem;
                                     text-transform: uppercase;
-                                    letter-spacing: 0.5px;
-                                    border-bottom: 2px solid #e9ecef;
+                                    letter-spacing: 0.025em;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    white-space: nowrap;
                                 ">
-                                    <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem; color: #00f2fe;"></i>Incident Types
+                                    Email
                                 </th>
                                 <th style="
-                                    padding: 1rem 2rem;
+                                    padding: 0.625rem 1rem;
                                     text-align: left;
                                     font-weight: 600;
-                                    color: #495057;
-                                    font-size: 0.875rem;
+                                    color: #374151;
+                                    font-size: 0.75rem;
                                     text-transform: uppercase;
-                                    letter-spacing: 0.5px;
-                                    border-bottom: 2px solid #e9ecef;
+                                    letter-spacing: 0.025em;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    white-space: nowrap;
                                 ">
-                                    <i class="fa-solid fa-comments" style="margin-right: 0.5rem; color: #f093fb;"></i>Communication Channels
+                                    Incident Types
                                 </th>
                                 <th style="
-                                    padding: 1rem 2rem;
+                                    padding: 0.625rem 1rem;
                                     text-align: left;
                                     font-weight: 600;
-                                    color: #495057;
-                                    font-size: 0.875rem;
+                                    color: #374151;
+                                    font-size: 0.75rem;
                                     text-transform: uppercase;
-                                    letter-spacing: 0.5px;
-                                    border-bottom: 2px solid #e9ecef;
+                                    letter-spacing: 0.025em;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    white-space: nowrap;
                                 ">
-                                    <i class="fa-solid fa-calendar" style="margin-right: 0.5rem; color: #f093fb;"></i>Created At
+                                    Communication
+                                </th>
+                                <th style="
+                                    padding: 0.625rem 1rem;
+                                    text-align: left;
+                                    font-weight: 600;
+                                    color: #374151;
+                                    font-size: 0.75rem;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.025em;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    white-space: nowrap;
+                                ">
+                                    Created At
                                 </th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for user in users_list %}
                             <tr class="user-row" style="
-                                border-bottom: 1px solid #f1f3f5;
-                                transition: all 0.2s ease;
+                                border-bottom: 1px solid #e5e7eb;
+                                transition: background-color 0.15s ease;
                                 background: white;
-                            ">
-                                <td style="padding: 1.25rem 2rem;">
-                                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            " onmouseover="this.style.backgroundColor='#f9fafb'" onmouseout="this.style.backgroundColor='white'">
+                                <td style="padding: 0.75rem 1rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
                                         <div style="
-                                            width: 40px;
-                                            height: 40px;
-                                            border-radius: 50%;
+                                            width: 32px;
+                                            height: 32px;
+                                            border-radius: 4px;
                                             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                                             display: flex;
                                             align-items: center;
                                             justify-content: center;
                                             color: white;
                                             font-weight: 600;
-                                            font-size: 0.9rem;
+                                            font-size: 0.75rem;
+                                            flex-shrink: 0;
                                         ">
                                             {{ user.agency_name|first|upper }}
                                         </div>
-                                        <div>
-                                            <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">
-                                                {{ user.agency_name }}
-                                            </div>
+                                        <div style="font-weight: 500; color: #111827; font-size: 0.875rem; line-height: 1.25rem;">
+                                            {{ user.agency_name }}
                                         </div>
                                     </div>
                                 </td>
-                                <td style="padding: 1.25rem 2rem;">
-                                    <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">
+                                <td style="padding: 0.75rem 1rem;">
+                                    <div style="font-weight: 500; color: #111827; font-size: 0.875rem; line-height: 1.25rem;">
                                         {{ user.primary_liaison_name }}
                                     </div>
                                 </td>
-                                <td style="padding: 1.25rem 2rem; color: #6c757d; font-size: 0.9rem;">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                        <i class="fa-solid fa-envelope" style="color: #adb5bd; font-size: 0.85rem;"></i>
-                                        <span>{{ user.liaison_email }}</span>
+                                <td style="padding: 0.75rem 1rem;">
+                                    {% if user.role %}
+                                        <span style="
+                                            padding: 0.25rem 0.5rem;
+                                            border-radius: 999px;
+                                            background: {% if user.role == 'admin' %}#fee2e2{% else %}#e5e7eb{% endif %};
+                                            color: {% if user.role == 'admin' %}#b91c1c{% else %}#374151{% endif %};
+                                            font-size: 0.75rem;
+                                            font-weight: 600;
+                                            text-transform: uppercase;
+                                            letter-spacing: 0.05em;
+                                        ">
+                                            {{ user.role|upper }}
+                                        </span>
+                                    {% else %}
+                                        <span style="color: #9ca3af; font-size: 0.75rem;">—</span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 0.75rem 1rem;">
+                                    <div style="color: #6b7280; font-size: 0.875rem; line-height: 1.25rem;">
+                                        {{ user.liaison_email }}
                                     </div>
                                 </td>
-                                <td style="padding: 1.25rem 2rem; color: #6c757d; font-size: 0.9rem;">
+                                <td style="padding: 0.75rem 1rem;">
                                     {% if user.key_incident_types %}
                                         <span style="
-                                            padding: 4px 10px;
-                                            border-radius: 12px;
-                                            background: #e3f2fd;
-                                            color: #1976d2;
-                                            font-size: 0.85rem;
+                                            padding: 0.25rem 0.5rem;
+                                            border-radius: 4px;
+                                            background: #dbeafe;
+                                            color: #1e40af;
+                                            font-size: 0.75rem;
                                             font-weight: 500;
+                                            white-space: nowrap;
                                         ">
                                             {{ user.key_incident_types }}
                                         </span>
                                     {% else %}
-                                        <span style="color: #adb5bd; font-style: italic;">Not specified</span>
+                                        <span style="color: #9ca3af; font-size: 0.875rem;">—</span>
                                     {% endif %}
                                 </td>
-                                <td style="padding: 1.25rem 2rem; color: #6c757d; font-size: 0.9rem;">
+                                <td style="padding: 0.75rem 1rem;">
                                     {% if user.preferred_communication_channels %}
                                         <span style="
-                                            padding: 4px 10px;
-                                            border-radius: 12px;
-                                            background: #f3e5f5;
-                                            color: #7b1fa2;
-                                            font-size: 0.85rem;
+                                            padding: 0.25rem 0.5rem;
+                                            border-radius: 4px;
+                                            background: #f3e8ff;
+                                            color: #6b21a8;
+                                            font-size: 0.75rem;
                                             font-weight: 500;
+                                            white-space: nowrap;
                                         ">
                                             {{ user.preferred_communication_channels|title }}
                                         </span>
                                     {% else %}
-                                        <span style="color: #adb5bd; font-style: italic;">Not specified</span>
+                                        <span style="color: #9ca3af; font-size: 0.875rem;">—</span>
                                     {% endif %}
                                 </td>
-                                <td style="padding: 1.25rem 2rem; color: #6c757d; font-size: 0.9rem;">
+                                <td style="padding: 0.75rem 1rem;">
                                     {% if user.created_at %}
-                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <i class="fa-solid fa-calendar" style="color: #adb5bd; font-size: 0.85rem;"></i>
-                                            <span>{{ user.created_at|date:"M d, Y g:i A" }}</span>
+                                        <div style="color: #6b7280; font-size: 0.875rem; line-height: 1.25rem;">
+                                            {{ user.created_at|date:"M d, Y" }}<br>
+                                            <span style="font-size: 0.75rem; color: #9ca3af;">{{ user.created_at|date:"g:i A" }}</span>
                                         </div>
                                     {% else %}
-                                        <span style="color: #adb5bd; font-style: italic;">—</span>
+                                        <span style="color: #9ca3af; font-size: 0.875rem;">—</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -343,12 +388,12 @@
     align-items: center;
     justify-content: center;
 ">
-    <div style="
+    <div id="modalContent" style="
         background: white;
         border-radius: 16px;
         padding: 2rem;
-        max-width: 600px;
-        width: 90%;
+        max-width: 1000px;
+        width: 95%;
         max-height: 90vh;
         overflow-y: auto;
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
@@ -369,40 +414,42 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="create_user">
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <!-- Personal Information Section -->
+            <h4 style="margin-bottom: 1rem; color: #495057; font-size: 1.1rem; font-weight: 600; border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem;">Personal Information</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="form-group">
                     <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                        Agency Name <span style="color: #ef4444;">*</span>
+                        Full Name <span style="color: #ef4444;">*</span>
                     </label>
-                    <input type="text" name="agency_name" required style="
+                    <input type="text" name="name" required style="
                         width: 100%;
                         padding: 0.75rem;
                         border: 1px solid #dee2e6;
                         border-radius: 6px;
                         font-size: 0.95rem;
-                    " placeholder="Enter agency name">
+                    " placeholder="Enter full name">
                 </div>
                 
                 <div class="form-group">
                     <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                        Primary Liaison Name <span style="color: #ef4444;">*</span>
+                        Mobile Number <span style="color: #ef4444;">*</span>
                     </label>
-                    <input type="text" name="primary_liaison_name" required style="
+                    <input type="tel" name="mobile_no" required style="
                         width: 100%;
                         padding: 0.75rem;
                         border: 1px solid #dee2e6;
                         border-radius: 6px;
                         font-size: 0.95rem;
-                    " placeholder="Enter liaison name">
+                    " placeholder="Enter mobile number">
                 </div>
             </div>
             
-            <div style="margin-bottom: 1rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="form-group">
                     <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                        Email <span style="color: #ef4444;">*</span>
+                        Email Address <span style="color: #ef4444;">*</span>
                     </label>
-                    <input type="email" name="liaison_email" required style="
+                    <input type="email" name="email_id" required style="
                         width: 100%;
                         padding: 0.75rem;
                         border: 1px solid #dee2e6;
@@ -410,38 +457,241 @@
                         font-size: 0.95rem;
                     " placeholder="Enter email address">
                 </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div class="form-group">
                     <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                        Key Incident Types
+                        Role <span style="color: #ef4444;">*</span>
                     </label>
-                    <input type="text" name="key_incident_types" style="
-                        width: 100%;
-                        padding: 0.75rem;
-                        border: 1px solid #dee2e6;
-                        border-radius: 6px;
-                        font-size: 0.95rem;
-                    " placeholder="e.g., cyber, flooding">
-                </div>
-                
-                <div class="form-group">
-                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                        Communication Channels
-                    </label>
-                    <select name="preferred_communication_channels" style="
+                    <select name="role" id="role" required style="
                         width: 100%;
                         padding: 0.75rem;
                         border: 1px solid #dee2e6;
                         border-radius: 6px;
                         font-size: 0.95rem;
                     ">
-                        <option value="">Select channel</option>
-                        <option value="email">Email</option>
-                        <option value="email_sms">Email + SMS</option>
-                        <option value="slack">Slack / Teams</option>
+                        <option value="">Select role</option>
+                        <option value="admin">Admin</option>
+                        <option value="member">Member</option>
                     </select>
+                </div>
+            </div>
+            
+            <!-- Department & Organization Section -->
+            <h4 style="margin-bottom: 1rem; color: #495057; font-size: 1.1rem; font-weight: 600; border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; margin-top: 1.5rem;">Department & Organization</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="form-group">
+                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                        Department (Category) <span style="color: #ef4444;">*</span>
+                    </label>
+                    <select name="department" id="department" required style="
+                        width: 100%;
+                        padding: 0.75rem;
+                        border: 1px solid #dee2e6;
+                        border-radius: 6px;
+                        font-size: 0.95rem;
+                    " onchange="updateSubDepartments()">
+                        <option value="">Select Department</option>
+                        {% for category, services in departments_by_category.items %}
+                        <option value="{{ category }}">{{ category }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                        Sub Department (Service Name) <span style="color: #ef4444;">*</span>
+                    </label>
+                    <select name="sub_department" id="sub_department" required style="
+                        width: 100%;
+                        padding: 0.75rem;
+                        border: 1px solid #dee2e6;
+                        border-radius: 6px;
+                        font-size: 0.95rem;
+                    ">
+                        <option value="">Select Sub Department</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                        Shift <span style="color: #ef4444;">*</span>
+                    </label>
+                    <select name="shift_id" id="shift_id" required style="
+                        width: 100%;
+                        padding: 0.75rem;
+                        border: 1px solid #dee2e6;
+                        border-radius: 6px;
+                        font-size: 0.95rem;
+                    " onchange="handleShiftChange()">
+                        <option value="">Select Shift</option>
+                        {% for shift in shifts %}
+                        <option value="{{ shift.shift_id }}" data-shift-type="{{ shift.shift_type }}" 
+                                data-start-time="{{ shift.shift_start_time }}" 
+                                data-end-time="{{ shift.shift_end_time }}"
+                                data-incharge="{{ shift.incharge_name|default:'Not assigned' }}">
+                            {{ shift.shift_type|title }} Shift ({{ shift.shift_start_time }} - {{ shift.shift_end_time }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <!-- Shift Details Display (for non-flexible shifts) -->
+                    <div id="shiftDetails" style="
+                        margin-top: 0.75rem;
+                        padding: 0.75rem;
+                        background: #f8f9fa;
+                        border-radius: 6px;
+                        border-left: 3px solid #667eea;
+                        display: none;
+                    ">
+                        <div style="font-size: 0.9rem; color: #495057;">
+                            <div style="margin-bottom: 0.25rem;"><strong>Shift Start Time:</strong> <span id="shiftStartTime"></span></div>
+                            <div style="margin-bottom: 0.25rem;"><strong>Shift End Time:</strong> <span id="shiftEndTime"></span></div>
+                            <div><strong>Shift Incharge:</strong> <span id="shiftIncharge"></span></div>
+                        </div>
+                    </div>
+                    <!-- Flexible Shift Date/Time Fields -->
+                    <div id="flexibleShiftFields" style="display: none; margin-top: 1rem;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div class="form-group">
+                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                                    Start Date & Time <span style="color: #ef4444;">*</span>
+                                </label>
+                                <input type="datetime-local" name="flexible_start_datetime" id="flexible_start_datetime" style="
+                                    width: 100%;
+                                    padding: 0.75rem;
+                                    border: 1px solid #dee2e6;
+                                    border-radius: 6px;
+                                    font-size: 0.95rem;
+                                ">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                                    End Date & Time <span style="color: #ef4444;">*</span>
+                                </label>
+                                <input type="datetime-local" name="flexible_end_datetime" id="flexible_end_datetime" style="
+                                    width: 100%;
+                                    padding: 0.75rem;
+                                    border: 1px solid #dee2e6;
+                                    border-radius: 6px;
+                                    font-size: 0.95rem;
+                                ">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            
+            <!-- Agency & Contact Information Section -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem;">
+                <h4 style="margin: 0; color: #495057; font-size: 1.1rem; font-weight: 600;">Agency & Contact Information</h4>
+                <button type="button" id="editAgencyInfoBtn" onclick="toggleAgencyInfoEdit()" style="
+                    background: none;
+                    border: none;
+                    color: #667eea;
+                    cursor: pointer;
+                    padding: 0.5rem;
+                    border-radius: 4px;
+                    font-size: 1rem;
+                    transition: background 0.2s ease;
+                " onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='none'" title="Edit Agency Information">
+                    <i class="fa-solid fa-pencil" id="editAgencyIcon"></i>
+                </button>
+            </div>
+            
+            <div id="agencyInfoSection">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                            Agency Name <span style="color: #ef4444;">*</span>
+                        </label>
+                        <input type="text" name="agency_name" id="agency_name" required 
+                               value="{% if logged_in_user_data %}{{ logged_in_user_data.agency_name }}{% endif %}"
+                               disabled style="
+                            width: 100%;
+                            padding: 0.75rem;
+                            border: 1px solid #dee2e6;
+                            border-radius: 6px;
+                            font-size: 0.95rem;
+                            background-color: #f8f9fa;
+                            color: #6c757d;
+                        " placeholder="Enter agency name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                            Primary Liaison Name <span style="color: #ef4444;">*</span>
+                        </label>
+                        <input type="text" name="primary_liaison_name" id="primary_liaison_name" required 
+                               value="{% if logged_in_user_data %}{{ logged_in_user_data.primary_liaison_name }}{% endif %}"
+                               disabled style="
+                            width: 100%;
+                            padding: 0.75rem;
+                            border: 1px solid #dee2e6;
+                            border-radius: 6px;
+                            font-size: 0.95rem;
+                            background-color: #f8f9fa;
+                            color: #6c757d;
+                        " placeholder="Enter liaison name">
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                            Email <span style="color: #ef4444;">*</span>
+                        </label>
+                        <input type="email" name="liaison_email" id="liaison_email" required 
+                               value="{% if logged_in_user_data %}{{ logged_in_user_data.liaison_email }}{% endif %}"
+                               disabled style="
+                            width: 100%;
+                            padding: 0.75rem;
+                            border: 1px solid #dee2e6;
+                            border-radius: 6px;
+                            font-size: 0.95rem;
+                            background-color: #f8f9fa;
+                            color: #6c757d;
+                        " placeholder="Enter email address">
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                            Key Incident Types
+                        </label>
+                        <input type="text" name="key_incident_types" id="key_incident_types" 
+                               value="{% if logged_in_user_data %}{{ logged_in_user_data.key_incident_types|default:'' }}{% endif %}"
+                               disabled style="
+                            width: 100%;
+                            padding: 0.75rem;
+                            border: 1px solid #dee2e6;
+                            border-radius: 6px;
+                            font-size: 0.95rem;
+                            background-color: #f8f9fa;
+                            color: #6c757d;
+                        " placeholder="e.g., cyber, flooding">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
+                            Communication Channels
+                        </label>
+                        <select name="preferred_communication_channels" id="preferred_communication_channels" disabled style="
+                            width: 100%;
+                            padding: 0.75rem;
+                            border: 1px solid #dee2e6;
+                            border-radius: 6px;
+                            font-size: 0.95rem;
+                            background-color: #f8f9fa;
+                            color: #6c757d;
+                        ">
+                            <option value="">Select channel</option>
+                            <option value="email" {% if logged_in_user_data and logged_in_user_data.preferred_communication_channels == 'email' %}selected{% endif %}>Email</option>
+                            <option value="email_sms" {% if logged_in_user_data and logged_in_user_data.preferred_communication_channels == 'email_sms' %}selected{% endif %}>Email + SMS</option>
+                            <option value="slack" {% if logged_in_user_data and logged_in_user_data.preferred_communication_channels == 'slack' %}selected{% endif %}>Slack / Teams</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             
@@ -473,13 +723,157 @@
 </div>
 
 <script>
+// Department and Sub-Department mapping from database
+const departmentSubDepartments = {
+    {% for category, services in departments_by_category.items %}
+    "{{ category }}": [
+        {% for service in services %}
+        "{{ service }}"{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]{% if not forloop.last %},{% endif %}
+    {% endfor %}
+};
+
+function updateSubDepartments() {
+    const departmentSelect = document.getElementById('department');
+    const subDepartmentSelect = document.getElementById('sub_department');
+    const selectedDepartment = departmentSelect.value;
+    
+    // Clear existing options
+    subDepartmentSelect.innerHTML = '<option value="">Select Sub Department</option>';
+    
+    // Populate sub-departments based on selected department
+    if (selectedDepartment && departmentSubDepartments[selectedDepartment]) {
+        departmentSubDepartments[selectedDepartment].forEach(function(subDept) {
+            const option = document.createElement('option');
+            option.value = subDept;
+            option.textContent = subDept;
+            subDepartmentSelect.appendChild(option);
+        });
+    }
+}
+
+function handleShiftChange() {
+    const shiftSelect = document.getElementById('shift_id');
+    const selectedOption = shiftSelect.options[shiftSelect.selectedIndex];
+    const shiftDetailsDiv = document.getElementById('shiftDetails');
+    const flexibleFieldsDiv = document.getElementById('flexibleShiftFields');
+    const flexibleStartInput = document.getElementById('flexible_start_datetime');
+    const flexibleEndInput = document.getElementById('flexible_end_datetime');
+    
+    // Hide both sections initially
+    shiftDetailsDiv.style.display = 'none';
+    flexibleFieldsDiv.style.display = 'none';
+    
+    // Clear flexible shift fields
+    if (flexibleStartInput) flexibleStartInput.value = '';
+    if (flexibleEndInput) flexibleEndInput.value = '';
+    
+    if (selectedOption.value) {
+        const shiftType = selectedOption.getAttribute('data-shift-type');
+        
+        if (shiftType === 'flexible') {
+            // Show flexible shift date/time fields
+            flexibleFieldsDiv.style.display = 'block';
+            // Make fields required
+            if (flexibleStartInput) flexibleStartInput.required = true;
+            if (flexibleEndInput) flexibleEndInput.required = true;
+        } else {
+            // Show shift details as plain text
+            const startTime = selectedOption.getAttribute('data-start-time');
+            const endTime = selectedOption.getAttribute('data-end-time');
+            const incharge = selectedOption.getAttribute('data-incharge');
+            
+            document.getElementById('shiftStartTime').textContent = startTime || 'N/A';
+            document.getElementById('shiftEndTime').textContent = endTime || 'N/A';
+            document.getElementById('shiftIncharge').textContent = incharge || 'N/A';
+            
+            shiftDetailsDiv.style.display = 'block';
+            // Make flexible fields not required
+            if (flexibleStartInput) flexibleStartInput.required = false;
+            if (flexibleEndInput) flexibleEndInput.required = false;
+        }
+    } else {
+        // No shift selected, make flexible fields not required
+        if (flexibleStartInput) flexibleStartInput.required = false;
+        if (flexibleEndInput) flexibleEndInput.required = false;
+    }
+}
+
 function showCreateUserModal() {
     document.getElementById('createUserModal').style.display = 'flex';
+}
+
+function toggleAgencyInfoEdit() {
+    const agencyFields = ['agency_name', 'primary_liaison_name', 'liaison_email', 'key_incident_types', 'preferred_communication_channels'];
+    const editBtn = document.getElementById('editAgencyInfoBtn');
+    const editIcon = document.getElementById('editAgencyIcon');
+    let isEditing = false;
+    
+    // Check if any field is disabled to determine current state
+    const firstField = document.getElementById('agency_name');
+    if (firstField && firstField.disabled) {
+        isEditing = false; // Currently read-only, switch to edit mode
+    } else {
+        isEditing = true; // Currently editable, switch to read-only mode
+    }
+    
+    agencyFields.forEach(function(fieldId) {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            if (isEditing) {
+                // Switch to read-only mode
+                field.disabled = true;
+                field.style.backgroundColor = '#f8f9fa';
+                field.style.color = '#6c757d';
+            } else {
+                // Switch to edit mode
+                field.disabled = false;
+                field.style.backgroundColor = 'white';
+                field.style.color = '#212529';
+            }
+        }
+    });
+    
+    // Update icon
+    if (editIcon) {
+        if (isEditing) {
+            editIcon.className = 'fa-solid fa-pencil';
+            editBtn.title = 'Edit Agency Information';
+        } else {
+            editIcon.className = 'fa-solid fa-check';
+            editBtn.title = 'Save Changes';
+        }
+    }
 }
 
 function closeCreateUserModal() {
     document.getElementById('createUserModal').style.display = 'none';
     document.getElementById('createUserForm').reset();
+    // Reset sub-department dropdown
+    document.getElementById('sub_department').innerHTML = '<option value="">Select Sub Department</option>';
+    // Reset shift details display
+    document.getElementById('shiftDetails').style.display = 'none';
+    document.getElementById('flexibleShiftFields').style.display = 'none';
+    const flexibleStartInput = document.getElementById('flexible_start_datetime');
+    const flexibleEndInput = document.getElementById('flexible_end_datetime');
+    if (flexibleStartInput) flexibleStartInput.required = false;
+    if (flexibleEndInput) flexibleEndInput.required = false;
+    // Reset agency info fields to read-only
+    const agencyFields = ['agency_name', 'primary_liaison_name', 'liaison_email', 'key_incident_types', 'preferred_communication_channels'];
+    agencyFields.forEach(function(fieldId) {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.disabled = true;
+            field.style.backgroundColor = '#f8f9fa';
+            field.style.color = '#6c757d';
+        }
+    });
+    // Reset edit icon
+    const editIcon = document.getElementById('editAgencyIcon');
+    if (editIcon) {
+        editIcon.className = 'fa-solid fa-pencil';
+    }
 }
 
 // Close modal when clicking outside
@@ -518,6 +912,25 @@ document.getElementById('createUserModal').addEventListener('click', function(e)
 }
 
 .table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #868e96;
+}
+
+/* Modal Scrollbar Styling */
+#modalContent::-webkit-scrollbar {
+    width: 10px;
+}
+
+#modalContent::-webkit-scrollbar-track {
+    background: #f1f3f5;
+    border-radius: 5px;
+}
+
+#modalContent::-webkit-scrollbar-thumb {
+    background: #adb5bd;
+    border-radius: 5px;
+}
+
+#modalContent::-webkit-scrollbar-thumb:hover {
     background: #868e96;
 }
 
