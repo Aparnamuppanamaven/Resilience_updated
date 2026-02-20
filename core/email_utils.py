@@ -20,7 +20,7 @@ def get_azure_credentials():
     return tenant_id, client_id, client_secret, sender
 
 
-def send_email_via_graph_api(to_email, subject, html_content, recipient_name=None):
+def send_email_via_graph_api(to_emails, subject, html_content, recipient_name=None):
     """
     Send email using Microsoft Graph API
     
@@ -59,22 +59,21 @@ def send_email_via_graph_api(to_email, subject, html_content, recipient_name=Non
         }
         
         # Prepare payload
-        recipient = {
-            "emailAddress": {
-                "address": to_email
-            }
-        }
-        if recipient_name:
-            recipient["emailAddress"]["name"] = recipient_name
-        
+        to_recipients = []
+        for email in to_emails:
+            to_recipients.append({
+                "emailAddress": {
+                    "address": email
+                }
+            })
         payload = {
             "message": {
-                "subject": subject,
+            "subject": subject,
                 "body": {
                     "contentType": "HTML",
                     "content": html_content
-                },
-                "toRecipients": [recipient]
+                    },
+            "toRecipients": to_recipients
             }
         }
         
@@ -164,9 +163,10 @@ def send_new_user_notification_email(liaison_email, liaison_name, agency_name):
     from django.conf import settings
     
     # Get admin email from settings or environment
-    admin_email = getattr(settings, 'ADMIN_EMAIL', None) or os.getenv("ADMIN_EMAIL") or os.getenv("NOTIFICATION_EMAIL")
+    admin_emails_raw = getattr(settings, 'ADMIN_EMAIL', None) or os.getenv("ADMIN_EMAIL", "")
+    admin_emails = [email.strip() for email in admin_emails_raw.split(",") if email.strip()]
     
-    if not admin_email:
+    if not admin_emails:
         return False, "Admin email not configured. Please set ADMIN_EMAIL or NOTIFICATION_EMAIL in settings or environment variables."
     
     subject = "New User Signup - Resilience Foundation"
@@ -213,8 +213,8 @@ def send_new_user_notification_email(liaison_email, liaison_name, agency_name):
     """
     
     return send_email_via_graph_api(
-        to_email=admin_email,
-        subject=subject,
-        html_content=html_content,
-        recipient_name="Admin"
+    to_emails=admin_emails,
+    subject=subject,
+    html_content=html_content,
+    recipient_name="Admin"
     )
