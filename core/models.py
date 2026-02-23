@@ -66,7 +66,7 @@ class IncidentAssignedUser(models.Model):
     class Meta:
         db_table = 'core_incidents_mapping'
         ordering = ['-created_at']
-        managed = True  # Django can manage this table
+        managed = False  # Django should NOT manage this table
     
     def __str__(self):
         return f"Incident {self.incident_id_id} - User {self.user_id_id} (assigned by {self.mapped_user_id_id if self.mapped_user_id else 'System'})"
@@ -102,6 +102,37 @@ class Incident(models.Model):
         return f"{self.title} ({self.severity})"
 
 
+class IncidentCapture(models.Model):
+    """Incidents captured from Capture form - maps to core_incidents table"""
+    SEVERITY_CHOICES = [
+        ('LOW', 'Low - Informational'),
+        ('MEDIUM', 'Medium - Potential Impact'),
+        ('HIGH', 'High - Critical Incident'),
+        ('CRITICAL', 'Critical'),
+    ]
+    
+    id = models.BigAutoField(primary_key=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='captured_incidents', db_column='organization_id')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='LOW')
+    impact = models.TextField(blank=True, help_text="Why it matters - operational impact analysis")
+    next_action = models.CharField(max_length=255, blank=True)
+    start_time = models.DateTimeField(null=True, blank=True, db_column='start_time')
+    end_time = models.DateTimeField(null=True, blank=True, db_column='end_time')
+    timestamp = models.DateTimeField(db_column='timestamp')
+    owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, blank=True, db_column='owner_id')
+    is_synthesized = models.BooleanField(default=False, db_column='is_synthesized')
+    
+    class Meta:
+        db_table = 'core_incidents'
+        ordering = ['-timestamp']
+        managed = False  # Don't let Django manage this table - it already exists
+    
+    def __str__(self):
+        return f"{self.title} ({self.severity})"
+
+
 class IncidentEvent(models.Model):
     """Incident event logs - tracks log entries for incidents"""
     log_id = models.AutoField(primary_key=True, db_column='log_id')
@@ -113,7 +144,7 @@ class IncidentEvent(models.Model):
     class Meta:
         db_table = 'core_incident_event'
         ordering = ['-created_time']
-        managed = True  # Django can manage this table
+        managed = False  # Django should NOT manage this table
     
     def __str__(self):
         return f"Log #{self.log_id} - Incident {self.incident_id} - {self.created_time}"

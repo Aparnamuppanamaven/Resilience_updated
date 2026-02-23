@@ -25,7 +25,7 @@ from reportlab.pdfgen import canvas
 
 from django.db import transaction
 from .models import (
-    Organization, Liaison, OperationalUpdate, Incident, IncidentEvent,
+    Organization, Liaison, OperationalUpdate, Incident, IncidentEvent, IncidentCapture,
     Decision, SystemSettings, ShiftPacket,
     ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials, UsersTable, Shift, Department,
     Payment, Invoice,
@@ -788,14 +788,28 @@ def capture(request):
     if request.method == 'POST':
         form = OperationalUpdateForm(request.POST)
         if form.is_valid():
-            # Save to core_operationalupdate table
-            incident = Incident.objects.create(
+            # Save to core_incidents table
+            start_time = None
+            end_time = None
+            
+            # Parse start_time if provided
+            if form.cleaned_data.get('start_time'):
+                start_time = form.cleaned_data['start_time']
+            
+            # Parse end_time if provided
+            if form.cleaned_data.get('end_time'):
+                end_time = form.cleaned_data['end_time']
+            
+            incident = IncidentCapture.objects.create(
                 organization=organization,
                 title=form.cleaned_data['title'],
                 severity=form.cleaned_data['severity'],
                 description=form.cleaned_data['description'] or '',  # Required field, use empty string if blank
                 impact=form.cleaned_data['impact'] or '',  # Required field
                 next_action=form.cleaned_data['next_action'] or '',  # Required field
+                start_time=start_time,
+                end_time=end_time,
+                timestamp=timezone.now(),  # Set timestamp explicitly
                 owner=liaison if liaison else None,
                 is_synthesized=False,  # Required field, default to False
             )
@@ -2015,8 +2029,8 @@ def incidents_list(request):
         messages.error(request, 'Please complete checkout first.')
         return redirect('checkout')
     
-    # Get all incidents for this organization
-    incidents = Incident.objects.filter(organization=organization).order_by('-timestamp')
+    # Get all incidents for this organization from core_incidents table
+    incidents = IncidentCapture.objects.filter(organization=organization).order_by('-timestamp')
     
     # Get or create system settings for status display
     settings_obj, created = SystemSettings.objects.get_or_create(
@@ -2085,10 +2099,10 @@ def incident_detail(request, incident_id):
         messages.error(request, 'Please complete checkout first.')
         return redirect('checkout')
     
-    # Get the incident
+    # Get the incident from core_incidents table
     try:
-        incident = Incident.objects.get(id=incident_id, organization=organization)
-    except Incident.DoesNotExist:
+        incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+    except IncidentCapture.DoesNotExist:
         messages.error(request, 'Incident not found.')
         return redirect('incidents_list')
     
@@ -2178,8 +2192,38 @@ def incident_detail(request, incident_id):
         assigned_users_data = []
     
     # Get incident event logs
+    # Note: IncidentEvent has ForeignKey to Incident, but we're using IncidentCapture
+    # So we need to query by incident_id directly
     try:
-        incident_logs = IncidentEvent.objects.filter(incident=incident).order_by('-created_time')
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT log_id, log_description, created_time, user_log_id
+                FROM core_incident_event
+                WHERE incident_id = %s
+                ORDER BY created_time DESC
+                """,
+                [incident.id]
+            )
+            log_rows = cursor.fetchall()
+        
+        # Convert to list of dicts for template
+        incident_logs = []
+        for row in log_rows:
+            log_id, log_description, created_time, user_log_id = row
+            user = None
+            if user_log_id:
+                try:
+                    user = User.objects.get(id=user_log_id)
+                except User.DoesNotExist:
+                    pass
+            incident_logs.append({
+                'log_id': log_id,
+                'log_description': log_description,
+                'created_time': created_time,
+                'user_log': user,
+            })
     except Exception:
         incident_logs = []
     
@@ -2252,8 +2296,8 @@ def assign_users_to_incident(request, incident_id):
         if not organization:
             return JsonResponse({'error': 'Organization not found'}, status=400)
         
-        # Get incident
-        incident = Incident.objects.get(id=incident_id, organization=organization)
+        # Get incident from core_incidents table
+        incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
         
         # Get user IDs from POST data (list of UsersTable IDs)
         data = json.loads(request.body)
@@ -2373,7 +2417,7 @@ def assign_users_to_incident(request, incident_id):
             ]
         })
         
-    except Incident.DoesNotExist:
+    except IncidentCapture.DoesNotExist:
         return JsonResponse({'error': 'Incident not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -2404,8 +2448,8 @@ def add_incident_event_log(request, incident_id):
         if not organization:
             return JsonResponse({'error': 'Organization not found'}, status=400)
         
-        # Get incident
-        incident = Incident.objects.get(id=incident_id, organization=organization)
+        # Get incident from core_incidents table
+        incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
         
         # Get log description from POST data
         data = json.loads(request.body)
@@ -2420,12 +2464,21 @@ def add_incident_event_log(request, incident_id):
             user_log_id = request.user.id
         
         # Create incident event log
-        log_entry = IncidentEvent.objects.create(
-            incident=incident,
-            log_description=log_description,
-            user_log_id=user_log_id,
-            created_time=timezone.now()
-        )
+        # Note: IncidentEvent has ForeignKey to Incident, but we're using IncidentCapture
+        # So we need to create it using the incident_id directly
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO core_incident_event (incident_id, log_description, user_log_id, created_time)
+                VALUES (%s, %s, %s, %s)
+                """,
+                [incident.id, log_description, user_log_id, timezone.now()]
+            )
+            log_id = cursor.lastrowid
+        
+        # Fetch the created log entry for response
+        log_entry = IncidentEvent.objects.get(log_id=log_id)
         
         return JsonResponse({
             'success': True,
@@ -2438,7 +2491,7 @@ def add_incident_event_log(request, incident_id):
             }
         })
         
-    except Incident.DoesNotExist:
+    except IncidentCapture.DoesNotExist:
         return JsonResponse({'error': 'Incident not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
