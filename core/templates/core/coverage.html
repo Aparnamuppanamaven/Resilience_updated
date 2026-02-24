@@ -35,19 +35,19 @@
         <header class="top-header" style="display: flex; align-items: center; justify-content: space-between;">
             <h2>Coverage & Comms</h2>
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <div class="header-status">
-                    <div class="status-indicator">
-                        <span class="status-label">Current Status:</span>
-                        <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
-                    </div>
-                    {% if current_status == 'Normal' %}
-                    <button type="button" class="btn-alert" id="activateAlertBtn" onclick="activateAlert()">
-                        <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
-                    </button>
-                    {% endif %}
-                    <div class="sync-time">
-                        <span>Last detailed sync: {{ last_sync_display }}</span>
-                    </div>
+            <div class="header-status">
+                <div class="status-indicator">
+                    <span class="status-label">Current Status:</span>
+                    <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                </div>
+                {% if current_status == 'Normal' %}
+                <button type="button" class="btn-alert" id="activateAlertBtn" onclick="activateAlert()">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Activate Alert
+                </button>
+                {% endif %}
+                <div class="sync-time">
+                    <span>Last detailed sync: {{ last_sync_display }}</span>
+                </div>
                 </div>
                 <button type="button" onclick="confirmLogout()" style="
                     display: flex;

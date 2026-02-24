@@ -54,9 +54,9 @@
         <header class="top-header" style="display: flex; align-items: center; justify-content: space-between;">
             <h2 id="page-title">Dashboard</h2>
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <div class="header-status">
-                    <span class="status-label">Current Status:</span>
-                    <span class="status-badge status-{{ settings.current_status|lower|slugify }}">{{ settings.current_status }}</span>
+            <div class="header-status">
+                <span class="status-label">Current Status:</span>
+                <span class="status-badge status-{{ settings.current_status|lower|slugify }}">{{ settings.current_status }}</span>
                 </div>
                 <button type="button" onclick="confirmLogout()" style="
                     display: flex;

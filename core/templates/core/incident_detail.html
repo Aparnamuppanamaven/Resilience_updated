@@ -128,7 +128,7 @@
                             <div class="form-group">
                                 <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Created At</label>
                                 <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-                                    {{ incident.timestamp|date:"M d, Y g:i A" }}
+                                    {{ incident.created_at|date:"M d, Y g:i A" }}
                                 </div>
                             </div>
                         </div>
@@ -147,12 +147,6 @@
                             </div>
                         </div>
 
-                        <div class="form-group" style="margin-bottom: 1.5rem;">
-                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Next Action</label>
-                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; white-space: pre-wrap; min-height: 60px; border-left: 3px solid #667eea;">
-                                {{ incident.next_action|default:"Not specified" }}
-                            </div>
-                        </div>
                         </div>
                     </div>
                 </div>
@@ -515,7 +509,7 @@
                                 <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; border-left: 3px solid #4facfe;">
                                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
                                         <span style="font-weight: 600; color: #212529;">Incident Created</span>
-                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ incident.timestamp|date:"M d, Y g:i A" }}</span>
+                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ incident.created_at|date:"M d, Y g:i A" }}</span>
                                     </div>
                                     <p style="margin: 0; color: #6c757d; font-size: 0.9rem;">
                                         Incident "{{ incident.title }}" was created with severity level {{ incident.get_severity_display|default:incident.severity }}.
@@ -523,8 +517,8 @@
                                 </div>
                             </div>
 
-                            <!-- Log Entry 2: Owner Assignment (if exists) -->
-                            {% if incident.owner %}
+                            <!-- Log Entry 2: Created By (if exists) -->
+                            {% if incident.created_by %}
                             <div style="position: relative; margin-bottom: 1.5rem;">
                                 <div style="
                                     position: absolute;
@@ -539,17 +533,17 @@
                                 "></div>
                                 <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; border-left: 3px solid #00f2fe;">
                                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
-                                        <span style="font-weight: 600; color: #212529;">Owner Assigned</span>
-                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ incident.timestamp|date:"M d, Y" }}</span>
+                                        <span style="font-weight: 600; color: #212529;">Created By</span>
+                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ incident.created_at|date:"M d, Y" }}</span>
                                     </div>
                                     <p style="margin: 0; color: #6c757d; font-size: 0.9rem;">
-                                        {{ incident.owner.user.get_full_name|default:incident.owner.user.username }} was assigned as the owner.
+                                        {{ incident.created_by.user.get_full_name|default:incident.created_by.user.username }} created this incident.
                                     </p>
                                 </div>
                             </div>
                             {% endif %}
 
-                            <!-- Incident Event Logs from core_incident_event -->
+                            <!-- Incident Event Logs from core_incident_events -->
                             {% for log in incident_logs %}
                             <div style="position: relative; margin-bottom: 1.5rem;">
                                 <div style="

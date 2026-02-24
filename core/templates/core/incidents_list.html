@@ -269,10 +269,10 @@
                                     {% endif %}
                                 </td>
                                 <td style="padding: 0.75rem 1rem;">
-                                    {% if incident.timestamp %}
+                                    {% if incident.created_at %}
                                         <div style="color: #6b7280; font-size: 0.875rem; line-height: 1.25rem;">
-                                            {{ incident.timestamp|date:"M d, Y" }}<br>
-                                            <span style="font-size: 0.75rem; color: #9ca3af;">{{ incident.timestamp|date:"g:i A" }}</span>
+                                            {{ incident.created_at|date:"M d, Y" }}<br>
+                                            <span style="font-size: 0.75rem; color: #9ca3af;">{{ incident.created_at|date:"g:i A" }}</span>
                                         </div>
                                     {% else %}
                                         <span style="color: #9ca3af; font-size: 0.875rem;">—</span>

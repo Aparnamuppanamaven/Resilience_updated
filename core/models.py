@@ -9,6 +9,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 class Organization(models.Model):
     """Organization/Agency model"""
+    tenant_id = models.BigAutoField(primary_key=True, db_column='tenant_id')
     name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
@@ -24,6 +25,7 @@ class Organization(models.Model):
     enterprise_upgrade_date = models.DateTimeField(null=True, blank=True)
     
     class Meta:
+        db_table = 'core_organization'
         ordering = ['-created_at']
     
     def __str__(self):
@@ -49,6 +51,7 @@ class Liaison(models.Model):
     dept = models.CharField(max_length=100, blank=True, help_text="Department")
     countee = models.CharField(max_length=100, blank=True, help_text="Countee")
     created_at = models.DateTimeField(auto_now_add=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.organization.name}"
@@ -62,9 +65,10 @@ class IncidentAssignedUser(models.Model):
     mapped_user_id = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, db_column='mapped_user_id', related_name='assignments_made', help_text="Logged-in user who made this assignment")
     is_active = models.BooleanField(default=True, db_column='is_active')  # True for current assignments, False for historical
     created_at = models.DateTimeField(auto_now_add=True, db_column='created_at')
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
-        db_table = 'core_incidents_mapping'
+        db_table = 'core_incident_user_mapping'
         ordering = ['-created_at']
         managed = False  # Django should NOT manage this table
     
@@ -92,6 +96,7 @@ class Incident(models.Model):
     owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, blank=True, db_column='owner_id')
     assigned_users = models.ManyToManyField(Liaison, through='IncidentAssignedUser', related_name='assigned_incidents', blank=True)
     is_synthesized = models.BooleanField(default=False)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
         db_table = 'core_operationalupdate'
@@ -117,16 +122,16 @@ class IncidentCapture(models.Model):
     description = models.TextField(blank=True)
     severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='LOW')
     impact = models.TextField(blank=True, help_text="Why it matters - operational impact analysis")
-    next_action = models.CharField(max_length=255, blank=True)
     start_time = models.DateTimeField(null=True, blank=True, db_column='start_time')
     end_time = models.DateTimeField(null=True, blank=True, db_column='end_time')
-    timestamp = models.DateTimeField(db_column='timestamp')
-    owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, blank=True, db_column='owner_id')
+    created_at = models.DateTimeField(db_column='Created_at')
+    created_by = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, blank=True, db_column='Created_by', related_name='created_incidents')
     is_synthesized = models.BooleanField(default=False, db_column='is_synthesized')
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
         db_table = 'core_incidents'
-        ordering = ['-timestamp']
+        ordering = ['-created_at']
         managed = False  # Don't let Django manage this table - it already exists
     
     def __str__(self):
@@ -135,19 +140,22 @@ class IncidentCapture(models.Model):
 
 class IncidentEvent(models.Model):
     """Incident event logs - tracks log entries for incidents"""
-    log_id = models.AutoField(primary_key=True, db_column='log_id')
+    id = models.AutoField(primary_key=True, db_column='id')
     incident = models.ForeignKey(Incident, on_delete=models.CASCADE, db_column='incident_id', related_name='event_logs')
-    log_description = models.TextField(db_column='log_description')
-    user_log = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, db_column='user_log_id', related_name='incident_logs_created')
+    # Note: underlying DB column was renamed from `event_desc` to `event_description`
+    # but we keep the Django field name `event_desc` for backwards compatibility.
+    event_desc = models.TextField(db_column='event_description')
+    user_log = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, db_column='user_id', related_name='incident_logs_created')
     created_time = models.DateTimeField(auto_now_add=True, db_column='created_time')
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
-        db_table = 'core_incident_event'
+        db_table = 'core_incident_events'
         ordering = ['-created_time']
         managed = False  # Django should NOT manage this table
     
     def __str__(self):
-        return f"Log #{self.log_id} - Incident {self.incident_id} - {self.created_time}"
+        return f"Event #{self.id} - Incident {self.incident_id} - {self.created_time}"
 
 
 class OperationalUpdate(models.Model):
@@ -169,6 +177,7 @@ class OperationalUpdate(models.Model):
     next_action = models.CharField(max_length=255, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     is_synthesized = models.BooleanField(default=False)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
         db_table = 'core_operationalupdate'
@@ -192,8 +201,10 @@ class Decision(models.Model):
     owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, related_name='owned_decisions')
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Open')
     timestamp = models.DateTimeField(auto_now_add=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
+        db_table = 'core_decision'
         ordering = ['-timestamp']
     
     def __str__(self):
@@ -226,6 +237,7 @@ class SystemSettings(models.Model):
         choices=[(0, 'Standard Operations'), (1, 'Escalation Protocol')]
     )
     last_sync = models.DateTimeField(auto_now=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     def __str__(self):
         return f"Settings for {self.organization.name}"
@@ -241,6 +253,7 @@ class ShiftPacket(models.Model):
     key_risks = models.TextField()
     next_actions = models.TextField()
     sent_at = models.DateTimeField(null=True, blank=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
         ordering = ['-generated_at']
@@ -271,6 +284,7 @@ class Payment(models.Model):
     invoice_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='payments', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
         ordering = ['-created_at']
@@ -294,6 +308,7 @@ class Invoice(models.Model):
     early_pay_terms = models.CharField(max_length=50, default='2% / 10, Net 30')
     due_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
         ordering = ['-created_at']
@@ -311,10 +326,11 @@ class ExternalUser(models.Model):
     key_incident_types = models.CharField(max_length=255, blank=True, null=True)
     preferred_communication_channels = models.CharField(max_length=100, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
 
     class Meta:
         managed = False
-        db_table = 'users'
+        db_table = 'core_users'
         
     def __str__(self):
         return self.agency_name
@@ -328,6 +344,7 @@ class ExternalPayment(models.Model):
     payment_method = models.CharField(max_length=50)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_time = models.DateTimeField(blank=True, null=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
 
     class Meta:
         managed = False
@@ -338,23 +355,23 @@ class ExternalPayment(models.Model):
 
 
 class ExternalSubscription(models.Model):
-    """Mapping to legacy subscriptions table"""
-    subscription_id = models.AutoField(primary_key=True)
-    username = models.CharField(max_length=100)
-    payment = models.ForeignKey(ExternalPayment, models.DO_NOTHING)
-    subscription_type = models.CharField(max_length=50)
-    duration = models.IntegerField(null=True, blank=True)  # set when user pays
-    subscription_start_date = models.DateField(null=True, blank=True)  # set when user pays
-    subscription_end_date = models.DateField(null=True, blank=True)  # set when user pays
-    subscription_status = models.CharField(max_length=30)
-    created_at = models.DateTimeField(blank=True, null=True)
+    """Mapping to core_subscriptions table"""
+    id = models.AutoField(primary_key=True)
+    subscription_id = models.CharField(max_length=64, unique=True, db_column='subscription_id')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    paid_status = models.CharField(max_length=20, db_column='paid_status')
+    created_at = models.DateTimeField(db_column='created_at')
+    updated_at = models.DateTimeField(db_column='updated_at')
+    stripe_payment = models.ForeignKey('StripePayment', on_delete=models.SET_NULL, null=True, blank=True, db_column='stripe_payment_id')
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, db_column='user_id')
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
 
     class Meta:
         managed = False
-        db_table = 'subscriptions'
+        db_table = 'core_subscriptions'
         
     def __str__(self):
-        return self.subscription_type
+        return f"Subscription {self.subscription_id} - {self.user.username if self.user else 'N/A'}"
 
 
 class UserCredentials(models.Model):
@@ -364,6 +381,7 @@ class UserCredentials(models.Model):
     # Plain text password stored in password_hash column
     password_hash = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
 
     class Meta:
         managed = False
@@ -397,6 +415,7 @@ class Department(models.Model):
     category = models.CharField(max_length=100, db_column='category')
     service_name = models.CharField(max_length=255, db_column='service_name')
     organization_id = models.BigIntegerField(db_column='organization_id')
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
         db_table = 'core_department'
@@ -404,6 +423,26 @@ class Department(models.Model):
     
     def __str__(self):
         return f"{self.category} - {self.service_name}"
+
+
+class TenantDomain(models.Model):
+    """Tenant Domain model - maps to existing tenant_domains table"""
+    tenant_id = models.BigIntegerField(primary_key=True, db_column='tenant_id')
+    org_name = models.CharField(max_length=255, db_column='org_name')
+    department = models.CharField(max_length=255, null=True, blank=True, db_column='department')
+    location = models.CharField(max_length=255, null=True, blank=True, db_column='location')
+    contact_person = models.CharField(max_length=255, null=True, blank=True, db_column='contact_person')
+    mobile = models.CharField(max_length=20, null=True, blank=True, db_column='mobile')
+    is_active = models.BooleanField(default=True, db_column='is_active')
+    created_at = models.DateTimeField(null=True, blank=True, db_column='created_at')
+    
+    class Meta:
+        db_table = 'tenant_domains'
+        managed = False  # Don't let Django manage this table - it already exists
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.org_name} (Tenant ID: {self.tenant_id})"
 
 
 class UsersTable(models.Model):
@@ -423,9 +462,10 @@ class UsersTable(models.Model):
     created_at = models.DateTimeField(auto_now_add=False, null=True, blank=True)
     shift_id = models.IntegerField(blank=True, null=True)
     role = models.CharField(max_length=20, blank=True, null=True, db_column='role')
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
-        db_table = 'users'
+        db_table = 'core_users'
         managed = False  # Don't let Django manage this table - it already exists
         ordering = ['-created_at']
     
@@ -467,6 +507,7 @@ class UserProfile(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
         ordering = ['-created_at']
@@ -498,6 +539,7 @@ class Payment(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='payments', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     # PCI-safe: store only tokenized card data (last 4 digits, token)
     card_last4 = models.CharField(max_length=4, blank=True)
@@ -534,6 +576,7 @@ class Invoice(models.Model):
     early_pay_terms = models.CharField(max_length=50, default='2% / 10, Net 30')
     due_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
         ordering = ['-created_at']
@@ -554,9 +597,10 @@ class StripePayment(models.Model):
     receipt_url = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
-        db_table = 'stripepayments'
+        db_table = 'core_stripepayments'
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['stripe_payment_intent_id']),

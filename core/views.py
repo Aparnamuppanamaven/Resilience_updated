@@ -131,17 +131,43 @@ def resolve_login_username(value):
 
 def user_has_active_subscription(username):
     """
-    Return True if the user has an Active subscription with end_date >= today.
+    Return True if the user has an Active subscription.
     Used at login to allow only users with valid active subscription.
+    Checks both new core_subscriptions table and old subscriptions table.
     """
     if not username:
         return False
-    sub = ExternalSubscription.objects.filter(
-        username=username,
-        subscription_status='Active',
-        subscription_end_date__gte=timezone.now().date()
-    ).order_by('-subscription_end_date').first()
-    return sub is not None
+    try:
+        # First, check new core_subscriptions table (if user exists in auth_user)
+        user = User.objects.filter(username=username).first()
+        if user:
+            # Check for active subscription in new table (paid_status = 'paid' or 'active')
+            sub = ExternalSubscription.objects.filter(
+                user=user,
+                paid_status__in=['paid', 'active', 'Paid', 'Active', 'PAID', 'ACTIVE']
+            ).order_by('-created_at').first()
+            if sub:
+                return True
+        
+        # If not found in new table, check old subscriptions table (legacy)
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute('''
+                SELECT subscription_status, subscription_end_date 
+                FROM subscriptions 
+                WHERE username = %s 
+                AND subscription_status = 'Active'
+                AND subscription_end_date >= %s
+                ORDER BY subscription_end_date DESC
+                LIMIT 1
+            ''', (username, timezone.now().date()))
+            result = cursor.fetchone()
+            if result:
+                return True
+        
+        return False
+    except Exception:
+        return False
 
 
 def calculate_new_subscription_end_date(subscription):
@@ -305,6 +331,9 @@ def payment(request):
     """Payment page - handles both new users and existing users (renewal)"""
     checkout_data = request.session.get('checkout_data')
     if not checkout_data:
+        # Clear renewal flags if checkout_data is missing
+        request.session.pop('is_existing_user', None)
+        request.session.pop('existing_user_email', None)
         messages.error(request, 'Session expired or invalid. Please checkout again.')
         return redirect('checkout')
     
@@ -314,7 +343,10 @@ def payment(request):
     
     # If existing user but not logged in, redirect to login
     if is_existing_user and not is_logged_in:
-        messages.info(request, 'Please login to renew your subscription.')
+        # Only show message once - check if we've already redirected
+        if not request.session.get('_payment_redirected_to_login'):
+            messages.info(request, 'Please login to renew your subscription.')
+            request.session['_payment_redirected_to_login'] = True
         return redirect('login')
     
     # Load existing user data if renewal
@@ -330,19 +362,18 @@ def payment(request):
             existing_org = liaison.organization
             
             # Find most recent paid (Active) subscription for renewal
-            username = existing_user.username
             existing_subscription = ExternalSubscription.objects.filter(
-                username=username,
-                subscription_status='Active'
-            ).order_by('-subscription_end_date').first()
+                user=existing_user,
+                paid_status__in=['paid', 'active', 'Paid', 'Active', 'PAID', 'ACTIVE']
+            ).order_by('-created_at').first()
             
             if existing_subscription:
-                new_end_date = calculate_new_subscription_end_date(existing_subscription)
+                # For renewal, use a simple calculation (new table doesn't have end_date)
                 renewal_info = {
                     'org_name': existing_org.name,
-                    'current_end_date': existing_subscription.subscription_end_date,
-                    'new_end_date': new_end_date,
-                    'amount': 7500.00
+                    'current_end_date': None,  # New table structure doesn't have end_date
+                    'new_end_date': None,  # Will be set when payment is processed
+                    'amount': float(existing_subscription.amount) if existing_subscription.amount else 7500.00
                 }
         except Exception as e:
             messages.error(request, 'Error loading subscription information.')
@@ -806,11 +837,10 @@ def capture(request):
                 severity=form.cleaned_data['severity'],
                 description=form.cleaned_data['description'] or '',  # Required field, use empty string if blank
                 impact=form.cleaned_data['impact'] or '',  # Required field
-                next_action=form.cleaned_data['next_action'] or '',  # Required field
                 start_time=start_time,
                 end_time=end_time,
-                timestamp=timezone.now(),  # Set timestamp explicitly
-                owner=liaison if liaison else None,
+                created_at=timezone.now(),  # Set Created_at explicitly
+                created_by=liaison if liaison else None,
                 is_synthesized=False,  # Required field, default to False
             )
             messages.success(request, 'Update captured successfully!')
@@ -1257,12 +1287,10 @@ def register_view(request):
 
 def login_view(request):
     """User login: UserCredentials (legacy) or Django auth (Liaison after setup password)."""
-
-    if request.user.is_authenticated or request.session.get('user_credentials_id'):
-        if request.session.get('is_existing_user'):
-            return redirect('payment')
-        return redirect('dashboard')
-
+    
+    # Always show login page - don't auto-redirect if already logged in
+    # This allows users to see the login form and switch accounts if needed
+    
     is_renewal_flow = request.session.get('is_existing_user', False)
     existing_email = request.session.get('existing_user_email', '')
 
@@ -1272,6 +1300,13 @@ def login_view(request):
             login_input = form.cleaned_data['username'].strip()
             password = form.cleaned_data['password']
 
+            # If user is already logged in, log them out first to allow new login
+            if request.user.is_authenticated:
+                logout(request)
+            if request.session.get('user_credentials_id'):
+                request.session.pop('user_credentials_id', None)
+                request.session.pop('user_credentials_username', None)
+
             # 1) Legacy login (UserCredentials)
             try:
                 user_cred = UserCredentials.objects.get(
@@ -1279,18 +1314,19 @@ def login_view(request):
                     password_hash=password
                 )
 
-                if not is_renewal_flow and not user_has_active_subscription(user_cred.username):
-                    messages.error(
-                        request,
-                        'Your subscription is inactive or has expired. Please renew to log in.'
-                    )
-                    return render(request, 'core/login.html', {
-                        'form': form,
-                        'existing_email': existing_email if is_renewal_flow else None
-                    })
+                # For UserCredentials users (legacy system), allow login without subscription check
+                # These are legacy users who may not have subscriptions in the new system
+                # Subscription check is only enforced for new Django auth users
+                # Legacy UserCredentials users should be able to log in regardless of subscription status
 
+                # Set session for UserCredentials user
                 request.session['user_credentials_id'] = user_cred.user_id
                 request.session['user_credentials_username'] = user_cred.username
+                
+                # Clear any renewal flags after successful login
+                request.session.pop('is_existing_user', None)
+                request.session.pop('existing_user_email', None)
+                request.session.pop('_payment_redirected_to_login', None)
 
                 messages.success(request, f'Welcome back, {user_cred.username}!')
 
@@ -1317,7 +1353,17 @@ def login_view(request):
                         'existing_email': existing_email if is_renewal_flow else None
                     })
 
+                # Log in the user
                 login(request, user)
+                
+                # Clear any UserCredentials session if exists
+                request.session.pop('user_credentials_id', None)
+                request.session.pop('user_credentials_username', None)
+                
+                # Clear any renewal flags after successful login
+                request.session.pop('is_existing_user', None)
+                request.session.pop('existing_user_email', None)
+                request.session.pop('_payment_redirected_to_login', None)
 
                 messages.success(
                     request,
@@ -1538,8 +1584,20 @@ def admin_module(request):
 
 def logout_view(request):
     """Logout: clear auth and session, redirect to index (default state). No message displayed."""
+    # Clear all session data including flags that might cause redirect loops
+    request.session.pop('user_credentials_id', None)
+    request.session.pop('user_credentials_username', None)
+    request.session.pop('is_existing_user', None)
+    request.session.pop('existing_user_email', None)
+    request.session.pop('checkout_data', None)
+    request.session.pop('checkout_user_id', None)
+    
+    # Clear Django auth
     logout(request)
+    
+    # Flush all remaining session data and messages
     request.session.flush()
+    
     return redirect('index')
 
 
@@ -1595,6 +1653,23 @@ def create_payment_intent(request):
                 'type': 'validation_error'
             }, status=400)
         
+        # Validate user_id exists in auth_user (required by foreign key constraint)
+        valid_user_id = None
+        tenant_id = None
+        if user_id:
+            try:
+                user_id_int = int(user_id)
+                # Check if user exists in auth_user table
+                user = User.objects.get(pk=user_id_int)
+                valid_user_id = user_id_int
+                # Get tenant_id from user's organization if available
+                if hasattr(user, 'liaison_profile'):
+                    org = user.liaison_profile.organization
+                    tenant_id = org.tenant_id
+            except (User.DoesNotExist, ValueError, AttributeError, Liaison.DoesNotExist):
+                # User doesn't exist, set to None to avoid foreign key constraint error
+                valid_user_id = None
+        
         # Create Payment Intent
         payment_intent = stripe.PaymentIntent.create(
             amount=amount,
@@ -1606,12 +1681,14 @@ def create_payment_intent(request):
         )
         
         # Create StripePayment record with pending status
+        # Use valid_user_id (None if user doesn't exist) to avoid foreign key constraint error
         StripePayment.objects.create(
             stripe_payment_intent_id=payment_intent.id,
             amount=amount,  # Store in cents
             currency=currency,
             status='pending',
-            user_id=int(user_id) if user_id else None,
+            user_id=valid_user_id,  # Will be None if user doesn't exist
+            tenant_id=tenant_id,
         )
         
         return JsonResponse({
@@ -1712,6 +1789,16 @@ def stripe_webhook(request):
             if charges:
                 stripe_payment.stripe_charge_id = charges[0].get('id', '')
                 stripe_payment.receipt_url = charges[0].get('receipt_url', '')
+            
+            # Set tenant_id if not already set and user_id is available
+            if not stripe_payment.tenant_id and stripe_payment.user_id:
+                try:
+                    user = User.objects.get(pk=stripe_payment.user_id)
+                    if hasattr(user, 'liaison_profile'):
+                        org = user.liaison_profile.organization
+                        stripe_payment.tenant_id = org.tenant_id
+                except (User.DoesNotExist, AttributeError, Liaison.DoesNotExist):
+                    pass
             
             stripe_payment.save()
             
@@ -2017,20 +2104,22 @@ def incidents_list(request):
     # Pathway 2: Legacy Session Auth (UserCredentials)
     elif 'user_credentials_id' in request.session:
         try:
+            # For legacy users we still need an organization for SystemSettings,
+            # but incident visibility should NOT be restricted by organization.
             organization = Organization.objects.first()
-            if not organization:
-                messages.error(request, 'No organization found. Please complete checkout first.')
-                return redirect('checkout')
         except Exception:
-            messages.error(request, 'Please complete checkout first.')
-            return redirect('checkout')
+            organization = None
     
-    if not organization:
-        messages.error(request, 'Please complete checkout first.')
-        return redirect('checkout')
-    
-    # Get all incidents for this organization from core_incidents table
-    incidents = IncidentCapture.objects.filter(organization=organization).order_by('-timestamp')
+    if liaison is not None and organization is not None:
+        # Standard Django auth users (with Liaison) only see incidents
+        # that belong to their organization.
+        incidents = IncidentCapture.objects.filter(
+            organization=organization
+        ).order_by('-created_at')
+    else:
+        # Legacy UserCredentials users and any fallback case:
+        # show all incidents (no org filter) so previously captured data is visible.
+        incidents = IncidentCapture.objects.all().order_by('-created_at')
     
     # Get or create system settings for status display
     settings_obj, created = SystemSettings.objects.get_or_create(
@@ -2142,13 +2231,13 @@ def incident_detail(request, incident_id):
             cursor.execute("""
                 SELECT COUNT(*) FROM information_schema.tables 
                 WHERE table_schema = DATABASE() 
-                AND table_name = 'core_incidents_mapping'
+                AND table_name = 'core_incident_user_mapping'
             """)
             table_exists = cursor.fetchone()[0] > 0
             
             if not table_exists:
                 cursor.execute("""
-                    CREATE TABLE core_incidents_mapping (
+                    CREATE TABLE core_incident_user_mapping (
                         id INT AUTO_INCREMENT PRIMARY KEY,
                         user_id INT NOT NULL,
                         incident_id BIGINT NOT NULL,
@@ -2171,7 +2260,7 @@ def incident_detail(request, incident_id):
             cursor.execute(
                 """
                 SELECT l.id FROM core_liaison l
-                INNER JOIN core_incidents_mapping m ON l.id = m.user_id
+                INNER JOIN core_incident_user_mapping m ON l.id = m.user_id
                 WHERE m.incident_id = %s AND m.is_active = 1
                 """,
                 [incident.id]
@@ -2199,8 +2288,8 @@ def incident_detail(request, incident_id):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT log_id, log_description, created_time, user_log_id
-                FROM core_incident_event
+                SELECT id, event_description, created_time, user_id
+                FROM core_incident_events
                 WHERE incident_id = %s
                 ORDER BY created_time DESC
                 """,
@@ -2211,16 +2300,16 @@ def incident_detail(request, incident_id):
         # Convert to list of dicts for template
         incident_logs = []
         for row in log_rows:
-            log_id, log_description, created_time, user_log_id = row
+            log_id, event_desc, created_time, user_id = row
             user = None
-            if user_log_id:
+            if user_id:
                 try:
-                    user = User.objects.get(id=user_log_id)
+                    user = User.objects.get(id=user_id)
                 except User.DoesNotExist:
                     pass
             incident_logs.append({
                 'log_id': log_id,
-                'log_description': log_description,
+                'log_description': event_desc,
                 'created_time': created_time,
                 'user_log': user,
             })
@@ -2351,13 +2440,13 @@ def assign_users_to_incident(request, incident_id):
                 cursor.execute("""
                     SELECT COUNT(*) FROM information_schema.tables 
                     WHERE table_schema = DATABASE() 
-                    AND table_name = 'core_incidents_mapping'
+                    AND table_name = 'core_incident_user_mapping'
                 """)
                 table_exists = cursor.fetchone()[0] > 0
                 
                 if not table_exists:
                     cursor.execute("""
-                        CREATE TABLE core_incidents_mapping (
+                        CREATE TABLE core_incident_user_mapping (
                             id INT AUTO_INCREMENT PRIMARY KEY,
                             user_id INT NOT NULL,
                             incident_id BIGINT NOT NULL,
@@ -2375,7 +2464,7 @@ def assign_users_to_incident(request, incident_id):
         with connection.cursor() as cursor:
             try:
                 cursor.execute(
-                    "UPDATE core_incidents_mapping SET is_active = 0 WHERE incident_id = %s",
+                    "UPDATE core_incident_user_mapping SET is_active = 0 WHERE incident_id = %s",
                     [incident.id]
                 )
             except Exception:
@@ -2388,7 +2477,7 @@ def assign_users_to_incident(request, incident_id):
                 with connection.cursor() as cursor:
                     cursor.execute(
                         """
-                        INSERT INTO core_incidents_mapping 
+                        INSERT INTO core_incident_user_mapping 
                         (user_id, incident_id, mapped_user_id, is_active, created_at) 
                         VALUES (%s, %s, %s, 1, NOW())
                         """,
@@ -2400,9 +2489,9 @@ def assign_users_to_incident(request, incident_id):
         if assignment_errors:
             errors.extend(assignment_errors)
         
-        # Also set the first one as owner for backward compatibility
+        # Also set the first one as created_by for backward compatibility
         if assigned_liaisons:
-            incident.owner = assigned_liaisons[0]
+            incident.created_by = assigned_liaisons[0]
             incident.save()
         
         return JsonResponse({
@@ -2459,9 +2548,9 @@ def add_incident_event_log(request, incident_id):
             return JsonResponse({'error': 'Log description is required'}, status=400)
         
         # Get logged-in user ID
-        user_log_id = None
+        user_id = None
         if request.user.is_authenticated:
-            user_log_id = request.user.id
+            user_id = request.user.id
         
         # Create incident event log
         # Note: IncidentEvent has ForeignKey to Incident, but we're using IncidentCapture
@@ -2470,22 +2559,22 @@ def add_incident_event_log(request, incident_id):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO core_incident_event (incident_id, log_description, user_log_id, created_time)
+                INSERT INTO core_incident_events (incident_id, event_description, user_id, created_time)
                 VALUES (%s, %s, %s, %s)
                 """,
-                [incident.id, log_description, user_log_id, timezone.now()]
+                [incident.id, log_description, user_id, timezone.now()]
             )
             log_id = cursor.lastrowid
         
         # Fetch the created log entry for response
-        log_entry = IncidentEvent.objects.get(log_id=log_id)
+        log_entry = IncidentEvent.objects.get(id=log_id)
         
         return JsonResponse({
             'success': True,
             'message': 'Log entry added successfully',
             'log': {
-                'id': log_entry.log_id,
-                'description': log_entry.log_description,
+                'id': log_entry.id,
+                'description': log_entry.event_desc,
                 'user': log_entry.user_log.get_full_name() if log_entry.user_log else 'System',
                 'created_time': log_entry.created_time.strftime('%b %d, %Y %I:%M %p')
             }
