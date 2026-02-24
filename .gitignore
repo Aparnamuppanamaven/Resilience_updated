@@ -55,4 +55,6 @@ htmlcov/
 .coverage.*
 coverage.xml
 
+*.sql
+
 
