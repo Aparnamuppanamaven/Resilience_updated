@@ -76,6 +76,24 @@ body {
     font-size: 1.25rem;
     font-weight: 700;
     color: var(--primary-color);
+    border-radius: 8px;
+}
+
+/* Sidebar logo colors */
+.sidebar-header .logo-icon,
+.sidebar-header .logo-text {
+    color: var(--primary-color) !important;
+}
+
+.sidebar-header:hover .logo-icon,
+.sidebar-header:hover .logo-text {
+    color: var(--primary-color) !important;
+}
+
+.sidebar-header:hover {
+    /* Slightly stronger blue highlight, similar to active nav item */
+    background-color: #dbeafe; /* blue-100 */
+    box-shadow: var(--shadow-sm);
 }
 
 .nav-links {
