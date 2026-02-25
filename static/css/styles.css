@@ -969,7 +969,7 @@ body {
 
 /* Landing Footer */
 .landing-footer {
-    padding: 2rem 0;
+    padding: 1rem 0;
     border-top: 1px solid var(--border-color);
     text-align: center;
     color: var(--text-secondary);
@@ -1889,4 +1889,36 @@ body {
 
 .section-list li {
     margin-bottom: 0.5rem;
+}
+
+.resilience-contact-footer {
+    text-align: center;
+    padding: 20px 20px;
+}
+
+.resilience-contact-footer h4 {
+    font-size: 18px;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.resilience-contact-footer p {
+    margin: 4px 0;
+    color: #555;
+}
+
+.resilience-contact-footer a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.resilience-contact-footer a:hover {
+    text-decoration: underline;
+}
+
+.footer-copy {
+    margin-top: 25px;
+    font-size: 13px;
+    color: #888;
 }

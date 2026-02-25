@@ -1,3 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <system.webServer>
+        <rewrite>
+            <rewriteMaps>
+                <rewriteMap name="http://resilience.mavensoft.com" />
+            </rewriteMaps>
+        </rewrite>
+    </system.webServer>
+</configuration>
+
+
 """
 Django settings for resilience_system project.
 Enterprise-level configuration.
@@ -41,13 +53,9 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
 ]
 CSRF_TRUSTED_ORIGINS = [
-    "https://resilience.mavensoft.com",
+        "https://resilience.mavensoft.com",
+    "http://resilience.mavensoft.com",
 ]
-
-# Behind IIS reverse proxy
-USE_X_FORWARDED_HOST = True
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
 # ✅ REQUIRED: Allow iframe embedding (DEV ONLY)
 X_FRAME_OPTIONS = "ALLOWALL"
 
@@ -187,16 +195,19 @@ MAIL_SENDER = os.getenv("MAIL_SENDER")
 # Admin/Notification email for new user signups
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL") or os.getenv("NOTIFICATION_EMAIL")
 
+# Admin/Notification email for new user signups
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL") or os.getenv("NOTIFICATION_EMAIL")
+
 # --------------------------------------------------
-# ENTERPRISE SECURITY
+# ENTERPRISE SECURITY (DEV-SAFE OVERRIDES)
 # --------------------------------------------------
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = "ALLOWALL"  # Allow iframe embedding as required
+    X_FRAME_OPTIONS = "ALLOWALL"
 
 # --------------------------------------------------
 # DEFAULT PK FIELD
