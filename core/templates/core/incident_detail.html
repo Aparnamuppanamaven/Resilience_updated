@@ -6,10 +6,10 @@
 {% block content %}
 <div class="app-container">
     <nav class="sidebar">
-        <div class="sidebar-header">
+        <a href="{% url 'dashboard' %}" class="sidebar-header" style="text-decoration: none; color: inherit; display: flex; align-items: center; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
             <i class="fa-solid fa-shield-halved logo-icon"></i>
             <span class="logo-text">Resilience</span>
-        </div>
+        </a>
         <ul class="nav-links">
             <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a></li>
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
@@ -47,6 +47,9 @@
                 <div class="sync-time">
                     <span>Last detailed sync: {{ last_sync_display }}</span>
                 </div>
+                <button type="button" class="btn-alert" id="generateShiftPacketBtn" onclick="generateShiftPacket()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin-left: 1rem;">
+                    <i class="fa-solid fa-file-pdf"></i> Generate Shift Packet
+                </button>
             </div>
         </header>
 
@@ -960,6 +963,73 @@
             });
         }
     });
+
+    // Generate Shift Packet PDF and show preview modal
+    function generateShiftPacket() {
+        const incidentId = {{ incident.id }};
+        const btn = document.getElementById('generateShiftPacketBtn');
+        const originalBtnText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+        
+        const pdfUrl = `/incidents/${incidentId}/generate-shift-packet/`;
+        
+        // Show preview modal
+        const modal = document.getElementById('pdfPreviewModal');
+        const pdfFrame = document.getElementById('pdfPreviewFrame');
+        pdfFrame.src = pdfUrl;
+        modal.style.display = 'flex';
+        
+        btn.disabled = false;
+        btn.innerHTML = originalBtnText;
+    }
+
+    // Close PDF preview modal
+    function closePdfPreview() {
+        const modal = document.getElementById('pdfPreviewModal');
+        const pdfFrame = document.getElementById('pdfPreviewFrame');
+        modal.style.display = 'none';
+        pdfFrame.src = '';
+    }
+
+    // Download PDF from preview
+    function downloadPdfFromPreview() {
+        const incidentId = {{ incident.id }};
+        const pdfUrl = `/incidents/${incidentId}/generate-shift-packet/`;
+        
+        fetch(pdfUrl)
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Incident_Log_History_INC-${incidentId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error downloading PDF. Please try again.');
+            });
+    }
+
+    // Print PDF from preview
+    function printPdfFromPreview() {
+        const pdfFrame = document.getElementById('pdfPreviewFrame');
+        if (pdfFrame.contentWindow) {
+            pdfFrame.contentWindow.print();
+        }
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('pdfPreviewModal');
+        if (event.target == modal) {
+            closePdfPreview();
+        }
+    }
     </script>
 
     <!-- User Assignment Modal -->
@@ -1097,6 +1167,120 @@
     .collapse-content::-webkit-scrollbar-thumb:hover {
         background: #555;
     }
+
+    /* PDF Preview Modal Styles */
+    #pdfPreviewModal {
+        display: none;
+        position: fixed;
+        z-index: 10000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.85);
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+    }
+
+    .pdf-preview-container {
+        background: white;
+        width: 95%;
+        height: 95%;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .pdf-preview-header {
+        padding: 1rem 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 8px 8px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .pdf-preview-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .pdf-preview-actions {
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    .pdf-preview-btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.2s;
+    }
+
+    .pdf-preview-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-print {
+        background: white;
+        color: #667eea;
+    }
+
+    .btn-download {
+        background: #10b981;
+        color: white;
+    }
+
+    .btn-close-preview {
+        background: #ef4444;
+        color: white;
+    }
+
+    .pdf-preview-body {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+    }
+
+    #pdfPreviewFrame {
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
     </style>
+
+    <!-- PDF Preview Modal -->
+    <div id="pdfPreviewModal">
+        <div class="pdf-preview-container">
+            <div class="pdf-preview-header">
+                <h3><i class="fa-solid fa-file-pdf"></i> Incident Log History - Preview</h3>
+                <div class="pdf-preview-actions">
+                    <button class="pdf-preview-btn btn-print" onclick="printPdfFromPreview()">
+                        <i class="fa-solid fa-print"></i> Print
+                    </button>
+                    <button class="pdf-preview-btn btn-download" onclick="downloadPdfFromPreview()">
+                        <i class="fa-solid fa-download"></i> Download
+                    </button>
+                    <button class="pdf-preview-btn btn-close-preview" onclick="closePdfPreview()">
+                        <i class="fa-solid fa-times"></i> Close
+                    </button>
+                </div>
+            </div>
+            <div class="pdf-preview-body">
+                <iframe id="pdfPreviewFrame" src=""></iframe>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

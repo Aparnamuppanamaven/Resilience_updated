@@ -22,6 +22,15 @@ from django.conf import settings
 from django.core.mail import send_mail
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, KeepTogether
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.lib.colors import HexColor
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+import csv
 
 from django.db import transaction
 from .models import (
@@ -702,6 +711,8 @@ def dashboard(request):
     """Main dashboard"""
     
     context = {}
+    liaison = None
+    organization = None
     
     # Pathway 1: Standard Django Auth (Liaison)
     if request.user.is_authenticated:
@@ -759,6 +770,18 @@ def dashboard(request):
         organization=organization
     ).order_by('-timestamp')[:3]
     
+    # Get all incidents for the Create Update dropdown - use same logic as incidents_list
+    if liaison is not None and organization is not None:
+        # Standard Django auth users (with Liaison) only see incidents
+        # that belong to their organization.
+        all_incidents = IncidentCapture.objects.filter(
+            organization=organization
+        ).order_by('-created_at')
+    else:
+        # Legacy UserCredentials users and any fallback case:
+        # show all incidents (no org filter) so previously captured data is visible.
+        all_incidents = IncidentCapture.objects.all().order_by('-created_at')
+    
     context = {
         'organization': organization,
         'settings': settings_obj,
@@ -769,6 +792,7 @@ def dashboard(request):
             timestamp__gte=last_sync
         ).count(),
         'is_admin': True,  # Always show admin link - access controlled by view decorator
+        'all_incidents': all_incidents,  # Add incidents for dropdown
     }
     
     return render(request, 'core/dashboard.html', context)
@@ -815,6 +839,18 @@ def capture(request):
             'cadence_hours': 24,
         }
     )
+    
+    # Check if incident_id is passed from dashboard
+    selected_incident = None
+    incident_id = request.GET.get('incident_id')
+    if incident_id:
+        try:
+            if 'user_credentials_id' in request.session:
+                selected_incident = IncidentCapture.objects.get(id=incident_id)
+            else:
+                selected_incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+        except IncidentCapture.DoesNotExist:
+            pass
     
     if request.method == 'POST':
         form = OperationalUpdateForm(request.POST)
@@ -882,6 +918,7 @@ def capture(request):
     
     return render(request, 'core/capture.html', {
         'form': form,
+        'selected_incident': selected_incident,  # Pass selected incident if any
         'is_admin': True,  # Always show admin link - access controlled by view decorator
         'current_status': settings_obj.current_status,
         'last_sync_display': sync_time_display,
@@ -2189,8 +2226,15 @@ def incident_detail(request, incident_id):
         return redirect('checkout')
     
     # Get the incident from core_incidents table
+    # For legacy users, don't filter by organization - get the incident first, then use its organization
     try:
-        incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+        if 'user_credentials_id' in request.session:
+            # Legacy users: get incident without organization filter, then use its organization
+            incident = IncidentCapture.objects.get(id=incident_id)
+            organization = incident.organization  # Update organization to match incident's org
+        else:
+            # Django auth users: filter by organization
+            incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
     except IncidentCapture.DoesNotExist:
         messages.error(request, 'Incident not found.')
         return redirect('incidents_list')
@@ -2382,11 +2426,23 @@ def assign_users_to_incident(request, incident_id):
         elif 'user_credentials_id' in request.session:
             organization = Organization.objects.first()
         
-        if not organization:
-            return JsonResponse({'error': 'Organization not found'}, status=400)
-        
         # Get incident from core_incidents table
-        incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+        # For legacy users, get incident first, then use its organization
+        if 'user_credentials_id' in request.session:
+            # Legacy users: get incident without organization filter, then use its organization
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id)
+                organization = incident.organization  # Update organization to match incident's org
+            except IncidentCapture.DoesNotExist:
+                return JsonResponse({'error': 'Incident not found'}, status=404)
+        else:
+            # Django auth users: filter by organization
+            if not organization:
+                return JsonResponse({'error': 'Organization not found'}, status=400)
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+            except IncidentCapture.DoesNotExist:
+                return JsonResponse({'error': 'Incident not found'}, status=404)
         
         # Get user IDs from POST data (list of UsersTable IDs)
         data = json.loads(request.body)
@@ -2534,11 +2590,23 @@ def add_incident_event_log(request, incident_id):
         elif 'user_credentials_id' in request.session:
             organization = Organization.objects.first()
         
-        if not organization:
-            return JsonResponse({'error': 'Organization not found'}, status=400)
-        
         # Get incident from core_incidents table
-        incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+        # For legacy users, get incident first, then use its organization
+        if 'user_credentials_id' in request.session:
+            # Legacy users: get incident without organization filter, then use its organization
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id)
+                organization = incident.organization  # Update organization to match incident's org
+            except IncidentCapture.DoesNotExist:
+                return JsonResponse({'error': 'Incident not found'}, status=404)
+        else:
+            # Django auth users: filter by organization
+            if not organization:
+                return JsonResponse({'error': 'Organization not found'}, status=400)
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+            except IncidentCapture.DoesNotExist:
+                return JsonResponse({'error': 'Incident not found'}, status=404)
         
         # Get log description from POST data
         data = json.loads(request.body)
@@ -2547,10 +2615,53 @@ def add_incident_event_log(request, incident_id):
         if not log_description:
             return JsonResponse({'error': 'Log description is required'}, status=400)
         
-        # Get logged-in user ID
+        # Get user_id from core_users table (not auth_user)
         user_id = None
         if request.user.is_authenticated:
-            user_id = request.user.id
+            # For Django authenticated users: find user in core_users by email
+            try:
+                user_email = request.user.email
+                if user_email:
+                    # Try to find in core_users by liaison_email
+                    core_user = UsersTable.objects.filter(liaison_email__iexact=user_email).first()
+                    if core_user:
+                        user_id = core_user.id
+            except Exception:
+                pass
+        elif 'user_credentials_id' in request.session:
+            # For legacy users: find user in core_users by username or email
+            try:
+                user_cred = UserCredentials.objects.get(user_id=request.session['user_credentials_id'])
+                # Try to find in core_users by primary_liaison_name (username) or liaison_email
+                core_user = UsersTable.objects.filter(
+                    Q(primary_liaison_name__iexact=user_cred.username) | 
+                    Q(liaison_email__iexact=user_cred.username)
+                ).first()
+                if core_user:
+                    user_id = core_user.id
+            except (UserCredentials.DoesNotExist, Exception):
+                pass
+
+        # Get tenant_id - prioritize user's tenant_id from tenant_domains
+        tenant_id = None
+        if request.user.is_authenticated:
+            # For Django authenticated users: try to get from incident's tenant_id first
+            if incident and hasattr(incident, 'tenant_id') and incident.tenant_id:
+                tenant_id = incident.tenant_id
+            # Fallback: try from organization (but note: org.tenant_id is org PK, may not match tenant_domains)
+            elif organization and hasattr(organization, 'tenant_id'):
+                tenant_id = organization.tenant_id
+        elif 'user_credentials_id' in request.session:
+            # For legacy users: get tenant_id from UserCredentials (matches tenant_domains.tenant_id)
+            try:
+                user_cred = UserCredentials.objects.get(user_id=request.session['user_credentials_id'])
+                tenant_id = user_cred.tenant_id
+            except UserCredentials.DoesNotExist:
+                pass
+        
+        # Final fallback: if still no tenant_id, try from incident's tenant_id
+        if not tenant_id and incident and hasattr(incident, 'tenant_id') and incident.tenant_id:
+            tenant_id = incident.tenant_id
         
         # Create incident event log
         # Note: IncidentEvent has ForeignKey to Incident, but we're using IncidentCapture
@@ -2559,24 +2670,44 @@ def add_incident_event_log(request, incident_id):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO core_incident_events (incident_id, event_description, user_id, created_time)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO core_incident_events (incident_id, event_description, user_id, created_time, tenant_id)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
-                [incident.id, log_description, user_id, timezone.now()]
+                [incident.id, log_description, user_id, timezone.now(), tenant_id]
             )
             log_id = cursor.lastrowid
         
-        # Fetch the created log entry for response
-        log_entry = IncidentEvent.objects.get(id=log_id)
+        # Fetch the created log entry for response using raw SQL to avoid ForeignKey issues
+        # Since user_id is from core_users, not auth_user, we can't use IncidentEvent.user_log
+        user_name = 'System'
+        if user_id:
+            try:
+                # Try to get user name from core_users table
+                core_user = UsersTable.objects.filter(id=user_id).first()
+                if core_user:
+                    user_name = core_user.primary_liaison_name or 'System'
+            except Exception:
+                pass
+        
+        # Get created_time from database
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT created_time FROM core_incident_events WHERE id = %s
+                """,
+                [log_id]
+            )
+            row = cursor.fetchone()
+            created_time = row[0] if row else timezone.now()
         
         return JsonResponse({
             'success': True,
             'message': 'Log entry added successfully',
             'log': {
-                'id': log_entry.id,
-                'description': log_entry.event_desc,
-                'user': log_entry.user_log.get_full_name() if log_entry.user_log else 'System',
-                'created_time': log_entry.created_time.strftime('%b %d, %Y %I:%M %p')
+                'id': log_id,
+                'description': log_description,
+                'user': user_name,
+                'created_time': created_time.strftime('%b %d, %Y %I:%M %p') if hasattr(created_time, 'strftime') else str(created_time)
             }
         })
         
@@ -2585,3 +2716,724 @@ def add_incident_event_log(request, incident_id):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+
+
+def generate_incident_shift_packet_pdf(request, incident_id):
+    """Generate a comprehensive incident log history PDF similar to the example format"""
+    # Check authentication
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return HttpResponse('Unauthorized', status=401)
+    
+    try:
+        # Get organization
+        organization = None
+        if request.user.is_authenticated:
+            try:
+                liaison = request.user.liaison_profile
+                organization = liaison.organization
+            except (Liaison.DoesNotExist, AttributeError):
+                return HttpResponse('Organization not found', status=400)
+        elif 'user_credentials_id' in request.session:
+            organization = Organization.objects.first()
+        
+        # Get the incident - for legacy users, get incident first then use its organization
+        if 'user_credentials_id' in request.session:
+            # Legacy users: get incident without organization filter, then use its organization
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id)
+                organization = incident.organization  # Update organization to match incident's org
+            except IncidentCapture.DoesNotExist:
+                return HttpResponse('Incident not found', status=404)
+        else:
+            # Django auth users: filter by organization
+            if not organization:
+                return HttpResponse('Organization not found', status=400)
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+            except IncidentCapture.DoesNotExist:
+                return HttpResponse('Incident not found', status=404)
+        
+        # Get assigned users
+        assigned_users_data = []
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT l.id FROM core_liaison l
+                    INNER JOIN core_incident_user_mapping m ON l.id = m.user_id
+                    WHERE m.incident_id = %s AND m.is_active = 1
+                    """,
+                    [incident.id]
+                )
+                liaison_ids = [row[0] for row in cursor.fetchall()]
+                assigned_liaisons = Liaison.objects.filter(id__in=liaison_ids) if liaison_ids else []
+                
+                for liaison in assigned_liaisons:
+                    user_table = UsersTable.objects.filter(liaison_email__iexact=liaison.user.email).first()
+                    assigned_users_data.append({
+                        'liaison': liaison,
+                        'user_table': user_table,
+                    })
+        except Exception:
+            assigned_users_data = []
+        
+        # Get incident logs
+        incident_logs = []
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, event_description, created_time, user_id
+                    FROM core_incident_events
+                    WHERE incident_id = %s
+                    ORDER BY created_time ASC
+                    """,
+                    [incident.id]
+                )
+                log_rows = cursor.fetchall()
+                
+                for row in log_rows:
+                    log_id, event_desc, created_time, user_id = row
+                    user = None
+                    if user_id:
+                        try:
+                            user = User.objects.get(id=user_id)
+                        except User.DoesNotExist:
+                            pass
+                    incident_logs.append({
+                        'log_id': log_id,
+                        'log_description': event_desc,
+                        'created_time': created_time,
+                        'user_log': user,
+                    })
+        except Exception:
+            incident_logs = []
+        
+        # Add the "Incident Created" log entry if not already present
+        has_created_log = any('created' in log.get('log_description', '').lower() for log in incident_logs)
+        if not has_created_log:
+            incident_logs.insert(0, {
+                'log_id': 0,
+                'log_description': f'Incident "{incident.title}" was created with severity level {incident.get_severity_display()}.',
+                'created_time': incident.created_at,
+                'user_log': incident.created_by.user if incident.created_by else None,
+            })
+        
+        # Prepare PDF in memory using custom template for gradients
+        buffer = BytesIO()
+        
+        # Custom template class for header/footer with gradients
+        class CustomPageTemplate:
+            def __init__(self, canvas, doc):
+                self.canvas = canvas
+                self.doc = doc
+            
+            def draw_header(self, canvas, doc):
+                # Draw gradient header background (simulated with solid color)
+                # Stay within page boundaries
+                canvas.setFillColor(HexColor('#0a1f44'))
+                canvas.rect(0, doc.pagesize[1] - 1.5*inch, doc.pagesize[0], 1.5*inch, fill=1, stroke=0)
+                
+                # Platform text - ensure it fits within margins
+                canvas.setFillColor(HexColor('#7fafd4'))
+                canvas.setFont("Helvetica-Bold", 10)
+                platform_text = "EMERGENCY & INCIDENT MANAGEMENT PLATFORM"
+                # Check text width and truncate if needed
+                text_width = canvas.stringWidth(platform_text, "Helvetica-Bold", 10)
+                max_width = doc.pagesize[0] - 1.1*inch  # Leave margin on both sides
+                if text_width > max_width:
+                    # Use smaller font or truncate
+                    canvas.setFont("Helvetica-Bold", 9)
+                canvas.drawString(0.55*inch, doc.pagesize[1] - 0.4*inch, platform_text)
+                
+                # Title
+                canvas.setFillColor(HexColor('#ffffff'))
+                canvas.setFont("Helvetica-Bold", 20)
+                title_text = "Incident Log History"
+                text_width = canvas.stringWidth(title_text, "Helvetica-Bold", 20)
+                if text_width > max_width:
+                    canvas.setFont("Helvetica-Bold", 18)
+                canvas.drawString(0.55*inch, doc.pagesize[1] - 0.65*inch, title_text)
+                
+                # Report generated - ensure it fits
+                canvas.setFillColor(HexColor('#4a6fa8'))
+                canvas.setFont("Helvetica", 10)
+                report_text = f"Report Generated: {timezone.now().strftime('%d %b %Y, %H:%M hrs')}"
+                text_width = canvas.stringWidth(report_text, "Helvetica", 10)
+                if text_width > max_width:
+                    canvas.setFont("Helvetica", 9)
+                canvas.drawRightString(doc.pagesize[0] - 0.55*inch, doc.pagesize[1] - 0.4*inch, report_text)
+            
+            def draw_footer(self, canvas, doc):
+                # Footer background
+                canvas.setFillColor(HexColor('#0a1f44'))
+                canvas.rect(0, 0, doc.pagesize[0], 0.3*inch, fill=1, stroke=0)
+                
+                # Footer text - ensure it fits within margins
+                canvas.setFillColor(HexColor('#4a6fa8'))
+                canvas.setFont("Helvetica", 10)
+                footer_left = f"INC-{incident.id} | Log History Report"
+                # Check if text fits, reduce font if needed
+                text_width = canvas.stringWidth(footer_left, "Helvetica", 10)
+                max_width = (doc.pagesize[0] - 1.1*inch) / 2  # Half width for left side
+                if text_width > max_width:
+                    canvas.setFont("Helvetica", 9)
+                canvas.drawString(0.55*inch, 0.15*inch, footer_left)
+                
+                org_name = organization.name if organization else "Resilience System"
+                footer_right = f"{org_name} EIMP | {timezone.now().strftime('%d %b %Y, %H:%M hrs')}"
+                text_width = canvas.stringWidth(footer_right, "Helvetica", 10)
+                if text_width > max_width:
+                    canvas.setFont("Helvetica", 9)
+                canvas.drawRightString(doc.pagesize[0] - 0.55*inch, 0.15*inch, footer_right)
+        
+        # Use SimpleDocTemplate with custom onFirstPage and onLaterPages
+        doc = SimpleDocTemplate(buffer, pagesize=letter, 
+                               topMargin=2*inch, bottomMargin=0.5*inch,
+                               leftMargin=0.6*inch, rightMargin=0.6*inch)
+        
+        # Container for the 'Flowable' objects
+        elements = []
+        
+        # Define styles matching HTML design
+        styles = getSampleStyleSheet()
+        
+        # Header styles
+        platform_style = ParagraphStyle(
+            'Platform',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=HexColor('#7fafd4'),
+            spaceAfter=5,
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold',
+            leading=12
+        )
+        
+        title_style = ParagraphStyle(
+            'Title',
+            parent=styles['Heading1'],
+            fontSize=20,
+            textColor=HexColor('#ffffff'),
+            spaceAfter=10,
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold',
+            leading=24
+        )
+        
+        # Incident title section
+        incident_title_label_style = ParagraphStyle(
+            'IncidentTitleLabel',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=HexColor('#7fafd4'),  # Light blue label for dark blue header
+            spaceAfter=6,
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold',
+            leading=11
+        )
+        
+        incident_title_style = ParagraphStyle(
+            'IncidentTitle',
+            parent=styles['Heading2'],
+            fontSize=16,
+            textColor=HexColor('#ffffff'),  # White color for dark blue header background
+            spaceAfter=10,
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold',
+            leading=20
+        )
+        
+        incident_desc_style = ParagraphStyle(
+            'IncidentDesc',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=HexColor('#93b4d8'),  # Light blue for dark blue header background
+            spaceAfter=20,
+            alignment=TA_LEFT,
+            fontName='Helvetica',
+            leading=21
+        )
+        
+        # Meta strip style
+        meta_label_style = ParagraphStyle(
+            'MetaLabel',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=HexColor('#7fafd4'),
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold',
+            leading=11
+        )
+        
+        meta_value_style = ParagraphStyle(
+            'MetaValue',
+            parent=styles['Normal'],
+            fontSize=13,
+            textColor=HexColor('#ffffff'),
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold',
+            leading=16
+        )
+        
+        # Table styles
+        table_header_style = ParagraphStyle(
+            'TableHeader',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=HexColor('#93b4d8'),
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold',
+            leading=12
+        )
+        
+        log_cell_style = ParagraphStyle(
+            'LogCell',
+            parent=styles['Normal'],
+            fontSize=12.5,
+            textColor=HexColor('#1e2a3a'),
+            alignment=TA_LEFT,
+            fontName='Helvetica',
+            leading=20.6
+        )
+        
+        log_number_style = ParagraphStyle(
+            'LogNumber',
+            parent=styles['Normal'],
+            fontSize=11,
+            textColor=HexColor('#9ca3af'),
+            alignment=TA_LEFT,
+            fontName='Courier',
+            leading=14,
+            wordWrap='LTR'  # Prevent vertical wrapping
+        )
+        
+        timestamp_style = ParagraphStyle(
+            'Timestamp',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=HexColor('#0a1f44'),
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold',
+            leading=16
+        )
+        
+        author_style = ParagraphStyle(
+            'Author',
+            parent=styles['Normal'],
+            fontSize=10.5,
+            textColor=HexColor('#94a3b8'),
+            alignment=TA_RIGHT,
+            fontName='Helvetica-Bold',
+            leading=14,
+            fontStyle='Italic'
+        )
+        
+        # Create header section with gradient background - include incident title inside
+        # Increase header height to accommodate incident title
+        header_bg = Table([['']], colWidths=[7.3*inch], rowHeights=[2.2*inch])
+        header_bg.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), HexColor('#0a1f44')),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        elements.append(header_bg)
+        
+        # Header content overlay - first two rows
+        header_content = Table([
+            [Paragraph("EMERGENCY & INCIDENT MANAGEMENT PLATFORM", platform_style), 
+             Paragraph(f"Report Generated: {timezone.now().strftime('%d %b %Y, %H:%M hrs')}", 
+                      ParagraphStyle('ReportGen', parent=styles['Normal'], fontSize=10, 
+                                    textColor=HexColor('#4a6fa8'), alignment=TA_RIGHT, fontName='Helvetica'))],
+            [Paragraph("Incident Log History", title_style), '']
+        ], colWidths=[4*inch, 3.3*inch])
+        header_content.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 12),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ]))
+        elements.append(Spacer(1, -2.2*inch))
+        elements.append(header_content)
+        
+        # Add incident title inside header - as separate elements positioned over the header
+        elements.append(Spacer(1, 0.1*inch))
+        elements.append(Paragraph("INCIDENT TITLE", incident_title_label_style))
+        elements.append(Spacer(1, 0.04*inch))
+        elements.append(Paragraph(f"{incident.title}", incident_title_style))
+        if incident.description:
+            elements.append(Spacer(1, 0.06*inch))
+            elements.append(Paragraph(incident.description.replace('\n', '<br/>'), incident_desc_style))
+        
+        elements.append(Spacer(1, 0.15*inch))
+        
+        # Meta strip
+        severity_display = f"{incident.severity.upper()} — P1" if incident.severity == 'CRITICAL' else f"{incident.severity.upper()}"
+        severity_color = HexColor('#7f1d1d') if incident.severity == 'CRITICAL' else HexColor('#78350f')
+        severity_text_color = HexColor('#fca5a5') if incident.severity == 'CRITICAL' else HexColor('#fcd34d')
+        
+        meta_data = [
+            [Paragraph("INCIDENT ID", meta_label_style), Paragraph(f"INC-{incident.id}", meta_value_style)],
+            [Paragraph("TOTAL LOG ENTRIES", meta_label_style), Paragraph(str(len(incident_logs)), meta_value_style)],
+            [Paragraph("PERIOD", meta_label_style), 
+             Paragraph(f"{incident.created_at.strftime('%d %b %Y, %H:%M')} — {timezone.now().strftime('%d %b %Y, %H:%M hrs')}", 
+                      ParagraphStyle('Period', parent=styles['Normal'], fontSize=13, 
+                                    textColor=HexColor('#e8f0fe'), alignment=TA_LEFT, fontName='Helvetica-Bold'))],
+            [Paragraph("SEVERITY", meta_label_style), 
+             Paragraph(severity_display, ParagraphStyle('Severity', parent=styles['Normal'], fontSize=10, 
+                                                       textColor=severity_text_color, alignment=TA_LEFT, 
+                                                       fontName='Helvetica-Bold', backColor=severity_color))]
+        ]
+        
+        meta_table = Table(meta_data, colWidths=[1.8*inch, 5.5*inch])
+        meta_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), HexColor('#1a3a6b')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 14),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 14),
+            ('TOPPADDING', (0, 0), (-1, -1), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 14),
+        ]))
+        elements.append(meta_table)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Incident Logs Table
+        log_data = [[
+            Paragraph('#', table_header_style),
+            Paragraph('TIMESTAMP', table_header_style),
+            Paragraph('DEPARTMENT', table_header_style),
+            Paragraph('ACTION / DESCRIPTION', table_header_style),
+            Paragraph('STATUS', table_header_style)
+        ]]
+        
+        # Department color mapping
+        dept_colors = {
+            'SIEM / SOC Platform': (HexColor('#e0f2fe'), HexColor('#0369a1')),
+            'Security Operations': (HexColor('#fce7f3'), HexColor('#9d174d')),
+            'Incident Management': (HexColor('#ede9fe'), HexColor('#5b21b6')),
+            'Infrastructure': (HexColor('#dcfce7'), HexColor('#14532d')),
+            'External — Cyber IR': (HexColor('#f1f5f9'), HexColor('#334155')),
+            'Business Continuity': (HexColor('#fef3c7'), HexColor('#92400e')),
+            'Legal & Compliance': (HexColor('#fef9c3'), HexColor('#713f12')),
+            'Communications': (HexColor('#fef9c3'), HexColor('#713f12')),
+            'External — Regulator': (HexColor('#f1f5f9'), HexColor('#334155')),
+        }
+        
+        # Status color mapping
+        status_colors = {
+            'DETECTED': (HexColor('#7f1d1d'), HexColor('#fca5a5')),
+            'ESCALATED': (HexColor('#78350f'), HexColor('#fcd34d')),
+            'IN PROGRESS': (HexColor('#78350f'), HexColor('#fcd34d')),
+            'LOGGED': (HexColor('#1e3a5f'), HexColor('#93c5fd')),
+            'COMPLETE': (HexColor('#064e3b'), HexColor('#6ee7b7')),
+            'NOTIFIED': (HexColor('#1e3a5f'), HexColor('#93c5fd')),
+            'CONTAINED': (HexColor('#064e3b'), HexColor('#6ee7b7')),
+            'CLOSED': (HexColor('#1e3a5f'), HexColor('#93c5fd')),
+        }
+        
+        for idx, log in enumerate(incident_logs, 1):
+            timestamp = log['created_time']
+            if isinstance(timestamp, str):
+                from datetime import datetime
+                try:
+                    timestamp = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                except:
+                    timestamp = timezone.now()
+            
+            date_str = timestamp.strftime('%d %b') if hasattr(timestamp, 'strftime') else str(timestamp)[:6]
+            time_str = timestamp.strftime('%H:%M') if hasattr(timestamp, 'strftime') else str(timestamp)[-5:]
+            timestamp_para = Paragraph(f"{date_str}<br/>{time_str}", timestamp_style)
+            
+            user = log.get('user_log')
+            department = 'System'
+            dept_bg, dept_text = (HexColor('#f1f5f9'), HexColor('#334155'))
+            if user:
+                try:
+                    liaison = user.liaison_profile
+                    department = liaison.organization.name if liaison.organization else 'Operations'
+                    # Try to match department name
+                    for dept_key, (bg, txt) in dept_colors.items():
+                        if dept_key.lower() in department.lower() or department.lower() in dept_key.lower():
+                            dept_bg, dept_text = bg, txt
+                            department = dept_key
+                            break
+                except:
+                    department = user.username
+            
+            # Department badge
+            dept_para = Paragraph(f'<para backColor="{dept_bg.hexval()}" textColor="{dept_text.hexval()}" '
+                                 f'leftIndent="3" rightIndent="3" spaceBefore="3" spaceAfter="3">'
+                                 f'<font size="10" name="Helvetica-Bold">{department}</font></para>',
+                                 ParagraphStyle('DeptBadge', parent=styles['Normal']))
+            
+            description = log.get('log_description', '')
+            # Extract author if present (format: "— Author Name" at end)
+            author = None
+            if '—' in description:
+                parts = description.rsplit('—', 1)
+                if len(parts) == 2:
+                    description = parts[0].strip()
+                    author = parts[1].strip()
+            
+            # Escape HTML
+            description = description.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            
+            # Determine status
+            status = 'LOGGED'
+            desc_lower = description.lower()
+            if 'detected' in desc_lower or 'fired' in desc_lower:
+                status = 'DETECTED'
+            elif 'escalated' in desc_lower:
+                status = 'ESCALATED'
+            elif 'complete' in desc_lower or 'completed' in desc_lower:
+                status = 'COMPLETE'
+            elif 'in progress' in desc_lower or 'progress' in desc_lower:
+                status = 'IN PROGRESS'
+            elif 'notified' in desc_lower:
+                status = 'NOTIFIED'
+            elif 'contained' in desc_lower:
+                status = 'CONTAINED'
+            elif 'closed' in desc_lower:
+                status = 'CLOSED'
+            
+            status_bg, status_text = status_colors.get(status, (HexColor('#1e3a5f'), HexColor('#93c5fd')))
+            # Match reference PDF: proper padding and font size so status doesn't wrap
+            status_para = Paragraph(f'<para backColor="{status_bg.hexval()}" textColor="{status_text.hexval()}" '
+                                  f'leftIndent="4" rightIndent="4" spaceBefore="3" spaceAfter="3">'
+                                  f'<font size="10" name="Helvetica-Bold">{status}</font></para>',
+                                  ParagraphStyle('StatusBadge', parent=styles['Normal']))
+            
+            # Description with author
+            if author:
+                desc_with_author = f'{description}<br/><br/><para alignment="right"><font size="10.5" color="#94a3b8"><i>— {author}</i></font></para>'
+            else:
+                desc_with_author = description
+            
+            desc_para = Paragraph(desc_with_author, log_cell_style)
+            
+            log_data.append([
+                Paragraph(f"{idx:03d}", log_number_style),
+                timestamp_para,
+                dept_para,
+                desc_para,
+                status_para
+            ])
+        
+        # Make log table same width as other sections (7.3 inches total)
+        # Match reference PDF: wider columns to prevent header wrapping
+        # #: 0.6 (wider to prevent vertical stacking), TIMESTAMP: 1.3, DEPARTMENT: 1.5, ACTION: 2.9, STATUS: 1.0 = 7.3 total
+        log_table = Table(log_data, colWidths=[0.6*inch, 1.3*inch, 1.5*inch, 2.9*inch, 1*inch])
+        
+        # Apply alternating row colors with better padding to match reference PDF
+        table_style_commands = [
+            ('BACKGROUND', (0, 0), (-1, 0), HexColor('#0a1f44')),  # Header
+            ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#93b4d8')),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('ALIGN', (2, 0), (2, -1), 'LEFT'),
+            ('ALIGN', (3, 0), (3, -1), 'LEFT'),
+            ('ALIGN', (4, 0), (4, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            # Header row padding
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 14),
+            ('TOPPADDING', (0, 0), (-1, 0), 14),
+            # Data rows padding - more generous padding
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 16),
+            ('TOPPADDING', (0, 1), (-1, -1), 16),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            # Left padding - more space on left
+            ('LEFTPADDING', (0, 0), (0, -1), 8),  # # column - less padding to prevent vertical stacking
+            ('RIGHTPADDING', (0, 0), (0, -1), 8),  # # column - less padding
+            ('LEFTPADDING', (1, 0), (1, -1), 14),  # TIMESTAMP
+            ('LEFTPADDING', (2, 0), (2, -1), 14),  # DEPARTMENT
+            ('LEFTPADDING', (3, 0), (3, -1), 16),  # ACTION/DESCRIPTION - more padding
+            ('LEFTPADDING', (4, 0), (4, -1), 12),  # STATUS
+            # Right padding - more space on right
+            ('RIGHTPADDING', (0, 0), (0, -1), 12),  # # column
+            ('RIGHTPADDING', (1, 0), (1, -1), 14),  # TIMESTAMP
+            ('RIGHTPADDING', (2, 0), (2, -1), 14),  # DEPARTMENT
+            ('RIGHTPADDING', (3, 0), (3, -1), 16),  # ACTION/DESCRIPTION - more padding
+            ('RIGHTPADDING', (4, 0), (4, -1), 12),  # STATUS
+            ('LINEBELOW', (0, 0), (-1, -1), 1, HexColor('#e5e7eb')),
+        ]
+        
+        # Add alternating row backgrounds
+        for i in range(1, len(log_data)):
+            if i % 2 == 0:
+                table_style_commands.append(('BACKGROUND', (0, i), (-1, i), HexColor('#ffffff')))
+            else:
+                table_style_commands.append(('BACKGROUND', (0, i), (-1, i), HexColor('#f8fafc')))
+        
+        log_table.setStyle(TableStyle(table_style_commands))
+        elements.append(log_table)
+        
+        # Build PDF with custom header/footer
+        def on_first_page(canvas, doc):
+            CustomPageTemplate(canvas, doc).draw_header(canvas, doc)
+            CustomPageTemplate(canvas, doc).draw_footer(canvas, doc)
+        
+        def on_later_pages(canvas, doc):
+            CustomPageTemplate(canvas, doc).draw_footer(canvas, doc)
+        
+        doc.build(elements, onFirstPage=on_first_page, onLaterPages=on_later_pages)
+        
+        buffer.seek(0)
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="Incident_Log_History_INC-{incident.id}.pdf"'
+        return response
+        
+    except IncidentCapture.DoesNotExist:
+        return HttpResponse('Incident not found', status=404)
+    except Exception as e:
+        return HttpResponse(f'Error generating PDF: {str(e)}', status=500)
+
+
+def incident_case_history_csv(request, incident_id):
+    """Export incident log history as CSV (case history) for a single incident."""
+    # Check authentication
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return HttpResponse('Unauthorized', status=401)
+
+    try:
+        # Get organization similar to generate_incident_shift_packet_pdf
+        organization = None
+        if request.user.is_authenticated:
+            try:
+                liaison = request.user.liaison_profile
+                organization = liaison.organization
+            except (Liaison.DoesNotExist, AttributeError):
+                return HttpResponse('Organization not found', status=400)
+        elif 'user_credentials_id' in request.session:
+            organization = Organization.objects.first()
+
+        # Get the incident - for legacy users, get incident first then use its organization
+        if 'user_credentials_id' in request.session:
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id)
+                organization = incident.organization
+            except IncidentCapture.DoesNotExist:
+                return HttpResponse('Incident not found', status=404)
+        else:
+            if not organization:
+                return HttpResponse('Organization not found', status=400)
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+            except IncidentCapture.DoesNotExist:
+                return HttpResponse('Incident not found', status=404)
+
+        # Build incident logs using same logic as PDF generation
+        incident_logs = []
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, event_description, created_time, user_id
+                    FROM core_incident_events
+                    WHERE incident_id = %s
+                    ORDER BY created_time ASC
+                    """,
+                    [incident.id]
+                )
+                log_rows = cursor.fetchall()
+
+                for row in log_rows:
+                    log_id, event_desc, created_time, user_id = row
+                    user = None
+                    if user_id:
+                        try:
+                            user = User.objects.get(id=user_id)
+                        except User.DoesNotExist:
+                            pass
+                    incident_logs.append({
+                        'log_id': log_id,
+                        'log_description': event_desc,
+                        'created_time': created_time,
+                        'user_log': user,
+                    })
+        except Exception:
+            incident_logs = []
+
+        # Add the "Incident Created" log entry if not already present
+        has_created_log = any('created' in (log.get('log_description') or '').lower() for log in incident_logs)
+        if not has_created_log:
+            incident_logs.insert(0, {
+                'log_id': 0,
+                'log_description': f'Incident \"{incident.title}\" was created with severity level {incident.get_severity_display()}.',
+                'created_time': incident.created_at,
+                'user_log': incident.created_by.user if incident.created_by else None,
+            })
+
+        # Prepare CSV response
+        filename = f"Case_History_INC-{incident.id}.csv"
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename=\"{filename}\"'
+
+        writer = csv.writer(response)
+
+        # Header info
+        writer.writerow(['Incident ID', f'INC-{incident.id}'])
+        writer.writerow(['Title', incident.title])
+        writer.writerow(['Severity', incident.get_severity_display()])
+        writer.writerow(['Created At', incident.created_at.strftime('%Y-%m-%d %H:%M') if incident.created_at else ''])
+        writer.writerow([])  # blank line
+
+        # Table header
+        writer.writerow(['#', 'Timestamp', 'Department', 'Action / Description', 'Status'])
+
+        # Department and status detection similar to PDF
+        for idx, log in enumerate(incident_logs, start=1):
+            timestamp = log.get('created_time')
+            if isinstance(timestamp, str):
+                from datetime import datetime
+                try:
+                    timestamp = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    timestamp = timezone.now()
+
+            ts_str = timestamp.strftime('%Y-%m-%d %H:%M') if hasattr(timestamp, 'strftime') else str(timestamp)
+
+            user = log.get('user_log')
+            department = 'System'
+            if user:
+                try:
+                    liaison = user.liaison_profile
+                    department = liaison.organization.name if liaison.organization else 'Operations'
+                except Exception:
+                    department = user.username
+
+            description = log.get('log_description') or ''
+            # Extract author suffix if present \"— Author\"
+            if '—' in description:
+                parts = description.rsplit('—', 1)
+                if len(parts) == 2:
+                    description = parts[0].strip()
+
+            desc_lower = description.lower()
+            status = 'LOGGED'
+            if 'detected' in desc_lower or 'fired' in desc_lower:
+                status = 'DETECTED'
+            elif 'escalated' in desc_lower:
+                status = 'ESCALATED'
+            elif 'complete' in desc_lower or 'completed' in desc_lower:
+                status = 'COMPLETE'
+            elif 'in progress' in desc_lower or 'progress' in desc_lower:
+                status = 'IN PROGRESS'
+            elif 'notified' in desc_lower:
+                status = 'NOTIFIED'
+            elif 'contained' in desc_lower:
+                status = 'CONTAINED'
+            elif 'closed' in desc_lower:
+                status = 'CLOSED'
+
+            writer.writerow([f"{idx:03d}", ts_str, department, description, status])
+
+        return response
+
+    except IncidentCapture.DoesNotExist:
+        return HttpResponse('Incident not found', status=404)
+    except Exception as e:
+        return HttpResponse(f'Error generating CSV: {str(e)}', status=500)

@@ -7,10 +7,10 @@
 <div class="app-container">
     <!-- Sidebar Navigation -->
     <nav class="sidebar">
-        <div class="sidebar-header">
+        <a href="{% url 'dashboard' %}" class="sidebar-header" style="text-decoration: none; color: var(--primary-color); display: flex; align-items: center; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
             <i class="fa-solid fa-shield-halved logo-icon"></i>
             <span class="logo-text">Resilience</span>
-        </div>
+        </a>
         <ul class="nav-links">
             <li class="nav-item">
                 <a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a>
@@ -101,12 +101,12 @@
                     <h3 class="card-title">Quick Actions</h3>
                 </div>
                 <div class="action-buttons">
-                    <a href="{% url 'capture' %}" class="btn btn-primary">
+                    <button type="button" class="btn btn-primary" onclick="openCreateUpdateModal()">
                         <i class="fa-solid fa-plus"></i> Create Update
-                    </a>
-                    <a href="{% url 'distribute' %}" class="btn btn-secondary">
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="openGenerateShiftPacketModal()">
                         <i class="fa-solid fa-file-export"></i> Generate Shift Packet
-                    </a>
+                    </button>
                 </div>
             </div>
 
@@ -115,12 +115,12 @@
                     <h3 class="card-title">Audit Pack (Export Ready)</h3>
                 </div>
                 <div class="action-buttons">
-                    <a href="#" class="btn btn-primary">
+                    <button type="button" class="btn btn-primary" onclick="openDecisionPacketModal()">
                         <i class="fa-solid fa-file-pdf"></i> Generate Decision Packet PDF
-                    </a>
-                    <a href="#" class="btn btn-secondary">
-                        <i class="fa-solid fa-download"></i> Generate Case History Export (PDF or CSV)
-                    </a>
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="openCaseHistoryModal()">
+                        <i class="fa-solid fa-download"></i> Generate Case History Export (CSV)
+                    </button>
                 </div>
             </div>
 
@@ -152,10 +152,770 @@
     </main>
 </div>
 
+<!-- Create Update Modal -->
+<div id="createUpdateModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3>Create Update - Select Incident</h3>
+            <span class="close" onclick="closeCreateUpdateModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom: 1rem;">
+                <input type="text" id="incidentSearch" placeholder="Search incidents..." 
+                       style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem;"
+                       onkeyup="filterIncidents()">
+            </div>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 1rem;">
+                <select id="incidentSelect" size="8" style="width: 100%; padding: 0.5rem; border: none; font-size: 0.95rem;"
+                        onchange="showIncidentEventForm()">
+                    <option value="">-- Select an incident --</option>
+                    {% for incident in all_incidents %}
+                        <option value="{{ incident.id }}" data-title="{{ incident.title|lower }}" data-description="{{ incident.description|lower|default:'' }}">
+                            {{ incident.title }} - {{ incident.created_at|date:"M d, Y H:i" }}
+                        </option>
+                    {% empty %}
+                        <option disabled>No incidents available</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Incident Event Form (shown when incident is selected) -->
+            <div id="incidentEventFormContainer" style="display: none; margin-top: 1.5rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #4facfe;">
+                <h4 style="margin: 0 0 1rem 0; color: #212529; font-size: 1rem; font-weight: 600;">
+                    <i class="fa-solid fa-pen" style="margin-right: 0.5rem; color: #4facfe;"></i>Incident Event
+                </h4>
+                <form id="incidentEventForm" onsubmit="submitIncidentEventFromModal(event)" style="display: flex; gap: 0.75rem; align-items: flex-start;">
+                    {% csrf_token %}
+                    <textarea 
+                        id="logDescription" 
+                        name="log_description" 
+                        placeholder="Enter incident event log description..." 
+                        required
+                        style="
+                            flex: 1;
+                            padding: 0.75rem;
+                            border: 2px solid #e2e8f0;
+                            border-radius: 8px;
+                            font-size: 0.9rem;
+                            font-family: inherit;
+                            resize: vertical;
+                            min-height: 80px;
+                        "></textarea>
+                    <button type="submit" class="btn btn-primary" style="
+                        padding: 0.75rem 1.5rem;
+                        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        font-size: 0.9rem;
+                        cursor: pointer;
+                        white-space: nowrap;
+                        display: flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                    ">
+                        <i class="fa-solid fa-paper-plane"></i> Submit
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeCreateUpdateModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Generate Shift Packet Modal -->
+<div id="generateShiftPacketModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3>Generate Shift Packet - Select Incident</h3>
+            <span class="close" onclick="closeGenerateShiftPacketModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom: 1rem;">
+                <input type="text" id="packetIncidentSearch" placeholder="Search incidents..."
+                       style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem;"
+                       onkeyup="filterPacketIncidents()">
+            </div>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 1rem;">
+                <select id="packetIncidentSelect" size="8" style="width: 100%; padding: 0.5rem; border: none; font-size: 0.95rem;">
+                    <option value="">-- Select an incident --</option>
+                    {% for incident in all_incidents %}
+                        <option value="{{ incident.id }}" data-title="{{ incident.title|lower }}" data-description="{{ incident.description|lower|default:'' }}">
+                            {{ incident.title }} - {{ incident.created_at|date:"M d, Y H:i" }}
+                        </option>
+                    {% empty %}
+                        <option disabled>No incidents available</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeGenerateShiftPacketModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="generateShiftPacketFromDashboard()">
+                <i class="fa-solid fa-file-pdf"></i> Generate
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Decision Packet Modal (Download only) -->
+<div id="decisionPacketModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3>Generate Decision Packet PDF - Select Incident</h3>
+            <span class="close" onclick="closeDecisionPacketModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom: 1rem;">
+                <input type="text" id="decisionIncidentSearch" placeholder="Search incidents..."
+                       style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem;"
+                       onkeyup="filterDecisionIncidents()">
+            </div>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 1rem;">
+                <select id="decisionIncidentSelect" size="8" style="width: 100%; padding: 0.5rem; border: none; font-size: 0.95rem;">
+                    <option value="">-- Select an incident --</option>
+                    {% for incident in all_incidents %}
+                        <option value="{{ incident.id }}" data-title="{{ incident.title|lower }}" data-description="{{ incident.description|lower|default:'' }}">
+                            {{ incident.title }} - {{ incident.created_at|date:"M d, Y H:i" }}
+                        </option>
+                    {% empty %}
+                        <option disabled>No incidents available</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeDecisionPacketModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="downloadDecisionPacket()">
+                <i class="fa-solid fa-download"></i> Download PDF
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Case History Export Modal (CSV only) -->
+<div id="caseHistoryModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3>Generate Case History CSV - Select Incident</h3>
+            <span class="close" onclick="closeCaseHistoryModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom: 1rem;">
+                <input type="text" id="caseHistorySearch" placeholder="Search incidents..."
+                       style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem;"
+                       onkeyup="filterCaseHistoryIncidents()">
+            </div>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 1rem;">
+                <select id="caseHistorySelect" size="8" style="width: 100%; padding: 0.5rem; border: none; font-size: 0.95rem;">
+                    <option value="">-- Select an incident --</option>
+                    {% for incident in all_incidents %}
+                        <option value="{{ incident.id }}" data-title="{{ incident.title|lower }}" data-description="{{ incident.description|lower|default:'' }}">
+                            {{ incident.title }} - {{ incident.created_at|date:"M d, Y H:i" }}
+                        </option>
+                    {% empty %}
+                        <option disabled>No incidents available</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeCaseHistoryModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="downloadCaseHistoryCsv()">
+                <i class="fa-solid fa-download"></i> Download CSV
+            </button>
+        </div>
+    </div>
+</div>
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+#incidentSelect {
+    outline: none;
+}
+
+#incidentSelect option {
+    padding: 0.75rem;
+    cursor: pointer;
+}
+
+#incidentSelect option:hover {
+    background-color: #f3f4f6;
+}
+
+#incidentSelect option:checked {
+    background-color: #6366f1;
+    color: white;
+}
+
+/* Generate Shift Packet dropdown styling */
+#packetIncidentSelect {
+    outline: none;
+}
+
+#packetIncidentSelect option {
+    padding: 0.65rem 0.75rem;
+    cursor: pointer;
+}
+
+#packetIncidentSelect option:hover {
+    background-color: #f3f4f6;
+}
+
+#packetIncidentSelect option:checked {
+    background-color: #6366f1;
+    color: white;
+}
+
+/* Decision Packet dropdown styling */
+#decisionIncidentSelect {
+    outline: none;
+}
+
+#decisionIncidentSelect option {
+    padding: 0.65rem 0.75rem;
+    cursor: pointer;
+}
+
+#decisionIncidentSelect option:hover {
+    background-color: #f3f4f6;
+}
+
+#decisionIncidentSelect option:checked {
+    background-color: #6366f1;
+    color: white;
+}
+
+/* Case History dropdown styling */
+#caseHistorySelect {
+    outline: none;
+}
+
+#caseHistorySelect option {
+    padding: 0.65rem 0.75rem;
+    cursor: pointer;
+}
+
+#caseHistorySelect option:hover {
+    background-color: #f3f4f6;
+}
+
+#caseHistorySelect option:checked {
+    background-color: #6366f1;
+    color: white;
+}
+</style>
+
 {% block extra_js %}
 <script>
-    // Any dashboard-specific JavaScript can go here
+    function openCreateUpdateModal() {
+        document.getElementById('createUpdateModal').style.display = 'block';
+        document.getElementById('incidentSearch').focus();
+    }
+
+    // Decision Packet modal helpers (download only, no preview)
+    function openDecisionPacketModal() {
+        const modal = document.getElementById('decisionPacketModal');
+        const search = document.getElementById('decisionIncidentSearch');
+        const select = document.getElementById('decisionIncidentSelect');
+        if (search) search.value = '';
+        if (select) select.value = '';
+        filterDecisionIncidents();
+        modal.style.display = 'block';
+        if (search) search.focus();
+    }
+
+    function closeDecisionPacketModal() {
+        const modal = document.getElementById('decisionPacketModal');
+        const search = document.getElementById('decisionIncidentSearch');
+        const select = document.getElementById('decisionIncidentSelect');
+        if (search) search.value = '';
+        if (select) select.value = '';
+        filterDecisionIncidents();
+        modal.style.display = 'none';
+    }
+
+    function filterDecisionIncidents() {
+        const searchTerm = (document.getElementById('decisionIncidentSearch')?.value || '').toLowerCase();
+        const select = document.getElementById('decisionIncidentSelect');
+        if (!select) return;
+        const options = select.getElementsByTagName('option');
+        for (let i = 0; i < options.length; i++) {
+            const option = options[i];
+            const title = option.getAttribute('data-title') || '';
+            const description = option.getAttribute('data-description') || '';
+            const text = (title + ' ' + description).toLowerCase();
+            if (!option.value || searchTerm === '' || text.includes(searchTerm)) {
+                option.style.display = '';
+            } else {
+                option.style.display = 'none';
+            }
+        }
+    }
+
+    // Case History (CSV) modal helpers
+    function openCaseHistoryModal() {
+        const modal = document.getElementById('caseHistoryModal');
+        const search = document.getElementById('caseHistorySearch');
+        const select = document.getElementById('caseHistorySelect');
+        if (search) search.value = '';
+        if (select) select.value = '';
+        filterCaseHistoryIncidents();
+        modal.style.display = 'block';
+        if (search) search.focus();
+    }
+
+    function closeCaseHistoryModal() {
+        const modal = document.getElementById('caseHistoryModal');
+        const search = document.getElementById('caseHistorySearch');
+        const select = document.getElementById('caseHistorySelect');
+        if (search) search.value = '';
+        if (select) select.value = '';
+        filterCaseHistoryIncidents();
+        modal.style.display = 'none';
+    }
+
+    function filterCaseHistoryIncidents() {
+        const searchTerm = (document.getElementById('caseHistorySearch')?.value || '').toLowerCase();
+        const select = document.getElementById('caseHistorySelect');
+        if (!select) return;
+        const options = select.getElementsByTagName('option');
+        for (let i = 0; i < options.length; i++) {
+            const option = options[i];
+            const title = option.getAttribute('data-title') || '';
+            const description = option.getAttribute('data-description') || '';
+            const text = (title + ' ' + description).toLowerCase();
+            if (!option.value || searchTerm === '' || text.includes(searchTerm)) {
+                option.style.display = '';
+            } else {
+                option.style.display = 'none';
+            }
+        }
+    }
+
+    function downloadCaseHistoryCsv() {
+        const select = document.getElementById('caseHistorySelect');
+        const incidentId = select ? select.value : '';
+        if (!incidentId) {
+            alert('Please select an incident first.');
+            return;
+        }
+        closeCaseHistoryModal();
+        window.location.href = `/incidents/${incidentId}/case-history.csv`;
+    }
+
+    function downloadDecisionPacket() {
+        const select = document.getElementById('decisionIncidentSelect');
+        const incidentId = select ? select.value : '';
+        if (!incidentId) {
+            alert('Please select an incident first.');
+            return;
+        }
+        const pdfUrl = `/incidents/${incidentId}/generate-shift-packet/`;
+        fetch(pdfUrl)
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Decision_Packet_INC-${incidentId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => {
+                console.error('Error downloading decision packet:', error);
+                alert('Error downloading decision packet. Please try again.');
+            });
+    }
+
+    function closeCreateUpdateModal() {
+        document.getElementById('createUpdateModal').style.display = 'none';
+        document.getElementById('incidentSearch').value = '';
+        document.getElementById('incidentSelect').value = '';
+        document.getElementById('logDescription').value = '';
+        document.getElementById('incidentEventFormContainer').style.display = 'none';
+        filterIncidents(); // Reset filter
+    }
+
+    function filterIncidents() {
+        const searchTerm = document.getElementById('incidentSearch').value.toLowerCase();
+        const select = document.getElementById('incidentSelect');
+        const options = select.getElementsByTagName('option');
+        
+        for (let i = 0; i < options.length; i++) {
+            const option = options[i];
+            const title = option.getAttribute('data-title') || '';
+            const description = option.getAttribute('data-description') || '';
+            const text = (title + ' ' + description).toLowerCase();
+            
+            if (text.includes(searchTerm) || searchTerm === '') {
+                option.style.display = '';
+            } else {
+                option.style.display = 'none';
+            }
+        }
+    }
+
+    function showIncidentEventForm() {
+        const select = document.getElementById('incidentSelect');
+        const selectedId = select.value;
+        const formContainer = document.getElementById('incidentEventFormContainer');
+        
+        if (selectedId) {
+            formContainer.style.display = 'block';
+        } else {
+            formContainer.style.display = 'none';
+        }
+    }
+
+    function submitIncidentEventFromModal(event) {
+        event.preventDefault();
+        
+        const select = document.getElementById('incidentSelect');
+        const incidentId = select.value;
+        const textarea = document.getElementById('logDescription');
+        const logDescription = textarea.value.trim();
+        
+        if (!incidentId) {
+            alert('Please select an incident first.');
+            return;
+        }
+        
+        if (!logDescription) {
+            alert('Please enter a log description.');
+            return;
+        }
+        
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+        
+        fetch(`/api/incidents/${incidentId}/add-event-log/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify({
+                log_description: logDescription
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Clear the textarea
+                textarea.value = '';
+                // Show success message
+                alert('Incident log added successfully!');
+                // Optionally close modal or keep it open for more entries
+                // closeCreateUpdateModal();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to add log entry'));
+            }
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error adding log entry. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        });
+    }
+
+    // Generate Shift Packet modal helpers
+    function openGenerateShiftPacketModal() {
+        document.getElementById('generateShiftPacketModal').style.display = 'block';
+        const search = document.getElementById('packetIncidentSearch');
+        if (search) {
+            search.value = '';
+            filterPacketIncidents();
+            search.focus();
+        }
+    }
+
+    function closeGenerateShiftPacketModal() {
+        document.getElementById('generateShiftPacketModal').style.display = 'none';
+        const search = document.getElementById('packetIncidentSearch');
+        const select = document.getElementById('packetIncidentSelect');
+        if (search) search.value = '';
+        if (select) select.value = '';
+        filterPacketIncidents();
+    }
+
+    function filterPacketIncidents() {
+        const searchTerm = (document.getElementById('packetIncidentSearch')?.value || '').toLowerCase();
+        const select = document.getElementById('packetIncidentSelect');
+        if (!select) return;
+        const options = select.getElementsByTagName('option');
+        for (let i = 0; i < options.length; i++) {
+            const option = options[i];
+            const title = option.getAttribute('data-title') || '';
+            const description = option.getAttribute('data-description') || '';
+            const text = (title + ' ' + description).toLowerCase();
+            if (!option.value || searchTerm === '' || text.includes(searchTerm)) {
+                option.style.display = '';
+            } else {
+                option.style.display = 'none';
+            }
+        }
+    }
+
+    function generateShiftPacketFromDashboard() {
+        const select = document.getElementById('packetIncidentSelect');
+        const selectedId = select ? select.value : '';
+        if (!selectedId) {
+            alert('Please select an incident to generate the shift packet.');
+            return;
+        }
+        
+        // Close the selection modal
+        closeGenerateShiftPacketModal();
+        
+        // Show PDF preview modal
+        const pdfModal = document.getElementById('pdfPreviewModal');
+        const pdfFrame = document.getElementById('pdfPreviewFrame');
+        const pdfUrl = `/incidents/${selectedId}/generate-shift-packet/`;
+        
+        // Set the iframe source to load the PDF
+        pdfFrame.src = pdfUrl;
+        pdfModal.style.display = 'flex';
+        
+        // Store the incident ID for download/print functions
+        pdfFrame.setAttribute('data-incident-id', selectedId);
+    }
+    
+    // Close PDF preview modal
+    function closePdfPreview() {
+        const modal = document.getElementById('pdfPreviewModal');
+        const pdfFrame = document.getElementById('pdfPreviewFrame');
+        modal.style.display = 'none';
+        pdfFrame.src = '';
+    }
+    
+    // Download PDF from preview
+    function downloadPdfFromPreview() {
+        const pdfFrame = document.getElementById('pdfPreviewFrame');
+        const incidentId = pdfFrame.getAttribute('data-incident-id');
+        if (!incidentId) return;
+        
+        const pdfUrl = `/incidents/${incidentId}/generate-shift-packet/`;
+        
+        fetch(pdfUrl)
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Incident_Log_History_INC-${incidentId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => {
+                console.error('Error downloading PDF:', error);
+                alert('Error downloading PDF. Please try again.');
+            });
+    }
+    
+    // Print PDF from preview
+    function printPdfFromPreview() {
+        const pdfFrame = document.getElementById('pdfPreviewFrame');
+        if (pdfFrame.contentWindow) {
+            pdfFrame.contentWindow.print();
+        }
+    }
+
+    // Close modals when clicking outside
+    window.onclick = function(event) {
+        const createModal = document.getElementById('createUpdateModal');
+        const packetModal = document.getElementById('generateShiftPacketModal');
+        const decisionModal = document.getElementById('decisionPacketModal');
+        const caseHistoryModal = document.getElementById('caseHistoryModal');
+        const pdfModal = document.getElementById('pdfPreviewModal');
+        if (event.target == createModal) {
+            closeCreateUpdateModal();
+        } else if (event.target == packetModal) {
+            closeGenerateShiftPacketModal();
+        } else if (event.target == decisionModal) {
+            closeDecisionPacketModal();
+        } else if (event.target == caseHistoryModal) {
+            closeCaseHistoryModal();
+        } else if (event.target == pdfModal) {
+            closePdfPreview();
+        }
+    }
+
+    // Allow Enter key to proceed
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('incidentSearch');
+        if (searchInput) {
+                    searchInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                        }
+                    });
+        }
+    });
 </script>
+
+<!-- PDF Preview Modal (similar to incident detail page) -->
+<div id="pdfPreviewModal" style="
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+">
+    <div style="
+        background: white;
+        width: 95%;
+        height: 95%;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    ">
+        <div style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        ">
+            <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-file-pdf"></i> Incident Log History - Preview
+            </h3>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+                <button onclick="printPdfFromPreview()" style="
+                    padding: 0.5rem 1rem;
+                    background: white;
+                    color: #667eea;
+                    border: 2px solid #667eea;
+                    border-radius: 6px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                ">
+                    <i class="fa-solid fa-print"></i> Print
+                </button>
+                <button onclick="downloadPdfFromPreview()" style="
+                    padding: 0.5rem 1rem;
+                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                ">
+                    <i class="fa-solid fa-download"></i> Download
+                </button>
+                <button onclick="closePdfPreview()" style="
+                    padding: 0.5rem 1rem;
+                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                ">
+                    <i class="fa-solid fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+        <div style="
+            flex: 1;
+            overflow: hidden;
+            border-radius: 0 0 8px 8px;
+        ">
+            <iframe id="pdfPreviewFrame" src="" style="
+                width: 100%;
+                height: 100%;
+                border: none;
+            "></iframe>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 {% endblock %}
 

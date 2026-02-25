@@ -6,10 +6,10 @@
 {% block content %}
 <div class="app-container">
     <nav class="sidebar">
-        <div class="sidebar-header">
+        <a href="{% url 'dashboard' %}" class="sidebar-header" style="text-decoration: none; color: var(--primary-color); display: flex; align-items: center; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
             <i class="fa-solid fa-shield-halved logo-icon"></i>
             <span class="logo-text">Resilience</span>
-        </div>
+        </a>
         <ul class="nav-links">
             <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a></li>
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
