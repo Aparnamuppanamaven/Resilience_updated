@@ -19,7 +19,7 @@ class CheckoutForm(forms.Form):
         label="Agency / Organization Name",
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'e.g. North District Ops'
+            'placeholder': 'eg: [County Name] Emergency Management'
         })
     )
     liaison_name = forms.CharField(
@@ -74,11 +74,11 @@ class CheckoutForm(forms.Form):
     )
     countee = forms.CharField(
         max_length=100,
-        label="Countee",
+        label="County",
         required=False,
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Countee information'
+            'placeholder': 'County information'
         })
     )
     incidents = forms.CharField(
