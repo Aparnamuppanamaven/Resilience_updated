@@ -77,12 +77,12 @@ Resilience_project/
 
 6. **Run development server:**
    ```bash
-   python manage.py runserver
+   python manage.py runserver 8001
    ```
 
 7. **Access the application:**
-   - Landing page: http://127.0.0.1:8000/
-   - Admin panel: http://127.0.0.1:8000/admin/
+   - Landing page: http://127.0.0.1:8001/
+   - Admin panel: http://127.0.0.1:8001/admin/
 
 ## Usage
 

@@ -31,8 +31,11 @@ from reportlab.lib.colors import HexColor
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 import csv
+import os
 
 from django.db import transaction
+from django.core.files.storage import default_storage
+from django.utils.text import slugify
 from .models import (
     Organization, Liaison, OperationalUpdate, Incident, IncidentEvent, IncidentCapture,
     Decision, SystemSettings, ShiftPacket,
@@ -244,7 +247,7 @@ def checkout(request):
                     license_type='foundation',
                     foundation_purchase_date=timezone.now()
                 )
-
+            
                 user = User.objects.create(
                     username=username,
                     email=liaison_email,
@@ -253,7 +256,7 @@ def checkout(request):
                 )
                 user.set_password(password)
                 user.save()
-
+            
                 Liaison.objects.update_or_create(
                     user=user,
                     defaults={
@@ -265,12 +268,12 @@ def checkout(request):
                         'countee': countee,
                     }
                 )
-
+            
                 SystemSettings.objects.get_or_create(
                     organization=org,
                     defaults={'cadence_hours': 24}
                 )
-
+            
                 try:
                     ExternalUser.objects.create(
                         agency_name=agency,
@@ -405,33 +408,33 @@ def payment(request):
                 # RENEWAL FLOW - Update existing subscription
                 # Note: Invoice/ACH renewal handled here, Stripe handled in webhook
                 payment_status = 'INVOICED' if payment_method == 'INVOICE' else 'PROCESSING'
-                invoice_id = None
-                
-                if payment_method == 'INVOICE':
-                    invoice_id = ensure_unique_invoice_id()
-                
+            invoice_id = None
+            
+            if payment_method == 'INVOICE':
+                invoice_id = ensure_unique_invoice_id()
+            
                 # Create Payment record linked to existing organization
-                payment_obj = Payment.objects.create(
-                    amount=amount,
-                    payment_method=payment_method,
-                    status=payment_status,
-                    invoice_id=invoice_id,
+            payment_obj = Payment.objects.create(
+                amount=amount,
+                payment_method=payment_method,
+                status=payment_status,
+                invoice_id=invoice_id,
                     organization=existing_org
-                )
-                
+            )
+            
                 # Create Invoice if needed
-                if payment_method == 'INVOICE':
-                    Invoice.objects.create(
-                        invoice_id=invoice_id,
-                        payment=payment_obj,
-                        billing_entity_name=form.cleaned_data['billing_entity_name'],
-                        billing_email=form.cleaned_data['billing_email'],
-                        po_number=form.cleaned_data['po_number'],
-                        payment_terms='NET_30',
-                        early_pay_terms='2% / 10, Net 30',
-                        due_date=calculate_due_date('NET_30')
-                    )
-                
+            if payment_method == 'INVOICE':
+                Invoice.objects.create(
+                    invoice_id=invoice_id,
+                    payment=payment_obj,
+                    billing_entity_name=form.cleaned_data['billing_entity_name'],
+                    billing_email=form.cleaned_data['billing_email'],
+                    po_number=form.cleaned_data['po_number'],
+                    payment_terms='NET_30',
+                    early_pay_terms='2% / 10, Net 30',
+                    due_date=calculate_due_date('NET_30')
+                )
+            
                 # Update existing subscription
                 if existing_subscription:
                     new_end_date = calculate_new_subscription_end_date(existing_subscription)
@@ -456,7 +459,7 @@ def payment(request):
                         'ACH': 'ACH',
                         'CARD': 'Credit Card'
                     }.get(payment_method, 'Credit Card')
-                    
+                
                     ExternalPayment.objects.create(
                         username=existing_user.username,
                         payment_status='Completed',
@@ -1491,6 +1494,27 @@ def admin_module(request):
             key_incident_types = request.POST.get('key_incident_types', '').strip() or None
             preferred_communication_channels = request.POST.get('preferred_communication_channels', '').strip() or None
             
+            # Optional profile image (file upload)
+            user_image_file = request.FILES.get('user_image')
+            user_image_path = None
+            if user_image_file:
+                try:
+                    upload_dir = settings.MEDIA_ROOT / 'user_images'
+                    upload_dir.mkdir(parents=True, exist_ok=True)
+                    base, ext = os.path.splitext(user_image_file.name)
+                    ext = (ext or '.jpg').lower()
+                    if ext not in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+                        ext = '.jpg'
+                    safe_name = slugify(name or primary_liaison_name or 'user') or 'user'
+                    filename = f"user_{safe_name}_{timezone.now().strftime('%Y%m%d%H%M%S')}{ext}"
+                    full_path = upload_dir / filename
+                    with open(full_path, 'wb') as f:
+                        for chunk in user_image_file.chunks():
+                            f.write(chunk)
+                    user_image_path = f"user_images/{filename}"
+                except Exception as upload_exc:
+                    messages.error(request, f'Profile picture could not be uploaded: {upload_exc}')
+            
             # Validation
             required_fields = {
                 'name': name,
@@ -1550,8 +1574,12 @@ def admin_module(request):
                     key_incident_types=key_incident_types,
                     preferred_communication_channels=preferred_communication_channels,
                     created_at=timezone.now(),
+                    user_image=user_image_path,
                 )
-                messages.success(request, f'User "{name}" from "{agency_name}" created successfully!')
+                if user_image_path:
+                    messages.success(request, f'User "{name}" from "{agency_name}" created successfully! Profile picture saved.')
+                else:
+                    messages.success(request, f'User "{name}" from "{agency_name}" created successfully!')
                 return redirect('admin_module')
         except Exception as e:
             messages.error(request, f'Error creating user: {str(e)}')
@@ -2192,6 +2220,166 @@ def incidents_list(request):
     })
 
 
+def incident_copy_view(request):
+    """Board-style incident copy view (separate module)"""
+    # Same auth + incident query logic as incidents_list
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return redirect('login')
+
+    liaison = None
+    organization = None
+
+    if request.user.is_authenticated:
+        try:
+            liaison = request.user.liaison_profile
+            organization = liaison.organization
+        except (Liaison.DoesNotExist, AttributeError):
+            messages.error(request, 'Please complete checkout first.')
+            return redirect('checkout')
+    elif 'user_credentials_id' in request.session:
+        try:
+            organization = Organization.objects.first()
+        except Exception:
+            organization = None
+
+    if liaison is not None and organization is not None:
+        incidents = IncidentCapture.objects.filter(
+            organization=organization
+        ).order_by('-created_at')
+    else:
+        incidents = IncidentCapture.objects.all().order_by('-created_at')
+
+    # System status / sync info (same as incidents_list)
+    settings_obj, created = SystemSettings.objects.get_or_create(
+        organization=organization,
+        defaults={
+            'current_status': 'Normal',
+            'cadence_hours': 24,
+        }
+    )
+
+    last_sync = settings_obj.last_sync
+    now = timezone.now()
+    time_diff = now - last_sync
+
+    if time_diff < timedelta(minutes=1):
+        sync_time_display = "Just now"
+    elif time_diff < timedelta(hours=1):
+        minutes = int(time_diff.total_seconds() / 60)
+        sync_time_display = f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    elif time_diff < timedelta(days=1):
+        hours = int(time_diff.total_seconds() / 3600)
+        sync_time_display = f"{hours} hour{'s' if hours != 1 else ''} ago"
+    else:
+        sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
+
+    # Optional selected incident (from dropdown)
+    incident = None
+    assigned_users_data = []
+    incident_logs = []
+    selected_id = request.GET.get('incident_id')
+
+    if selected_id:
+        try:
+            incident = IncidentCapture.objects.get(id=selected_id)
+        except IncidentCapture.DoesNotExist:
+            incident = None
+
+    if incident:
+        # Reuse the assignment + log logic from incident_detail
+        from django.db import connection
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT l.id FROM core_liaison l
+                    INNER JOIN core_incident_user_mapping m ON l.id = m.user_id
+                    WHERE m.incident_id = %s AND m.is_active = 1
+                    """,
+                    [incident.id]
+                )
+                liaison_ids = [row[0] for row in cursor.fetchall()]
+                assigned_liaisons = Liaison.objects.filter(id__in=liaison_ids) if liaison_ids else []
+
+                for liaison in assigned_liaisons:
+                    user_table = UsersTable.objects.filter(liaison_email__iexact=liaison.user.email).first()
+                    assigned_users_data.append({
+                        'liaison': liaison,
+                        'user_table': user_table,
+                    })
+        except Exception:
+            assigned_users_data = []
+
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, event_description, created_time, user_id
+                    FROM core_incident_events
+                    WHERE incident_id = %s
+                    ORDER BY created_time DESC
+                    """,
+                    [incident.id]
+                )
+                log_rows = cursor.fetchall()
+
+            for row in log_rows:
+                log_id, event_desc, created_time, user_id = row
+                user = None
+                user_display_name = None
+                user_image_url = None
+                if user_id:
+                    # First, try to resolve from core_users (UsersTable)
+                    core_user = UsersTable.objects.filter(id=user_id).first()
+                    if core_user:
+                        user_display_name = (
+                            core_user.primary_liaison_name
+                            or core_user.name
+                            or core_user.liaison_email
+                            or core_user.email_id
+                        )
+                        if core_user.user_image:
+                            user_image_url = settings.MEDIA_URL + core_user.user_image
+                    # Also try to resolve to Django auth User for backwards compatibility
+                    try:
+                        user = User.objects.get(id=user_id)
+                        if not user_display_name:
+                            user_display_name = user.get_full_name() or user.username
+                    except User.DoesNotExist:
+                        pass
+                incident_logs.append({
+                    'log_id': log_id,
+                    'log_description': event_desc,
+                    'created_time': created_time,
+                    'user_log': user,
+                    'user_display_name': user_display_name,
+                    'user_image_url': user_image_url,
+                })
+        except Exception:
+            incident_logs = []
+
+    # Get all users and department categories for user assignment modal
+    all_users = UsersTable.objects.all().order_by('-created_at')
+    department_categories = (
+        Department.objects.values_list('category', flat=True)
+        .distinct()
+        .order_by('category')
+    )
+
+    return render(request, 'core/incident_copy.html', {
+        'incidents': incidents,
+        'incident': incident,
+        'assigned_users_data': assigned_users_data,
+        'incident_logs': incident_logs,
+        'all_users': all_users,
+        'department_categories': department_categories,
+        'organization': organization,
+        'is_admin': True,
+        'current_status': settings_obj.current_status,
+        'last_sync_display': sync_time_display,
+    })
+
 def incident_detail(request, incident_id):
     """Show detailed view of a single incident"""
     # Check authentication (Django auth or legacy session)
@@ -2266,6 +2454,13 @@ def incident_detail(request, incident_id):
     
     # Get all users from UsersTable (same as admin page)
     all_users = UsersTable.objects.all().order_by('-created_at')
+    
+    # Get list of available department categories (for filtering users by department)
+    department_categories = (
+        Department.objects.values_list('category', flat=True)
+        .distinct()
+        .order_by('category')
+    )
     
     # Ensure mapping table exists (create if not exists)
     from django.db import connection
@@ -2346,9 +2541,25 @@ def incident_detail(request, incident_id):
         for row in log_rows:
             log_id, event_desc, created_time, user_id = row
             user = None
+            user_display_name = None
+            user_image_url = None
             if user_id:
+                # First, try to resolve from core_users (UsersTable)
+                core_user = UsersTable.objects.filter(id=user_id).first()
+                if core_user:
+                    user_display_name = (
+                        core_user.primary_liaison_name
+                        or core_user.name
+                        or core_user.liaison_email
+                        or core_user.email_id
+                    )
+                    if core_user.user_image:
+                        user_image_url = settings.MEDIA_URL + core_user.user_image
+                # Also try to resolve to Django auth User for backwards compatibility
                 try:
                     user = User.objects.get(id=user_id)
+                    if not user_display_name:
+                        user_display_name = user.get_full_name() or user.username
                 except User.DoesNotExist:
                     pass
             incident_logs.append({
@@ -2356,6 +2567,8 @@ def incident_detail(request, incident_id):
                 'log_description': event_desc,
                 'created_time': created_time,
                 'user_log': user,
+                'user_display_name': user_display_name,
+                'user_image_url': user_image_url,
             })
     except Exception:
         incident_logs = []
@@ -2367,6 +2580,7 @@ def incident_detail(request, incident_id):
         'current_status': settings_obj.current_status,
         'last_sync_display': sync_time_display,
         'all_users': all_users,
+        'department_categories': department_categories,
         'assigned_liaisons': assigned_liaisons,
         'assigned_users_data': assigned_users_data,  # Liaison + UsersTable data combined
         'incident_logs': incident_logs,

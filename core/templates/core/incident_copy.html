@@ -1,0 +1,753 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Incident Copy View - Resilience System{% endblock %}
+
+{% block content %}
+<div class="app-container" style="background: white; min-height: 100vh;">
+    <nav class="sidebar">
+        <a href="{% url 'dashboard' %}" class="sidebar-header" style="text-decoration: none; color: inherit; display: flex; align-items: center; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </a>
+        <ul class="nav-links">
+            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a></li>
+            <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
+            <li class="nav-item"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents</a></li>
+            <li class="nav-item active"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
+            <li class="nav-item"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
+            <li class="nav-item"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
+            <li class="nav-item"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
+            <li class="nav-item"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="avatar">DL</div>
+                <div class="user-info">
+                    <span class="user-name">Designated Liaison</span>
+                    <span class="user-role">Operations</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content" style="background: white; min-height: 100vh;">
+        <header class="top-header" style="display: flex; justify-content: space-between; align-items: center; background: white;">
+            <h2 style="color: #111827;">Incident Copy View</h2>
+            {% if incident %}
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <!-- Status dropdown button (In-progress) -->
+                <div style="position: relative;">
+                    <button id="statusDropdownBtn" onclick="toggleStatusDropdown()" style="
+                        padding: 0.5rem 1rem;
+                        background: #3b82f6;
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        font-weight: 600;
+                        font-size: 0.875rem;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                    ">
+                        <span>In-progress</span>
+                        <i class="fa-solid fa-chevron-down" style="font-size: 0.7rem;"></i>
+                    </button>
+                    <div id="statusDropdown" style="
+                        display: none;
+                        position: absolute;
+                        top: 100%;
+                        right: 0;
+                        margin-top: 0.25rem;
+                        background: white;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 6px;
+                        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+                        min-width: 150px;
+                        z-index: 100;
+                    ">
+                        <button onclick="changeStatus('In-progress')" style="width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: none; cursor: pointer; font-size: 0.875rem;">In-progress</button>
+                        <button onclick="changeStatus('To Do')" style="width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: none; cursor: pointer; font-size: 0.875rem;">To Do</button>
+                        <button onclick="changeStatus('Done')" style="width: 100%; text-align: left; padding: 0.5rem 1rem; border: none; background: none; cursor: pointer; font-size: 0.875rem;">Done</button>
+                    </div>
+                </div>
+                <!-- Action icons -->
+                <button type="button" style="border: none; background: none; cursor: pointer; padding: 0.5rem; color: #6b7280;" title="Watch">
+                    <i class="fa-solid fa-eye" style="font-size: 1rem;"></i>
+                </button>
+                <button type="button" style="border: none; background: none; cursor: pointer; padding: 0.5rem; color: #6b7280;" title="Share">
+                    <i class="fa-solid fa-share" style="font-size: 1rem;"></i>
+                </button>
+                <button type="button" style="border: none; background: none; cursor: pointer; padding: 0.5rem; color: #6b7280;" title="More options">
+                    <i class="fa-solid fa-ellipsis-h" style="font-size: 1rem;"></i>
+                </button>
+            </div>
+            {% else %}
+            <div class="header-status">
+                <div class="status-indicator">
+                    <span class="status-label">Current Status:</span>
+                    <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                </div>
+                <div class="sync-time">
+                    <span>Last detailed sync: {{ last_sync_display }}</span>
+                </div>
+            </div>
+            {% endif %}
+        </header>
+
+        <div class="view-container" style="background: white;">
+            <!-- Incident selector -->
+            <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                <label for="incidentSelect" style="font-weight: 600; color: #374151;">Select Incident:</label>
+                <form method="get" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                    <select id="incidentSelect" name="incident_id" onchange="this.form.submit()" style="
+                        min-width: 260px;
+                        padding: 0.5rem 0.75rem;
+                        border-radius: 6px;
+                        border: 1px solid #e5e7eb;
+                        font-size: 0.9rem;
+                        background-color: #ffffff;
+                        color: #111827;
+                    ">
+                        <option value="">-- Choose an incident --</option>
+                        {% for inc in incidents %}
+                            <option value="{{ inc.id }}" {% if incident and inc.id == incident.id %}selected{% endif %}>
+                                INC-{{ inc.id }} - {{ inc.title }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+
+            {% if incident %}
+            <!-- Board-style layout based on reference image -->
+            <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr); gap: 1.5rem;">
+                <!-- Left column: single incident overview box + assigned users -->
+                <div style="display: grid; grid-template-rows: auto auto; gap: 1rem;">
+                    <!-- Single combined overview box -->
+                    <div style="padding: 1.5rem 1.5rem 1.75rem; border-radius: 12px; background: #e0f2fe; border: 1px solid #93c5fd;">
+                        <!-- Incident ID -->
+                        <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #111827; margin-bottom: 0.25rem;">
+                            Incident ID
+                        </div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: #111827; margin-bottom: 1.25rem;">
+                            INC-{{ incident.id }}
+                        </div>
+
+                        <!-- Incident title row with icons (no inner box) -->
+                        <div style="margin-bottom: 1.25rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <div style="font-size: 0.9rem; font-weight: 600; color: #111827;">
+                                    Incident title
+                                </div>
+                                <div style="display: flex; gap: 0.25rem;">
+                                    <!-- Icon buttons similar to reference image -->
+                                    <button type="button" style="border: 1px solid #e5e7eb; background: white; border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: default;">
+                                        <i class="fa-solid fa-align-left" style="font-size: 0.8rem; color: #4b5563;"></i>
+                                    </button>
+                                    <button type="button" style="border: 1px solid #e5e7eb; background: white; border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: default;">
+                                        <i class="fa-solid fa-link" style="font-size: 0.8rem; color: #4b5563;"></i>
+                                    </button>
+                                    <button type="button" style="border: 1px solid #e5e7eb; background: white; border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: default;">
+                                        <i class="fa-solid fa-paperclip" style="font-size: 0.8rem; color: #4b5563;"></i>
+                                    </button>
+                                    <button type="button" style="border: 1px solid #e5e7eb; background: white; border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: default;">
+                                        <i class="fa-solid fa-ellipsis-h" style="font-size: 0.8rem; color: #4b5563;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="font-size: 1.05rem; font-weight: 600; color: #111827; word-break: break-word; border: 2px solid #ef4444; padding: 0.5rem 0.75rem; background: white;">
+                                {{ incident.title }}
+                            </div>
+                        </div>
+
+                        <!-- Incident full information (non editable) + meta (still inside same big box, no extra box) -->
+                        <div>
+                            <div style="font-size: 1rem; font-weight: 600; color: #111827; margin-bottom: 0.75rem;">
+                                Incident full information (non editable)
+                            </div>
+
+                            <!-- Meta info row: Severity, Created By, Start / End Time (like Capture form) -->
+                            <div style="margin-bottom: 0.75rem;">
+                                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 0.5rem;">
+                                    <div>
+                                        <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Severity</div>
+                                        <div style="font-size: 0.9rem;">
+                                            {{ incident.get_severity_display|default:incident.severity }}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Created By</div>
+                                        <div style="font-size: 0.9rem;">
+                                            Designated Liaison
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem;">
+                                    <div>
+                                        <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Start Time</div>
+                                        <div style="font-size: 0.9rem; color: #111827;">
+                                            {% if incident.start_time %}
+                                                {{ incident.start_time|date:"M d, Y g:i A" }}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">End Time</div>
+                                        <div style="font-size: 0.9rem; color: #111827;">
+                                            {% if incident.end_time %}
+                                                {{ incident.end_time|date:"M d, Y g:i A" }}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="font-size: 0.9rem; color: #111827; white-space: pre-wrap;">
+                                {{ incident.description|default:"Not specified" }}
+                            </div>
+                            {% if incident.impact %}
+                                <hr style="margin: 1rem 0; border-color: rgba(15, 23, 42, 0.2);">
+                                <div style="font-size: 0.9rem; color: #111827; white-space: pre-wrap;">
+                                    <strong>Impact:</strong> {{ incident.impact }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Assigned Users section moved here -->
+                    <div style="padding: 1.25rem 1.25rem 1rem; border-radius: 8px; background: #e0f2fe; border: 1px solid #93c5fd; display: grid; grid-template-rows: auto 1fr;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                            <div>
+                                <div style="font-size: 1rem; font-weight: 600; color: #111827;">
+                                    Assigned Users
+                                </div>
+                                <div style="font-size: 0.85rem; color: #6b7280;">
+                                    Users currently mapped to this incident.
+                                </div>
+                            </div>
+                            <button onclick="openAssignUsersModal()" style="
+                                padding: 0.5rem 1rem;
+                                background: #6366f1;
+                                color: white;
+                                border: none;
+                                border-radius: 6px;
+                                font-size: 0.875rem;
+                                font-weight: 600;
+                                cursor: pointer;
+                            " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#6366f1'">
+                                <i class="fa-solid fa-user-plus" style="margin-right: 0.25rem;"></i>Assign Users
+                            </button>
+                        </div>
+
+                        {% if assigned_users_data %}
+                            <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 300px; overflow-y: auto;">
+                                {% for item in assigned_users_data %}
+                                    {% with liaison=item.liaison user_table=item.user_table %}
+                                    <div style="padding: 0.75rem 0.75rem; border-radius: 8px; background: white; border: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                            <div style="
+                                                width: 32px;
+                                                height: 32px;
+                                                border-radius: 999px;
+                                                background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
+                                                display: flex;
+                                                align-items: center;
+                                                justify-content: center;
+                                                color: white;
+                                                font-weight: 600;
+                                                font-size: 0.8rem;
+                                            ">
+                                                {% if user_table %}
+                                                    {{ user_table.primary_liaison_name|first|upper }}
+                                                {% else %}
+                                                    {{ liaison.user.get_full_name|first|default:liaison.user.username|first|upper }}
+                                                {% endif %}
+                                            </div>
+                                            <div>
+                                                <div style="font-size: 0.9rem; font-weight: 600; color: #111827;">
+                                                    {% if user_table %}{{ user_table.primary_liaison_name }}{% else %}{{ liaison.user.get_full_name|default:liaison.user.username }}{% endif %}
+                                                </div>
+                                                <div style="font-size: 0.8rem; color: #6b7280;">
+                                                    {% if user_table %}{{ user_table.agency_name }}{% else %}N/A{% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div style="font-size: 0.8rem; color: #6b7280;">
+                                            {% if user_table %}{{ user_table.liaison_email }}{% else %}{{ liaison.user.email|default:"Not available" }}{% endif %}
+                                        </div>
+                                    </div>
+                                    {% endwith %}
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div style="text-align: center; padding: 1.25rem 0.75rem; color: #6b7280; font-size: 0.85rem;">
+                                No users assigned to this incident.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Right column: Incident events only (larger size, extended height) -->
+                <div>
+                    <div style="padding: 1.25rem 1.25rem 1.5rem; border-radius: 8px; background: #e0f2fe; border: 1px solid #93c5fd; min-height: 800px; display: grid; grid-template-rows: auto 1fr auto;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                            <div style="font-size: 1rem; font-weight: 600; color: #111827;">
+                                Incident events
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <label for="commentFilter" style="font-size: 0.8rem; color: #6b7280;">Show:</label>
+                                <select id="commentFilter" onchange="filterComments(this.value)" style="
+                                    padding: 0.25rem 0.5rem;
+                                    border: 1px solid #e5e7eb;
+                                    border-radius: 4px;
+                                    font-size: 0.8rem;
+                                    background: white;
+                                    color: #374151;
+                                ">
+                                    <option value="all">All</option>
+                                    <option value="comments">Comments</option>
+                                    <option value="activity">Activity</option>
+                                    <option value="history">History</option>
+                                </select>
+                                <div style="font-size: 0.8rem; color: #6b7280;">
+                                    Newest first
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Event list: reference layout — line 1: System (left) + Date (right); line 2+: Logs full width, wrap -->
+                        <div style="max-height: 650px; overflow-y: auto; margin-bottom: 0.75rem; background: white; border-radius: 8px; border: 1px solid #e5e7eb; padding: 0.75rem 1rem;">
+                            {% if incident_logs %}
+                                {% for log in incident_logs %}
+                                <div style="display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid #f3f4f6;">
+                                    <div style="
+                                        width: 32px;
+                                        height: 32px;
+                                        border-radius: 999px;
+                                        background: #6366f1;
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        color: white;
+                                        font-weight: 600;
+                                        font-size: 0.8rem;
+                                        flex-shrink: 0;
+                                        overflow: hidden;
+                                    ">
+                                        {% if log.user_image_url %}
+                                            <img src="{{ log.user_image_url }}" alt="{{ log.user_display_name|default:'User' }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 999px;">
+                                        {% elif log.user_display_name %}
+                                            {{ log.user_display_name|first|upper }}
+                                        {% elif log.user_log %}
+                                            {{ log.user_log.get_full_name|default:log.user_log.username|first|upper }}
+                                        {% else %}
+                                            S
+                                        {% endif %}
+                                    </div>
+                                    <div style="flex: 1; min-width: 0;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                            <span style="font-size: 0.9rem; font-weight: 600; color: #111827;">
+                                                {% if log.user_display_name %}
+                                                    {{ log.user_display_name }}
+                                                {% elif log.user_log %}
+                                                    {{ log.user_log.get_full_name|default:log.user_log.username }}
+                                                {% else %}
+                                                    System
+                                                {% endif %}
+                                            </span>
+                                            <span style="font-size: 0.75rem; color: #6b7280; white-space: nowrap;">{{ log.created_time|date:"M d, Y g:i A" }}</span>
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: #4b5563; word-break: break-word; white-space: pre-wrap;">{{ log.log_description }}</div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div style="padding: 1rem 0; font-size: 0.85rem; color: #6b7280; text-align: center;">
+                                    No incident events yet.
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Comment input that reuses existing incident log API -->
+                        <form id="copyIncidentEventForm" onsubmit="submitCopyIncidentEvent(event)" style="
+                            display: flex;
+                            align-items: center;
+                            gap: 1rem;
+                        ">
+                            {% csrf_token %}
+                            <div style="
+                                width: 32px;
+                                height: 32px;
+                                border-radius: 999px;
+                                background: #6366f1;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                color: white;
+                                font-weight: 600;
+                                font-size: 0.8rem;
+                                flex-shrink: 0;
+                            ">
+                                {% if request.user.is_authenticated %}
+                                    {{ request.user.get_full_name|first|default:request.user.username|first|upper }}
+                                {% elif request.session.user_credentials_username %}
+                                    {{ request.session.user_credentials_username|first|upper }}
+                                {% else %}
+                                    U
+                                {% endif %}
+                            </div>
+                            <label for="copyLogDescription" style="font-size: 0.85rem; font-weight: 500; color: #374151; flex-shrink: 0;">
+                                Add Event
+                            </label>
+                            <textarea
+                                id="copyLogDescription"
+                                name="log_description"
+                                placeholder="Add a comment about this incident..."
+                                style="
+                                    flex: 1;
+                                    min-height: 44px;
+                                    padding: 0.6rem 0.75rem;
+                                    border-radius: 6px;
+                                    border: 1px solid #e5e7eb;
+                                    font-size: 0.85rem;
+                                    resize: vertical;
+                                "
+                            ></textarea>
+                            <button type="submit" style="
+                                padding: 0.5rem 1.25rem;
+                                background: #4facfe;
+                                color: white;
+                                border: none;
+                                border-radius: 999px;
+                                font-size: 0.85rem;
+                                font-weight: 600;
+                                cursor: pointer;
+                                flex-shrink: 0;
+                            " onmouseover="this.style.background='#3d9ce8'" onmouseout="this.style.background='#4facfe'">
+                                Save
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div style="padding: 2rem; text-align: center; color: #6b7280; background: #e0f2fe; border-radius: 12px; border: 1px solid #93c5fd;">
+                Please select an incident from the dropdown above to see the copy view.
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+<!-- User Assignment Modal -->
+{% if incident %}
+<div id="assignUsersModal" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+">
+    <div style="
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        max-width: 800px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    ">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="margin: 0; font-size: 1.5rem; color: #212529;">Assign Users</h3>
+            <button onclick="closeAssignUsersModal()" style="
+                background: none;
+                border: none;
+                font-size: 1.5rem;
+                color: #6c757d;
+                cursor: pointer;
+                padding: 0;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            ">&times;</button>
+        </div>
+        
+        {% if all_users %}
+        <div style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h4 style="margin: 0; color: #212529; font-size: 1rem; font-weight: 600;">Select Users</h4>
+                <button onclick="saveSelectedUsersFromModal()" style="
+                    padding: 0.5rem 1rem;
+                    background: #10b981;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    font-size: 0.875rem;
+                ">Add Selected</button>
+            </div>
+            <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+                <input type="text" id="userFilterInput" placeholder="Search by name or department..." onkeyup="filterUserSelection()" style="
+                    flex: 1;
+                    padding: 0.5rem 0.75rem;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 6px;
+                    font-size: 0.9rem;
+                ">
+                <select id="departmentFilter" onchange="filterUserSelection()" style="
+                    padding: 0.5rem 0.75rem;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 6px;
+                    font-size: 0.9rem;
+                    min-width: 180px;
+                ">
+                    <option value="">All Departments</option>
+                    {% for category in department_categories %}
+                        <option value="{{ category|lower }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                <table class="users-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                    <thead>
+                        <tr style="background: linear-gradient(to right, #f8f9fa, #f1f3f5); position: sticky; top: 0; z-index: 10;">
+                            <th style="padding: 0.75rem 1rem; width: 40px; text-align: center;">
+                                <input type="checkbox" id="selectAllUsersModal" onchange="toggleAllUsersModal(this)">
+                            </th>
+                            <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                <i class="fa-solid fa-building" style="margin-right: 0.5rem; color: #667eea;"></i>Agency
+                            </th>
+                            <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                <i class="fa-solid fa-user" style="margin-right: 0.5rem; color: #f5576c;"></i>Name
+                            </th>
+                            <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                <i class="fa-solid fa-envelope" style="margin-right: 0.5rem; color: #4facfe;"></i>Email
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in all_users %}
+                        <tr class="user-select-row-modal" data-name="{{ user.primary_liaison_name|lower }}" data-department="{{ user.department|default_if_none:''|lower }}" style="border-bottom: 1px solid #f1f3f5; background: white;">
+                            <td style="padding: 0.75rem 1rem; text-align: center;">
+                                <input type="checkbox" class="user-checkbox-modal" value="{{ user.id }}" data-user-name="{{ user.primary_liaison_name }}" data-user-email="{{ user.liaison_email }}">
+                            </td>
+                            <td style="padding: 0.75rem 1rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="
+                                        width: 32px;
+                                        height: 32px;
+                                        border-radius: 50%;
+                                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        color: white;
+                                        font-weight: 600;
+                                        font-size: 0.8rem;
+                                    ">
+                                        {{ user.agency_name|first|upper }}
+                                    </div>
+                                    <span style="font-weight: 500; color: #212529; font-size: 0.9rem;">{{ user.agency_name }}</span>
+                                </div>
+                            </td>
+                            <td style="padding: 0.75rem 1rem; font-weight: 500; color: #212529; font-size: 0.9rem;">
+                                {{ user.primary_liaison_name }}
+                            </td>
+                            <td style="padding: 0.75rem 1rem; color: #6c757d; font-size: 0.875rem;">
+                                {{ user.liaison_email }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p style="text-align: center; color: #6c757d; padding: 2rem;">No users available.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if incident %}
+<script>
+function toggleStatusDropdown() {
+    const dropdown = document.getElementById('statusDropdown');
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+}
+
+function changeStatus(status) {
+    const btn = document.getElementById('statusDropdownBtn');
+    btn.querySelector('span').textContent = status;
+    document.getElementById('statusDropdown').style.display = 'none';
+    // You can add API call here to save status if needed
+}
+
+function filterComments(filterValue) {
+    // Filter logic for comments - can be enhanced based on log types
+    console.log('Filtering comments by:', filterValue);
+    // For now, just reload or filter client-side if needed
+}
+
+function openAssignUsersModal() {
+    document.getElementById('assignUsersModal').style.display = 'flex';
+}
+
+function closeAssignUsersModal() {
+    document.getElementById('assignUsersModal').style.display = 'none';
+}
+
+function filterUserSelection() {
+    const searchText = document.getElementById('userFilterInput').value.toLowerCase();
+    const selectedDept = document.getElementById('departmentFilter').value.toLowerCase();
+    const rows = document.querySelectorAll('.user-select-row-modal');
+    
+    rows.forEach(row => {
+        const name = (row.getAttribute('data-name') || '').toLowerCase();
+        const department = (row.getAttribute('data-department') || '').toLowerCase();
+        const matchesSearch = !searchText || name.includes(searchText) || department.includes(searchText);
+        const matchesDept = !selectedDept || department === selectedDept;
+        
+        row.style.display = (matchesSearch && matchesDept) ? '' : 'none';
+    });
+}
+
+function toggleAllUsersModal(checkbox) {
+    const checkboxes = document.querySelectorAll('.user-checkbox-modal');
+    checkboxes.forEach(cb => {
+        const row = cb.closest('tr');
+        if (row.style.display !== 'none') {
+            cb.checked = checkbox.checked;
+        }
+    });
+}
+
+function saveSelectedUsersFromModal() {
+    const checkboxes = document.querySelectorAll('.user-checkbox-modal:checked');
+    const userIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    
+    if (userIds.length === 0) {
+        alert('Please select at least one user.');
+        return;
+    }
+
+    if (!confirm(`Assign ${userIds.length} user(s) to this incident?`)) {
+        return;
+    }
+
+    fetch(`/api/incidents/{{ incident.id }}/assign-users/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_ids: userIds
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+            return;
+        }
+
+        if (data.success) {
+            closeAssignUsersModal();
+            location.reload();
+        }
+    })
+    .catch(error => {
+        alert('Error assigning users. Please try again.');
+        console.error('Error:', error);
+    });
+}
+
+// Close modal when clicking outside
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('assignUsersModal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAssignUsersModal();
+            }
+        });
+    }
+    
+    // Close status dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        const statusBtn = document.getElementById('statusDropdownBtn');
+        const statusDropdown = document.getElementById('statusDropdown');
+        if (statusBtn && statusDropdown && !statusBtn.contains(e.target) && !statusDropdown.contains(e.target)) {
+            statusDropdown.style.display = 'none';
+        }
+    });
+});
+
+function submitCopyIncidentEvent(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('copyIncidentEventForm');
+    const textarea = document.getElementById('copyLogDescription');
+    const logDescription = textarea.value.trim();
+
+    if (!logDescription) {
+        alert('Please enter a comment.');
+        return;
+    }
+
+    const csrfTokenInput = form.querySelector('[name=csrfmiddlewaretoken]');
+    const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Adding...';
+
+    fetch(`/api/incidents/{{ incident.id }}/add-event-log/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+        },
+        body: JSON.stringify({
+            log_description: logDescription
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            textarea.value = '';
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to add comment.'));
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error adding comment. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    });
+}
+</script>
+{% endif %}
+{% endblock %}
+

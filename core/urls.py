@@ -18,6 +18,7 @@ urlpatterns = [
     path('distribute/', views.distribute, name='distribute'),
     path('decision-log/', views.decision_log, name='decision_log'),
     path('coverage/', views.coverage, name='coverage'),
+    path('incident-copy/', views.incident_copy_view, name='incident_copy'),
     path('incidents/', views.incidents_list, name='incidents_list'),
     path('incidents/<int:incident_id>/', views.incident_detail, name='incident_detail'),
     path('incidents/<int:incident_id>/generate-shift-packet/', views.generate_incident_shift_packet_pdf, name='generate_shift_packet_pdf'),

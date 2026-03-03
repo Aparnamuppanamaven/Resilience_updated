@@ -457,6 +457,13 @@ class UsersTable(models.Model):
     agency_name = models.CharField(max_length=150)
     primary_liaison_name = models.CharField(max_length=100)
     liaison_email = models.CharField(max_length=150)
+    # Optional profile picture path stored in new User_image column
+    user_image = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        db_column='User_image',
+    )
     key_incident_types = models.CharField(max_length=255, blank=True, null=True)
     preferred_communication_channels = models.CharField(max_length=100, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=False, null=True, blank=True)

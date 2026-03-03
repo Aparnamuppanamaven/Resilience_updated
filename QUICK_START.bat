@@ -71,13 +71,13 @@ echo ========================================
 echo.
 echo Next steps:
 echo 1. (Optional) Create admin user: python manage.py createsuperuser
-echo 2. Start server: python manage.py runserver
-echo 3. Open browser: http://127.0.0.1:8000/
+echo 2. Start server: python manage.py runserver 8001
+echo 3. Open browser: http://127.0.0.1:8001/
 echo.
 echo To start the server now, press any key...
 pause >nul
 
 echo Starting development server...
-python manage.py runserver
+python manage.py runserver 8001
 
 

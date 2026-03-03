@@ -24,6 +24,9 @@
                 <a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents</a>
             </li>
             <li class="nav-item">
+                <a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a>
+            </li>
+            <li class="nav-item">
                 <a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a>
             </li>
             <li class="nav-item">
@@ -439,9 +442,54 @@
             ">&times;</button>
         </div>
         
-        <form method="post" action="{% url 'admin_module' %}" id="createUserForm">
+        <form method="post" action="{% url 'admin_module' %}" id="createUserForm" enctype="multipart/form-data">
             {% csrf_token %}
             <input type="hidden" name="action" value="create_user">
+            
+            <!-- Profile picture upload section -->
+            <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 1.5rem;">
+                <div id="userImagePreview" style="
+                    width: 120px;
+                    height: 120px;
+                    border-radius: 999px;
+                    background: #f3f4f6;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #9ca3af;
+                    font-size: 3rem;
+                    margin-bottom: 0.75rem;
+                    overflow: hidden;
+                    position: relative;
+                ">
+                    <img id="userImagePreviewImg" src="" alt="" style="
+                        display: none;
+                        width: 100%;
+                        height: 100%;
+                        object-fit: cover;
+                        border-radius: 999px;
+                    ">
+                    <span id="userImagePreviewPlaceholder" style="font-weight: 600;">S</span>
+                </div>
+                <label style="
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0.5rem 1rem;
+                    border-radius: 999px;
+                    background: #ffb74d;
+                    color: #212529;
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                ">
+                    Upload Picture
+                    <input type="file" id="user_image_input" name="user_image" accept="image/jpeg,image/png,image/gif,image/webp" style="display: none;" form="createUserForm">
+                </label>
+                <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.25rem;">
+                    JPG or PNG, up to 2 MB.
+                </div>
+            </div>
             
             <!-- Personal Information Section -->
             <h4 style="margin-bottom: 1rem; color: #495057; font-size: 1.1rem; font-weight: 600; border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem;">Personal Information</h4>
@@ -751,6 +799,58 @@
     </div>
 </div>
 
+<!-- Crop Image Modal -->
+<div id="cropImageModal" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+">
+    <div style="
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        max-width: 500px;
+        width: 95%;
+        max-height: 90vh;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    ">
+        <h4 style="margin: 0 0 1rem 0; font-size: 1.1rem; color: #212529;">Crop picture</h4>
+        <div id="cropImageContainer" style="height: 360px; margin-bottom: 1rem; background: #000;">
+            <img id="cropImageSrc" src="" alt="" style="max-width: 100%; max-height: 100%; display: block;">
+        </div>
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+            <button type="button" id="cropModalCancel" style="
+                padding: 0.5rem 1rem;
+                background: #f1f3f5;
+                color: #495057;
+                border: none;
+                border-radius: 8px;
+                font-weight: 600;
+                cursor: pointer;
+            ">Cancel</button>
+            <button type="button" id="cropModalApply" style="
+                padding: 0.5rem 1rem;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-weight: 600;
+                cursor: pointer;
+            ">Apply</button>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
 {{ departments_by_category|json_script:"department-data" }}
 <script>
 // Department and Sub-Department mapping from database
@@ -872,6 +972,20 @@ function toggleAgencyInfoEdit() {
 function closeCreateUserModal() {
     document.getElementById('createUserModal').style.display = 'none';
     document.getElementById('createUserForm').reset();
+    // Reset profile picture preview
+    const previewImg = document.getElementById('userImagePreviewImg');
+    const placeholder = document.getElementById('userImagePreviewPlaceholder');
+    const fileInput = document.getElementById('user_image_input');
+    if (previewImg && previewImg.src && previewImg.src.startsWith('blob:')) {
+        URL.revokeObjectURL(previewImg.src);
+    }
+    if (previewImg) {
+        previewImg.src = '';
+        previewImg.style.display = 'none';
+    }
+    if (placeholder) placeholder.style.display = '';
+    if (fileInput) fileInput.value = '';
+    croppedImageBlob = null;
     // Reset sub-department dropdown
     document.getElementById('sub_department').innerHTML = '<option value="">Select Sub Department</option>';
     // Reset shift details display
@@ -903,6 +1017,140 @@ document.getElementById('createUserModal').addEventListener('click', function(e)
     if (e.target === this) {
         closeCreateUserModal();
     }
+});
+
+// Crop modal and cropped image state
+let cropModalCropper = null;
+let cropModalObjectUrl = null;
+let croppedImageBlob = null;
+
+function openCropModal(file) {
+    const modal = document.getElementById('cropImageModal');
+    const img = document.getElementById('cropImageSrc');
+    if (cropModalObjectUrl) URL.revokeObjectURL(cropModalObjectUrl);
+    cropModalObjectUrl = URL.createObjectURL(file);
+    img.src = cropModalObjectUrl;
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+    // Init Cropper after image loads
+    img.onload = function() {
+        if (cropModalCropper) {
+            cropModalCropper.destroy();
+            cropModalCropper = null;
+        }
+        cropModalCropper = new Cropper(img, {
+            aspectRatio: 1,
+            viewMode: 1,
+            dragMode: 'move',
+            autoCropArea: 0.8,
+            restore: false,
+            guides: true,
+            center: true,
+            highlight: false,
+            cropBoxMovable: true,
+            cropBoxResizable: true,
+            toggleDragModeOnDblclick: false
+        });
+    };
+}
+
+function closeCropModal() {
+    const modal = document.getElementById('cropImageModal');
+    modal.style.display = 'none';
+    if (cropModalCropper) {
+        cropModalCropper.destroy();
+        cropModalCropper = null;
+    }
+    if (cropModalObjectUrl) {
+        URL.revokeObjectURL(cropModalObjectUrl);
+        cropModalObjectUrl = null;
+    }
+    document.getElementById('cropImageSrc').src = '';
+}
+
+// Show selected image in the circle - after crop or direct (when no crop step)
+function showImagePreviewInCircle(blobOrUrl) {
+    const previewImg = document.getElementById('userImagePreviewImg');
+    const placeholder = document.getElementById('userImagePreviewPlaceholder');
+    if (previewImg.src && previewImg.src.startsWith('blob:')) {
+        URL.revokeObjectURL(previewImg.src);
+    }
+    previewImg.src = typeof blobOrUrl === 'string' ? blobOrUrl : URL.createObjectURL(blobOrUrl);
+    previewImg.style.display = 'block';
+    placeholder.style.display = 'none';
+}
+
+function clearImagePreview() {
+    const previewImg = document.getElementById('userImagePreviewImg');
+    const placeholder = document.getElementById('userImagePreviewPlaceholder');
+    if (previewImg.src && previewImg.src.startsWith('blob:')) {
+        URL.revokeObjectURL(previewImg.src);
+    }
+    previewImg.src = '';
+    previewImg.style.display = 'none';
+    placeholder.style.display = '';
+    croppedImageBlob = null;
+}
+
+// Show selected image in the circle when user picks a file (opens crop modal first)
+(function() {
+    const fileInput = document.getElementById('user_image_input');
+    if (!fileInput) return;
+    fileInput.addEventListener('change', function() {
+        const file = this.files && this.files[0];
+        if (file && file.type.indexOf('image/') === 0) {
+            openCropModal(file);
+        } else {
+            clearImagePreview();
+        }
+    });
+})();
+
+// Crop modal buttons
+document.getElementById('cropModalCancel').addEventListener('click', function() {
+    closeCropModal();
+    document.getElementById('user_image_input').value = '';
+});
+
+document.getElementById('cropModalApply').addEventListener('click', function() {
+    if (!cropModalCropper) return;
+    cropModalCropper.getCroppedCanvas({ maxWidth: 800, maxHeight: 800 }).toBlob(function(blob) {
+        if (!blob) return;
+        croppedImageBlob = blob;
+        showImagePreviewInCircle(blob);
+        document.getElementById('user_image_input').value = '';
+        closeCropModal();
+    }, 'image/jpeg', 0.92);
+});
+
+// Submit form with cropped image when applicable
+document.getElementById('createUserForm').addEventListener('submit', function(e) {
+    if (!croppedImageBlob) return;
+    e.preventDefault();
+    var form = this;
+    var formData = new FormData(form);
+    formData.delete('user_image');
+    formData.append('user_image', croppedImageBlob, 'cropped.jpg');
+    var action = form.getAttribute('action');
+    var csrf = form.querySelector('input[name=csrfmiddlewaretoken]');
+    if (csrf) formData.append('csrfmiddlewaretoken', csrf.value);
+    fetch(action, {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(function(response) {
+        if (response.redirected) {
+            window.location.href = response.url;
+        } else if (response.ok) {
+            window.location.href = action.replace(/\?.*$/, '');
+        } else {
+            window.location.reload();
+        }
+    }).catch(function() {
+        window.location.reload();
+    });
 });
 </script>
 

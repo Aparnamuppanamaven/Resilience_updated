@@ -15,6 +15,7 @@
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
             <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
             <li class="nav-item active"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents</a></li>
+            <li class="nav-item"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
             <li class="nav-item"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
             <li class="nav-item"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
             <li class="nav-item"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
@@ -344,6 +345,45 @@
                                             font-size: 0.875rem;
                                         ">Add Selected</button>
                                     </div>
+
+                                    <!-- Search and filter for users (by Name and Department/Agency) -->
+                                    <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;">
+                                        <div style="flex: 1 1 220px;">
+                                            <input
+                                                type="text"
+                                                id="userFilterInput"
+                                                placeholder="Search by name or department..."
+                                                onkeyup="filterUserSelection()"
+                                                style="
+                                                    width: 100%;
+                                                    padding: 0.5rem 0.75rem;
+                                                    border-radius: 6px;
+                                                    border: 1px solid #e2e8f0;
+                                                    font-size: 0.9rem;
+                                                "
+                                            />
+                                        </div>
+                                        <div style="flex: 0 0 220px;">
+                                            <select
+                                                id="departmentFilter"
+                                                onchange="filterUserSelection()"
+                                                style="
+                                                    width: 100%;
+                                                    padding: 0.5rem 0.75rem;
+                                                    border-radius: 6px;
+                                                    border: 1px solid #e2e8f0;
+                                                    font-size: 0.9rem;
+                                                    background-color: #ffffff;
+                                                "
+                                            >
+                                                <option value="">All Departments</option>
+                                                {% for category in department_categories %}
+                                                    <option value="{{ category|lower }}">{{ category }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
                                     <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
                                         <table class="users-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
                                             <thead>
@@ -364,7 +404,7 @@
                                             </thead>
                                             <tbody>
                                                 {% for user in all_users %}
-                                                <tr class="user-select-row" style="border-bottom: 1px solid #f1f3f5; background: white;">
+                                                <tr class="user-select-row" data-name="{{ user.primary_liaison_name|lower }}" data-department="{{ user.department|default_if_none:''|lower }}" style="border-bottom: 1px solid #f1f3f5; background: white;">
                                                     <td style="padding: 0.75rem 1rem; text-align: center;">
                                                         <input type="checkbox" class="user-checkbox" value="{{ user.id }}" data-user-name="{{ user.primary_liaison_name }}" data-user-email="{{ user.liaison_email }}" {% for liaison in assigned_liaisons %}{% if liaison.user.email|lower == user.liaison_email|lower %}checked{% endif %}{% endfor %}>
                                                     </td>
@@ -546,32 +586,46 @@
                             </div>
                             {% endif %}
 
-                            <!-- Incident Event Logs from core_incident_events -->
+                            <!-- Incident Event Logs: reference layout — line 1: System (left) + Date (right); line 2+: Logs full width, wrap -->
                             {% for log in incident_logs %}
-                            <div style="position: relative; margin-bottom: 1.5rem;">
+                            <div style="display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid #f3f4f6;">
                                 <div style="
-                                    position: absolute;
-                                    left: -1.5rem;
-                                    top: 0.25rem;
-                                    width: 12px;
-                                    height: 12px;
-                                    border-radius: 50%;
-                                    background: #10b981;
-                                    border: 2px solid white;
-                                    box-shadow: 0 0 0 2px #10b981;
-                                "></div>
-                                <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; border-left: 3px solid #10b981;">
-                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
-                                        <span style="font-weight: 600; color: #212529;">
-                                            {% if log.user_log %}
+                                    width: 32px;
+                                    height: 32px;
+                                    border-radius: 999px;
+                                    background: #6366f1;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    color: white;
+                                    font-weight: 600;
+                                    font-size: 0.8rem;
+                                    overflow: hidden;
+                                ">
+                                    {% if log.user_image_url %}
+                                        <img src="{{ log.user_image_url }}" alt="{{ log.user_display_name|default:'User' }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 999px;">
+                                    {% elif log.user_display_name %}
+                                        {{ log.user_display_name|first|upper }}
+                                    {% elif log.user_log %}
+                                        {{ log.user_log.get_full_name|default:log.user_log.username|first|upper }}
+                                    {% else %}
+                                        S
+                                    {% endif %}
+                                </div>
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                        <span style="font-size: 0.9rem; font-weight: 600; color: #111827;">
+                                            {% if log.user_display_name %}
+                                                {{ log.user_display_name }}
+                                            {% elif log.user_log %}
                                                 {{ log.user_log.get_full_name|default:log.user_log.username }}
                                             {% else %}
                                                 System
                                             {% endif %}
                                         </span>
-                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ log.created_time|date:"M d, Y g:i A" }}</span>
+                                        <span style="font-size: 0.75rem; color: #6b7280; white-space: nowrap;">{{ log.created_time|date:"M d, Y g:i A" }}</span>
                                     </div>
-                                    <p style="margin: 0; color: #6c757d; font-size: 0.9rem; white-space: pre-wrap;">{{ log.log_description }}</p>
+                                    <div style="font-size: 0.85rem; color: #4b5563; word-break: break-word; white-space: pre-wrap;">{{ log.log_description }}</div>
                                 </div>
                             </div>
                             {% endfor %}
@@ -579,6 +633,7 @@
                         </div>
                     </div>
                 </div>
+
             </div>
         </div>
     </main>
@@ -752,6 +807,33 @@
     function toggleAllUsers(checkbox) {
         const checkboxes = document.querySelectorAll('.user-checkbox');
         checkboxes.forEach(cb => cb.checked = checkbox.checked);
+    }
+
+    // Filter users in "Select Users" table by name and department/agency
+    function filterUserSelection() {
+        const searchInput = document.getElementById('userFilterInput');
+        const departmentSelect = document.getElementById('departmentFilter');
+        const searchText = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        const selectedDept = departmentSelect ? departmentSelect.value.toLowerCase() : '';
+
+        const rows = document.querySelectorAll('#usersTableContainer .user-select-row');
+
+        rows.forEach(row => {
+            const name = (row.getAttribute('data-name') || '').toLowerCase();
+            const department = (row.getAttribute('data-department') || '').toLowerCase();
+
+            const matchesSearch = !searchText ||
+                name.includes(searchText) ||
+                department.includes(searchText);
+
+            const matchesDept = !selectedDept || department === selectedDept;
+
+            if (matchesSearch && matchesDept) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
     }
 
     function saveSelectedUsers() {

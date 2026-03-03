@@ -51,9 +51,9 @@ def main():
     print("="*60)
     print("\nNext steps:")
     print("1. Create a superuser: python manage.py createsuperuser")
-    print("2. Run the server: python manage.py runserver")
-    print("3. Access the app at: http://127.0.0.1:8000/")
-    print("4. Access admin at: http://127.0.0.1:8000/admin/")
+    print("2. Run the server: python manage.py runserver 8001")
+    print("3. Access the app at: http://127.0.0.1:8001/")
+    print("4. Access admin at: http://127.0.0.1:8001/admin/")
     print("\n")
 
 if __name__ == "__main__":
