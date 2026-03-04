@@ -12,98 +12,134 @@ import re
 from .models import OperationalUpdate, SystemSettings, UserCredentials, Payment, Invoice, UserProfile
 
 
+PASSWORD_REGEX = re.compile(
+    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}$"
+)
+
+
 class CheckoutForm(forms.Form):
     """Checkout form for Foundation purchase"""
     agency = forms.CharField(
         max_length=255,
         label="Agency / Organization Name",
+        required=True,
+        strip=True,
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'eg: [County Name] Emergency Management'
+            'placeholder': 'eg: [County Name] Emergency Management',
+            'required': 'required',
         })
     )
     liaison_name = forms.CharField(
         max_length=255,
         label="Primary Liaison Name",
+        required=True,
+        strip=True,
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Full Name'
+            'placeholder': 'Full Name',
+            'required': 'required',
         })
     )
     liaison_email = forms.EmailField(
         label="Liaison Email (Primary Contact)",
+        required=True,
         widget=forms.EmailInput(attrs={
             'class': 'form-control',
-            'placeholder': 'email@agency.com'
+            'placeholder': 'email@agency.com',
+            'required': 'required',
         })
     )
     password = forms.CharField(
         label="Password",
+        required=True,
+        strip=False,
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
             'placeholder': 'Enter password',
-            'id': 'id_password'
+            'id': 'id_password',
+            'required': 'required',
         }),
         help_text="Must contain uppercase, lowercase, number, special character, and be at least 6 characters"
     )
     confirm_password = forms.CharField(
         label="Confirm Password",
+        required=True,
+        strip=False,
         widget=forms.PasswordInput(attrs={
             'class': 'form-control',
             'placeholder': 'Confirm password',
-            'id': 'id_confirm_password'
+            'id': 'id_confirm_password',
+            'required': 'required',
         })
     )
     role = forms.CharField(
         max_length=100,
         label="Role",
-        required=False,
+        required=True,
+        strip=True,
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'e.g. Operations Manager'
+            'placeholder': 'e.g. Operations Manager',
+            'required': 'required',
         })
     )
     dept = forms.CharField(
         max_length=100,
         label="Department",
-        required=False,
+        required=True,
+        strip=True,
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'e.g. Emergency Management'
+            'placeholder': 'e.g. Emergency Management',
+            'required': 'required',
         })
     )
     countee = forms.CharField(
         max_length=100,
         label="County",
-        required=False,
+        required=True,
+        strip=True,
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'County information'
+            'placeholder': 'County information',
+            'required': 'required',
         })
     )
     incidents = forms.CharField(
         label="Key Incident Types of Concern",
+        required=True,
+        strip=True,
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'e.g. Flooding, Cyber, Power Outage'
+            'placeholder': 'e.g. Flooding, Cyber, Power Outage',
+            'required': 'required',
         })
     )
     channels = forms.ChoiceField(
         label="Preferred Communication Channels",
+        required=True,
         choices=[
+            ('', 'Select a channel'),
             ('email', 'Email Only'),
             ('email_sms', 'Email + SMS'),
             ('slack', 'Slack / Teams Webhook'),
         ],
-        widget=forms.Select(attrs={'class': 'form-control'})
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+            'required': 'required',
+        })
     )
     number_of_users = forms.IntegerField(
         label="Number of Users",
-        min_value=0,
-        initial=0,
+        min_value=1,
+        initial=1,
+        required=True,
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
-            'placeholder': 'e.g. 10'
+            'placeholder': 'e.g. 10',
+            'min': '1',
+            'required': 'required',
         })
     )
     
@@ -111,33 +147,69 @@ class CheckoutForm(forms.Form):
         """Validate password requirements"""
         password = self.cleaned_data.get('password')
         if password:
-            errors = []
-            
-            # Check minimum length
-            if len(password) < 6:
-                errors.append('Password must be at least 6 characters long.')
-            
-            # Check for uppercase
-            if not any(c.isupper() for c in password):
-                errors.append('Password must contain at least one uppercase letter.')
-            
-            # Check for lowercase
-            if not any(c.islower() for c in password):
-                errors.append('Password must contain at least one lowercase letter.')
-            
-            # Check for number
-            if not any(c.isdigit() for c in password):
-                errors.append('Password must contain at least one number.')
-            
-            # Check for special character
-            special_chars = '!@#$%^&*()_+-=[]{}|;:,.<>?'
-            if not any(c in special_chars for c in password):
-                errors.append('Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?).')
-            
-            if errors:
-                raise ValidationError(errors)
+            if not PASSWORD_REGEX.match(password):
+                raise ValidationError(
+                    'Password must be at least 6 characters and include '
+                    'uppercase, lowercase, number, and special character.'
+                )
         
         return password
+
+    def clean_agency(self):
+        value = (self.cleaned_data.get('agency') or '').strip()
+        if not value:
+            raise ValidationError('Please enter your agency or organization name.')
+        if value.isdigit():
+            raise ValidationError('Agency / Organization name cannot be only numbers. Please include letters.')
+        return value
+
+    def clean_liaison_name(self):
+        value = (self.cleaned_data.get('liaison_name') or '').strip()
+        if not value:
+            raise ValidationError("Please enter the primary liaison's name.")
+        return value
+
+    def clean_role(self):
+        value = (self.cleaned_data.get('role') or '').strip()
+        if not value:
+            raise ValidationError("Please enter the liaison's role.")
+        return value
+
+    def clean_dept(self):
+        value = (self.cleaned_data.get('dept') or '').strip()
+        if not value:
+            raise ValidationError('Please enter the department.')
+        return value
+
+    def clean_countee(self):
+        value = (self.cleaned_data.get('countee') or '').strip()
+        if not value:
+            raise ValidationError('Please enter the county.')
+        if value.isdigit():
+            raise ValidationError('County cannot be only numbers. Please include letters.')
+        return value
+
+    def clean_incidents(self):
+        value = (self.cleaned_data.get('incidents') or '').strip()
+        if not value:
+            raise ValidationError('Please list your key incident types of concern.')
+        return value
+
+    def clean_number_of_users(self):
+        num = self.cleaned_data.get('number_of_users')
+        if num is None or num <= 0:
+            raise ValidationError('Number of users must be greater than 0.')
+        return num
+
+    def clean(self):
+        cleaned = super().clean()
+        password = cleaned.get('password') or ''
+        confirm = cleaned.get('confirm_password') or ''
+
+        if password and confirm and password != confirm:
+            self.add_error('confirm_password', 'Passwords do not match.')
+
+        return cleaned
     
     def clean(self):
         """Validate that passwords match"""

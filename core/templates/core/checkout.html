@@ -67,7 +67,7 @@
     </div>
     {% endif %}
 
-    <form method="post" id="checkout-form">
+    <form method="post" id="checkout-form" novalidate>
         {% csrf_token %}
 
         <div class="form-group">
@@ -76,6 +76,7 @@
             {% if form.agency.errors %}
             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.agency.errors }}</div>
             {% endif %}
+            <div class="client-error" data-field="agency" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;"></div>
         </div>
 
         <div class="form-group">
@@ -84,6 +85,7 @@
             {% if form.liaison_name.errors %}
             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.liaison_name.errors }}</div>
             {% endif %}
+            <div class="client-error" data-field="liaison_name" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;"></div>
         </div>
 
         <div class="form-group">
@@ -92,6 +94,7 @@
             {% if form.liaison_email.errors %}
             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.liaison_email.errors }}</div>
             {% endif %}
+            <div class="client-error" data-field="liaison_email" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;"></div>
         </div>
 
         <div class="form-group">
@@ -107,6 +110,7 @@
                 {% endfor %}
             </div>
             {% endif %}
+            <div class="client-error" data-field="password" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;"></div>
         </div>
 
         <div class="form-group">
@@ -119,6 +123,7 @@
                 {% endfor %}
             </div>
             {% endif %}
+            <div class="client-error" data-field="confirm_password" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;"></div>
         </div>
 
         <div class="form-group">
@@ -127,6 +132,7 @@
             {% if form.role.errors %}
             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.role.errors }}</div>
             {% endif %}
+            <div class="client-error" data-field="role" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;"></div>
         </div>
 
         <div class="form-group">
@@ -135,6 +141,7 @@
             {% if form.dept.errors %}
             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.dept.errors }}</div>
             {% endif %}
+            <div class="client-error" data-field="dept" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;"></div>
         </div>
 
         <div class="form-group">
@@ -143,6 +150,7 @@
             {% if form.countee.errors %}
             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.countee.errors }}</div>
             {% endif %}
+            <div class="client-error" data-field="countee" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;"></div>
         </div>
 
         <div class="form-group">
@@ -151,6 +159,7 @@
             {% if form.incidents.errors %}
             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.incidents.errors }}</div>
             {% endif %}
+            <div class="client-error" data-field="incidents" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;"></div>
         </div>
 
         <div class="form-group">
@@ -159,6 +168,7 @@
             {% if form.channels.errors %}
             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.channels.errors }}</div>
             {% endif %}
+            <div class="client-error" data-field="channels" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;"></div>
         </div>
 
         <div class="form-group">
@@ -167,6 +177,7 @@
             {% if form.number_of_users.errors %}
             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ form.number_of_users.errors }}</div>
             {% endif %}
+            <div class="client-error" data-field="number_of_users" style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;"></div>
         </div>
 
         <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #e2e8f0;">
@@ -189,9 +200,187 @@
         </div>
 
         {% if not show_login_button %}
-        <button type="submit" class="btn btn-submit" data-disable-text="Please wait...">Proceed to Payment <i class="fa-solid fa-lock"
-                style="font-size: 0.75rem;"></i></button>
+        <button type="submit"
+                id="proceed-button"
+                class="btn btn-submit"
+                data-disable-text="Please wait...">
+            Proceed to Payment <i class="fa-solid fa-lock" style="font-size: 0.75rem;"></i>
+        </button>
         {% endif %}
     </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const form = document.getElementById('checkout-form');
+        if (!form) return;
+
+        const proceedBtn = document.getElementById('proceed-button');
+        let hasSubmitted = false;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}$/;
+
+        const fieldNames = [
+            'agency',
+            'liaison_name',
+            'liaison_email',
+            'password',
+            'confirm_password',
+            'role',
+            'dept',
+            'countee',
+            'incidents',
+            'channels',
+            'number_of_users'
+        ];
+
+        function getField(name) {
+            return form.querySelector('[name="' + name + '"]');
+        }
+
+        function getClientErrorEl(name) {
+            return document.querySelector('.client-error[data-field="' + name + '"]');
+        }
+
+        function setError(name, message) {
+            const input = getField(name);
+            const errEl = getClientErrorEl(name);
+            if (!input || !errEl) return;
+            errEl.textContent = message || '';
+            if (message) {
+                input.classList.add('has-error');
+            } else {
+                input.classList.remove('has-error');
+            }
+        }
+
+        function validateField(name, showMessage) {
+            showMessage = !!showMessage;
+            const input = getField(name);
+            if (!input) return true;
+
+            let value = input.value || '';
+            if (input.type === 'text' || input.type === 'email') {
+                value = value.trim();
+                input.value = value;
+            }
+
+            // Required check
+            if (!value) {
+                if (showMessage) {
+                    setError(name, 'This field is required.');
+                }
+                return false;
+            }
+
+            // Email
+            if (name === 'liaison_email') {
+                if (!emailRegex.test(value)) {
+                    if (showMessage) {
+                        setError(name, 'Please enter a valid email address.');
+                    }
+                    return false;
+                }
+            }
+
+            // Agency / County should not be only numbers
+            if (name === 'agency' || name === 'countee') {
+                if (/^\d+$/.test(value)) {
+                    if (showMessage) {
+                        setError(name, 'Only numbers are not allowed. Please enter a valid name.');
+                    }
+                    return false;
+                }
+            }
+
+            // Password strength
+            if (name === 'password') {
+                if (!passwordRegex.test(value)) {
+                    if (showMessage) {
+                        setError(
+                            name,
+                            'Password must be at least 6 characters and include uppercase, lowercase, number, and special character.'
+                        );
+                    }
+                    return false;
+                }
+            }
+
+            // Confirm password
+            if (name === 'confirm_password') {
+                const pwd = getField('password').value;
+                if (pwd !== value) {
+                    if (showMessage) {
+                        setError(name, 'Passwords do not match.');
+                    }
+                    return false;
+                }
+            }
+
+            // Number of users > 0
+            if (name === 'number_of_users') {
+                const num = parseInt(value, 10);
+                if (isNaN(num) || num <= 0) {
+                    if (showMessage) {
+                        setError(name, 'Number of users must be greater than 0.');
+                    }
+                    return false;
+                }
+            }
+
+            // Channels selection
+            if (name === 'channels') {
+                if (!value) {
+                    if (showMessage) {
+                        setError(name, 'Please select a communication channel.');
+                    }
+                    return false;
+                }
+            }
+
+            if (showMessage) {
+                setError(name, '');
+            }
+            return true;
+        }
+
+        function isFormValid(showMessages) {
+            let ok = true;
+            fieldNames.forEach(function (name) {
+                if (!validateField(name, showMessages)) {
+                    ok = false;
+                }
+            });
+            return ok;
+        }
+
+        function updateButtonState() {
+            // Button should always remain enabled; no-op.
+        }
+
+        fieldNames.forEach(function (name) {
+            const input = getField(name);
+            if (!input) return;
+
+            input.addEventListener('input', function () {
+                validateField(name, hasSubmitted);
+                updateButtonState();
+            });
+
+            input.addEventListener('blur', function () {
+                validateField(name, hasSubmitted);
+                updateButtonState();
+            });
+        });
+
+        form.addEventListener('submit', function (e) {
+            hasSubmitted = true;
+            if (!isFormValid(true)) {
+                e.preventDefault();
+            }
+        });
+    })();
+</script>
 {% endblock %}
