@@ -40,29 +40,7 @@
             </li>
         </ul>
         <div class="sidebar-footer">
-            <div class="user-profile">
-                <div class="avatar">
-                    {% if user.first_name %}
-                        {{ user.first_name|first|upper }}{{ user.last_name|first|upper|default:"" }}
-                    {% elif user.username %}
-                        {{ user.username|first|upper }}
-                    {% else %}
-                        A
-                    {% endif %}
-                </div>
-                <div class="user-info">
-                    <span class="user-name">
-                        {% if user.get_full_name %}
-                            {{ user.get_full_name }}
-                        {% elif user.username %}
-                            {{ user.username }}
-                        {% else %}
-                            Admin User
-                        {% endif %}
-                    </span>
-                    <span class="user-role">Admin</span>
-                </div>
-            </div>
+            {% include 'core/_profile_dropdown.html' with profile_footer_role="Admin" %}
         </div>
     </nav>
 

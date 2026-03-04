@@ -22,13 +22,7 @@
             <li class="nav-item"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
         </ul>
         <div class="sidebar-footer">
-            <div class="user-profile">
-                <div class="avatar">DL</div>
-                <div class="user-info">
-                    <span class="user-name">Designated Liaison</span>
-                    <span class="user-role">Operations</span>
-                </div>
-            </div>
+            {% include 'core/_profile_dropdown.html' %}
         </div>
     </nav>
 
@@ -395,12 +389,16 @@
                                 font-size: 0.8rem;
                                 flex-shrink: 0;
                             ">
-                                {% if request.user.is_authenticated %}
-                                    {{ request.user.get_full_name|first|default:request.user.username|first|upper }}
-                                {% elif request.session.user_credentials_username %}
-                                    {{ request.session.user_credentials_username|first|upper }}
+                                {% if sidebar_profile_image_url %}
+                                    <img src="{{ sidebar_profile_image_url }}" alt="" style="width: 32px; height: 32px; border-radius: 999px; object-fit: cover; display: block;">
                                 {% else %}
-                                    U
+                                    {% if request.user.is_authenticated %}
+                                        {{ request.user.get_full_name|first|default:request.user.username|first|upper }}
+                                    {% elif request.session.user_credentials_username %}
+                                        {{ request.session.user_credentials_username|first|upper }}
+                                    {% else %}
+                                        U
+                                    {% endif %}
                                 {% endif %}
                             </div>
                             <label for="copyLogDescription" style="font-size: 0.85rem; font-weight: 500; color: #374151; flex-shrink: 0;">

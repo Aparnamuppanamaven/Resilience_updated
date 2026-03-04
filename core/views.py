@@ -43,7 +43,7 @@ from .models import (
     Payment, Invoice,
     StripePayment, UserProfile,
 )
-from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm
+from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm, ProfileEditForm, LegacyProfileEditForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
 from .payment_utils import generate_invoice_id, calculate_due_date, ensure_unique_invoice_id
 from .email_utils import send_checkout_confirmation_email, send_new_user_notification_email
@@ -247,7 +247,7 @@ def checkout(request):
                     license_type='foundation',
                     foundation_purchase_date=timezone.now()
                 )
-            
+
                 user = User.objects.create(
                     username=username,
                     email=liaison_email,
@@ -256,7 +256,7 @@ def checkout(request):
                 )
                 user.set_password(password)
                 user.save()
-            
+
                 Liaison.objects.update_or_create(
                     user=user,
                     defaults={
@@ -268,12 +268,12 @@ def checkout(request):
                         'countee': countee,
                     }
                 )
-            
+
                 SystemSettings.objects.get_or_create(
                     organization=org,
                     defaults={'cadence_hours': 24}
                 )
-            
+
                 try:
                     ExternalUser.objects.create(
                         agency_name=agency,
@@ -285,6 +285,17 @@ def checkout(request):
                     )
                 except Exception as e:
                     print(f"Error creating legacy user: {e}")
+
+                # Also create legacy UserCredentials entry so this account can log in via username/password.
+                try:
+                    legacy_username = (liaison_email or '').strip()
+                    if legacy_username and not UserCredentials.objects.filter(username=legacy_username).exists():
+                        UserCredentials.objects.create(
+                            username=legacy_username,
+                            password_hash=password,
+                        )
+                except Exception as e:
+                    print(f"Error creating UserCredentials record: {e}")
 
             # Placeholder subscription
             try:
@@ -459,7 +470,7 @@ def payment(request):
                         'ACH': 'ACH',
                         'CARD': 'Credit Card'
                     }.get(payment_method, 'Credit Card')
-                
+
                     ExternalPayment.objects.create(
                         username=existing_user.username,
                         payment_status='Completed',
@@ -521,6 +532,7 @@ def payment(request):
                         'ACH': 'ACH',
                         'CARD': 'Credit Card'
                     }.get(payment_method, 'Credit Card')
+
                     ext_payment = ExternalPayment.objects.create(
                         username=username,
                         payment_status='Completed',
@@ -552,7 +564,7 @@ def payment(request):
                             created_at=timezone.now()
                         )
                 except Exception as e:
-                    print(f"Error populating legacy tables: {e}")
+                    print(f"Error populating legacy tables: {e}") 
 
                 request.session.pop('checkout_data', None)
                 request.session.pop('is_existing_user', None)
@@ -799,6 +811,187 @@ def dashboard(request):
     }
     
     return render(request, 'core/dashboard.html', context)
+
+
+def profile_edit(request):
+    """Edit profile for the currently logged-in user (Django auth or UserCredentials)."""
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        messages.error(request, 'Please log in to edit your profile.')
+        return redirect('login')
+
+    is_legacy = 'user_credentials_id' in request.session and not request.user.is_authenticated
+
+    if is_legacy:
+        # Legacy UserCredentials user
+        cred_id = request.session.get('user_credentials_id')
+        try:
+            user_cred = UserCredentials.objects.get(user_id=cred_id)
+        except UserCredentials.DoesNotExist:
+            messages.error(request, 'Session invalid. Please log in again.')
+            return redirect('login')
+
+        if request.method == 'POST':
+            form = LegacyProfileEditForm(request.POST, request.FILES)
+            if form.is_valid():
+                user_cred.username = form.cleaned_data['username'].strip()
+                try:
+                    user_cred.save()
+                    request.session['user_credentials_username'] = user_cred.username
+                except Exception as e:
+                    messages.error(request, f'Could not save: {e}')
+                    form = LegacyProfileEditForm(request.POST, request.FILES)
+                    return render(request, 'core/profile_edit.html', {'form': form, 'is_legacy': True, 'profile_display_name': user_cred.username})
+                # Update UserProfile if it exists (mobile, email, full_name)
+                try:
+                    profile = getattr(user_cred, 'profile', None)
+                    if profile:
+                        profile.email = form.cleaned_data.get('email', '').strip() or user_cred.username
+                        profile.full_name = form.cleaned_data.get('username', '').strip() or profile.full_name
+                        profile.mobile = (form.cleaned_data.get('mobile_number') or '').strip() or profile.mobile
+                        profile.save()
+                except Exception:
+                    pass
+                # Optional: save profile photo to MEDIA and store path in core_users.user_image
+                photo = request.FILES.get('profile_photo')
+                if photo:
+                    try:
+                        upload_dir = settings.MEDIA_ROOT / 'user_images'
+                        upload_dir.mkdir(parents=True, exist_ok=True)
+                        ext = (os.path.splitext(photo.name)[1] or '.jpg').lower()
+                        if ext not in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+                            ext = '.jpg'
+                        filename = f"legacy_{user_cred.user_id}{ext}"
+                        full_path = upload_dir / filename
+                        with open(full_path, 'wb') as f:
+                            for chunk in photo.chunks():
+                                f.write(chunk)
+                        user_image_path = f"user_images/{filename}"
+                        # Store path in core_users.user_image (match by liaison_email, email_id, or primary_liaison_name)
+                        UsersTable.objects.filter(
+                            Q(liaison_email__iexact=user_cred.username) |
+                            Q(email_id__iexact=user_cred.username) |
+                            Q(primary_liaison_name__iexact=user_cred.username)
+                        ).update(user_image=user_image_path)
+                    except Exception:
+                        pass
+                messages.success(request, 'Profile updated successfully.')
+                return redirect('dashboard')
+        else:
+            profile = getattr(user_cred, 'profile', None)
+            initial = {
+                'username': user_cred.username,
+                'email': user_cred.username,
+                'organization_name': getattr(profile, 'organization_name', '') if profile else '',
+                'mobile_number': profile.mobile if profile else '',
+            }
+            form = LegacyProfileEditForm(initial=initial)
+
+        # Mock user so sidebar dropdown shows correct name/email
+        class _MockUser:
+            username = user_cred.username
+            email = user_cred.username
+            def get_full_name(self):
+                return self.username
+            liaison_profile = None
+            is_authenticated = True
+        request.user = _MockUser()
+
+        # Profile image from core_users.user_image for legacy user (match by liaison_email, email_id, primary_liaison_name)
+        profile_image_url = None
+        try:
+            user_table = UsersTable.objects.filter(
+                Q(liaison_email__iexact=user_cred.username) | Q(email_id__iexact=user_cred.username) | Q(primary_liaison_name__iexact=user_cred.username)
+            ).filter(user_image__isnull=False).exclude(user_image='').first()
+            if user_table and user_table.user_image:
+                profile_image_url = f"{(settings.MEDIA_URL or '/media/').rstrip('/')}/{user_table.user_image.lstrip('/')}"
+        except Exception:
+            pass
+
+        return render(request, 'core/profile_edit.html', {
+            'form': form,
+            'is_legacy': True,
+            'profile_display_name': user_cred.username,
+            'profile_image_url': profile_image_url,
+        })
+
+    # Django auth user (Liaison)
+    try:
+        liaison = request.user.liaison_profile
+        organization = liaison.organization
+    except (Liaison.DoesNotExist, AttributeError):
+        messages.error(request, 'Please complete checkout first.')
+        return redirect('checkout')
+
+    if request.method == 'POST':
+        form = ProfileEditForm(request.POST, request.FILES)
+        if form.is_valid():
+            request.user.username = form.cleaned_data['username'].strip()
+            request.user.email = form.cleaned_data['email'].strip()
+            request.user.save()
+            liaison.phone = (form.cleaned_data.get('mobile_number') or '').strip() or ''
+            organization.name = (form.cleaned_data.get('organization_name') or '').strip() or organization.name
+            organization.save()
+            # Profile photo upload
+            photo = request.FILES.get('profile_photo')
+            if photo:
+                try:
+                    upload_dir = settings.MEDIA_ROOT / 'user_images'
+                    upload_dir.mkdir(parents=True, exist_ok=True)
+                    base, ext = os.path.splitext(photo.name)
+                    ext = (ext or '.jpg').lower()
+                    if ext not in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+                        ext = '.jpg'
+                    safe_name = slugify(request.user.username or 'user') or 'user'
+                    filename = f"liaison_{request.user.id}_{timezone.now().strftime('%Y%m%d%H%M%S')}{ext}"
+                    full_path = upload_dir / filename
+                    with open(full_path, 'wb') as f:
+                        for chunk in photo.chunks():
+                            f.write(chunk)
+                    user_image_path = f"user_images/{filename}"
+                    # Primary storage: core_users.user_image — update any row matching this user (email or name)
+                    q = (
+                        Q(liaison_email__iexact=request.user.email)
+                        | Q(email_id__iexact=request.user.email)
+                        | Q(primary_liaison_name__iexact=request.user.username or '')
+                        | Q(primary_liaison_name__iexact=(request.user.get_full_name() or '').strip())
+                    )
+                    UsersTable.objects.filter(q).update(user_image=user_image_path)
+                    # Keep liaison.profile_image in sync for backward compatibility
+                    liaison.profile_image = user_image_path
+                except Exception as e:
+                    messages.error(request, f'Profile photo could not be saved: {e}')
+            liaison.save()
+            messages.success(request, 'Profile updated successfully.')
+            return redirect('dashboard')
+    else:
+        form = ProfileEditForm(initial={
+            'username': request.user.username or '',
+            'email': request.user.email or '',
+            'organization_name': organization.name or '',
+            'mobile_number': liaison.phone or '',
+        })
+
+    # Profile image URL for form: prefer core_users.user_image (match by email or name), then liaison.profile_image
+    profile_image_url = None
+    q = (
+        Q(liaison_email__iexact=request.user.email or '')
+        | Q(email_id__iexact=request.user.email or '')
+        | Q(primary_liaison_name__iexact=request.user.username or '')
+        | Q(primary_liaison_name__iexact=(request.user.get_full_name() or '').strip())
+    )
+    user_row = UsersTable.objects.filter(q).filter(user_image__isnull=False).exclude(user_image='').first()
+    if user_row and user_row.user_image:
+        profile_image_url = f"{(settings.MEDIA_URL or '/media/').rstrip('/')}/{user_row.user_image.lstrip('/')}"
+    elif liaison.profile_image:
+        profile_image_url = f"{(settings.MEDIA_URL or '/media/').rstrip('/')}/{liaison.profile_image.lstrip('/')}"
+
+    return render(request, 'core/profile_edit.html', {
+        'form': form,
+        'is_legacy': False,
+        'profile_display_name': request.user.get_full_name() or request.user.username,
+        'organization_name': organization.name,
+        'profile_image_url': profile_image_url,
+    })
 
 
 def capture(request):

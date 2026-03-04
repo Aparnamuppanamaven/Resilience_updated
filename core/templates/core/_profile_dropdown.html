@@ -1,0 +1,60 @@
+{% load static %}
+<div class="user-profile-dropdown" id="profileDropdownWrapper">
+    <div class="user-profile-row" style="display:flex;flex-direction:row;align-items:center;gap:0.75rem;">
+        <button type="button" class="user-profile-avatar-trigger" aria-expanded="false" aria-haspopup="true" title="Account options">
+            {% if sidebar_profile_image_url %}
+            <div class="avatar avatar-img-wrap" style="width:44px;height:44px;border-radius:50%;overflow:hidden;">
+                <img src="{{ sidebar_profile_image_url }}" alt="" class="avatar-img" style="width:44px;height:44px;border-radius:50%;object-fit:cover;display:block;">
+            </div>
+            {% else %}
+            <div class="avatar">{% if user.get_full_name %}{{ user.get_full_name|slice:":1"|upper }}{% elif user.username %}{{ user.username|slice:":1"|upper }}{% else %}?{% endif %}</div>
+            {% endif %}
+        </button>
+        <div class="user-info">
+            <span class="user-name">{{ user.get_full_name|default:user.username|default:"User" }}</span>
+            <span class="user-role">{% if profile_footer_role %}{{ profile_footer_role }}{% elif user.liaison_profile %}{{ user.liaison_profile.organization.name }}{% else %}Account{% endif %}</span>
+        </div>
+    </div>
+    <div class="profile-dropdown-panel" id="profileDropdownPanel" aria-hidden="true" style="display: none;">
+        <a href="{% url 'profile_edit' %}" class="profile-dropdown-link"><i class="fa-solid fa-pen-to-square"></i> Profile edit</a>
+        <a href="#" class="profile-dropdown-link" onclick="document.getElementById('profileDropdownWrapper').classList.remove('is-open'); document.getElementById('profileDropdownPanel').classList.remove('is-visible'); if(typeof confirmLogout === 'function') confirmLogout(); return false;"><i class="fa-solid fa-sign-out-alt"></i> Sign out</a>
+    </div>
+</div>
+<script>
+(function() {
+    function initProfileDropdown() {
+        var wrapper = document.getElementById('profileDropdownWrapper');
+        if (!wrapper) return;
+        var trigger = wrapper.querySelector('.user-profile-avatar-trigger');
+        var panel = wrapper.querySelector('.profile-dropdown-panel');
+        if (!trigger || !panel) return;
+        panel.style.display = 'none';
+        function open() {
+            wrapper.classList.add('is-open');
+            panel.classList.add('is-visible');
+            panel.style.display = 'block';
+            panel.setAttribute('aria-hidden', 'false');
+            trigger.setAttribute('aria-expanded', 'true');
+        }
+        function close() {
+            wrapper.classList.remove('is-open');
+            panel.classList.remove('is-visible');
+            panel.style.display = 'none';
+            trigger.setAttribute('aria-expanded', 'false');
+            panel.setAttribute('aria-hidden', 'true');
+        }
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (wrapper.classList.contains('is-open')) close();
+            else open();
+        });
+        document.addEventListener('click', function() { close(); });
+        panel.addEventListener('click', function(e) { e.stopPropagation(); });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initProfileDropdown);
+    } else {
+        initProfileDropdown();
+    }
+})();
+</script>

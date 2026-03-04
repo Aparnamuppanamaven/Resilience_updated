@@ -37,6 +37,7 @@ class Liaison(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='liaison_profile')
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='liaisons')
     phone = models.CharField(max_length=20, blank=True)
+    profile_image = models.CharField(max_length=255, blank=True, null=True, help_text="Path to profile photo in MEDIA")
     preferred_channels = models.CharField(
         max_length=50,
         choices=[
@@ -492,8 +493,8 @@ class UserProfile(models.Model):
     ]
     
     user_credential = models.OneToOneField(
-        UserCredentials, 
-        on_delete=models.CASCADE, 
+        UserCredentials,
+        on_delete=models.CASCADE,
         related_name='profile',
         primary_key=True
     )

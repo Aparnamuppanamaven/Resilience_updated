@@ -12,6 +12,7 @@ urlpatterns = [
     path('payment-success/<str:is_renewal>/', views.payment_success, name='payment_success'),
     path('onboarding/', views.onboarding, name='onboarding'),
     path('dashboard/', views.dashboard, name='dashboard'),
+    path('profile/edit/', views.profile_edit, name='profile_edit'),
     path('admin-module/', views.admin_module, name='admin_module'),
     path('capture/', views.capture, name='capture'),
     path('normalize/', views.normalize, name='normalize'),

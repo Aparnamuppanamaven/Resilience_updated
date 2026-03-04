@@ -554,6 +554,95 @@ class UserLoginForm(forms.Form):
     }))
 
 
+class ProfileEditForm(forms.Form):
+    """Edit profile for Django auth users: photo, username, email, organization, mobile. No password."""
+    profile_photo = forms.ImageField(
+        label="Profile photo",
+        required=False,
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': 'image/jpeg,image/png,image/gif,image/webp',
+        })
+    )
+    username = forms.CharField(
+        max_length=150,
+        label="Username",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Username',
+        })
+    )
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'email@example.com',
+        })
+    )
+    organization_name = forms.CharField(
+        max_length=255,
+        label="Organization name",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Organization / Agency name',
+        })
+    )
+    mobile_number = forms.CharField(
+        max_length=20,
+        required=False,
+        label="Mobile number",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Mobile number',
+        })
+    )
+
+
+class LegacyProfileEditForm(forms.Form):
+    """Edit profile for legacy UserCredentials users: photo, username, email, organization, mobile. No password."""
+    profile_photo = forms.ImageField(
+        label="Profile photo",
+        required=False,
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': 'image/jpeg,image/png,image/gif,image/webp',
+        })
+    )
+    username = forms.CharField(
+        max_length=100,
+        label="Username",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Username / email',
+        })
+    )
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'email@example.com',
+        })
+    )
+    organization_name = forms.CharField(
+        max_length=255,
+        required=False,
+        label="Organization name",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Organization / Agency name',
+        })
+    )
+    mobile_number = forms.CharField(
+        max_length=20,
+        required=False,
+        label="Mobile number",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Mobile number',
+        })
+    )
+
+
 class UserCreateForm(forms.ModelForm):
     """Form for creating users with full profile information"""
     password = forms.CharField(
