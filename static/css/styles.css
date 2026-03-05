@@ -1057,6 +1057,7 @@ body {
     display: flex;
     gap: 0.5rem;
     align-items: flex-start;
+    margin-left: 16px;
 }
 
 .payment-info i {
@@ -2082,4 +2083,11 @@ body {
     margin-top: 25px;
     font-size: 13px;
     color: #888;
+}
+.timeline-box {
+    background: rgba(0, 123, 255, 0.05);
+    border-left: 4px solid #007bff;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 0.9rem;
 }
