@@ -27,16 +27,16 @@
             <li class="nav-item">
                 <a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a>
             </li>
-            <li class="nav-item">
+            <li class="nav-item nav-item-hidden">
                 <a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a>
             </li>
-            <li class="nav-item">
+            <li class="nav-item nav-item-hidden">
                 <a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a>
             </li>
-            <li class="nav-item">
+            <li class="nav-item nav-item-hidden">
                 <a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a>
             </li>
-            <li class="nav-item">
+            <li class="nav-item nav-item-hidden">
                 <a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a>
             </li>
         </ul>
@@ -99,7 +99,7 @@
                 </div>
                 <div class="action-buttons">
                     <button type="button" class="btn btn-primary" onclick="openCreateUpdateModal()">
-                        <i class="fa-solid fa-plus"></i> Create Update
+                        <i class="fa-solid fa-plus"></i> Capture Update
                     </button>
                     <button type="button" class="btn btn-secondary" onclick="openGenerateShiftPacketModal()">
                         <i class="fa-solid fa-file-export"></i> Generate Shift Packet
@@ -153,7 +153,7 @@
 <div id="createUpdateModal" class="modal" style="display: none;">
     <div class="modal-content" style="max-width: 600px;">
         <div class="modal-header">
-            <h3>Create Update - Select Incident</h3>
+            <h3>Capture Update - Select Incident</h3>
             <span class="close" onclick="closeCreateUpdateModal()">&times;</span>
         </div>
         <div class="modal-body">

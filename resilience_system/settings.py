@@ -14,11 +14,15 @@ import pymysql
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --------------------------------------------------
-# LOAD .env (try root level first, then resilience_system folder)
+# LOAD .env
+# Try project root (one level above BASE_DIR), then BASE_DIR, then app folder
 # --------------------------------------------------
-env_path = BASE_DIR / ".env"
+env_path = BASE_DIR.parent / ".env"
+if not env_path.exists():
+    env_path = BASE_DIR / ".env"
 if not env_path.exists():
     env_path = Path(__file__).resolve().parent / ".env"
+
 load_dotenv(env_path)
 
 # --------------------------------------------------
@@ -109,11 +113,12 @@ TEMPLATES = [
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("DB_NAME"),
-        "USER": os.getenv("DB_USER"),
-        "PASSWORD": os.getenv("DB_PASSWORD"),
-        "HOST": os.getenv("DB_HOST"),
-        "PORT": os.getenv("DB_PORT"),
+        "NAME": os.getenv("DB_NAME", ""),
+        "USER": os.getenv("DB_USER", ""),
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),
+        # Django's MySQL backend expects a string for HOST, not None
+        "HOST": os.getenv("DB_HOST", ""),
+        "PORT": os.getenv("DB_PORT", "3306"),
     }
 }
 

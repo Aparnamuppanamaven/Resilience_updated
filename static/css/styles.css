@@ -128,6 +128,17 @@ body {
     color: var(--primary-color);
 }
 
+/* Hidden nav modules (Normalize, Distribute, Decision Log, Coverage) - links remain, only display hidden */
+.sidebar .nav-item.nav-item-hidden,
+.nav-item.nav-item-hidden {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
 .sidebar-footer {
     padding-top: var(--spacing-md);
     border-top: 1px solid var(--border-color);

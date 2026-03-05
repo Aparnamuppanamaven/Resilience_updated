@@ -26,16 +26,16 @@
             <li class="nav-item">
                 <a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a>
             </li>
-            <li class="nav-item">
+            <li class="nav-item nav-item-hidden">
                 <a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a>
             </li>
-            <li class="nav-item">
+            <li class="nav-item nav-item-hidden">
                 <a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a>
             </li>
-            <li class="nav-item">
+            <li class="nav-item nav-item-hidden">
                 <a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a>
             </li>
-            <li class="nav-item">
+            <li class="nav-item nav-item-hidden">
                 <a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a>
             </li>
         </ul>
@@ -152,7 +152,7 @@
                                     border-bottom: 1px solid #e5e7eb;
                                     white-space: nowrap;
                                 ">
-                                    Agency Name
+                                    User Name
                                 </th>
                                 <th style="
                                     padding: 0.625rem 1rem;
@@ -165,7 +165,7 @@
                                     border-bottom: 1px solid #e5e7eb;
                                     white-space: nowrap;
                                 ">
-                                    Primary Liaison
+                                    Agency
                                 </th>
                                 <th style="
                                     padding: 0.625rem 1rem;
@@ -178,7 +178,7 @@
                                     border-bottom: 1px solid #e5e7eb;
                                     white-space: nowrap;
                                 ">
-                                    Role
+                                    Department
                                 </th>
                                 <th style="
                                     padding: 0.625rem 1rem;
@@ -191,7 +191,7 @@
                                     border-bottom: 1px solid #e5e7eb;
                                     white-space: nowrap;
                                 ">
-                                    Email
+                                    Created Date
                                 </th>
                                 <th style="
                                     padding: 0.625rem 1rem;
@@ -204,7 +204,7 @@
                                     border-bottom: 1px solid #e5e7eb;
                                     white-space: nowrap;
                                 ">
-                                    Incident Types
+                                    Phone Number
                                 </th>
                                 <th style="
                                     padding: 0.625rem 1rem;
@@ -217,20 +217,7 @@
                                     border-bottom: 1px solid #e5e7eb;
                                     white-space: nowrap;
                                 ">
-                                    Communication
-                                </th>
-                                <th style="
-                                    padding: 0.625rem 1rem;
-                                    text-align: left;
-                                    font-weight: 600;
-                                    color: #374151;
-                                    font-size: 0.75rem;
-                                    text-transform: uppercase;
-                                    letter-spacing: 0.025em;
-                                    border-bottom: 1px solid #e5e7eb;
-                                    white-space: nowrap;
-                                ">
-                                    Created At
+                                    Email Address
                                 </th>
                             </tr>
                         </thead>
@@ -256,89 +243,22 @@
                                             font-size: 0.75rem;
                                             flex-shrink: 0;
                                         ">
-                                            {{ user.agency_name|first|upper }}
+                                            {{ user.name|default:user.primary_liaison_name|first|upper|default:"?" }}
                                         </div>
                                         <div style="font-weight: 500; color: #111827; font-size: 0.875rem; line-height: 1.25rem;">
-                                            {{ user.agency_name }}
+                                            {{ user.name|default:user.primary_liaison_name|default:"—" }}
                                         </div>
                                     </div>
                                 </td>
                                 <td style="padding: 0.75rem 1rem;">
                                     <div style="font-weight: 500; color: #111827; font-size: 0.875rem; line-height: 1.25rem;">
-                                        {{ user.primary_liaison_name }}
+                                        {{ user.agency_name|default:"—" }}
                                     </div>
-                                </td>
-                                <td style="padding: 0.75rem 1rem;">
-                                    {% if user.role %}
-                                        {% if user.role == 'admin' %}
-                                        <span style="
-                                            padding: 0.25rem 0.5rem;
-                                            border-radius: 999px;
-                                            background: #fee2e2;
-                                            color: #b91c1c;
-                                            font-size: 0.75rem;
-                                            font-weight: 600;
-                                            text-transform: uppercase;
-                                            letter-spacing: 0.05em;
-                                        ">
-                                            {{ user.role|upper }}
-                                        </span>
-                                        {% else %}
-                                        <span style="
-                                            padding: 0.25rem 0.5rem;
-                                            border-radius: 999px;
-                                            background: #e5e7eb;
-                                            color: #374151;
-                                            font-size: 0.75rem;
-                                            font-weight: 600;
-                                            text-transform: uppercase;
-                                            letter-spacing: 0.05em;
-                                        ">
-                                            {{ user.role|upper }}
-                                        </span>
-                                        {% endif %}
-                                    {% else %}
-                                        <span style="color: #9ca3af; font-size: 0.75rem;">—</span>
-                                    {% endif %}
                                 </td>
                                 <td style="padding: 0.75rem 1rem;">
                                     <div style="color: #6b7280; font-size: 0.875rem; line-height: 1.25rem;">
-                                        {{ user.liaison_email }}
+                                        {% if user.department %}{{ user.department }}{% elif user.sub_department %}{{ user.sub_department }}{% else %}—{% endif %}
                                     </div>
-                                </td>
-                                <td style="padding: 0.75rem 1rem;">
-                                    {% if user.key_incident_types %}
-                                        <span style="
-                                            padding: 0.25rem 0.5rem;
-                                            border-radius: 4px;
-                                            background: #dbeafe;
-                                            color: #1e40af;
-                                            font-size: 0.75rem;
-                                            font-weight: 500;
-                                            white-space: nowrap;
-                                        ">
-                                            {{ user.key_incident_types }}
-                                        </span>
-                                    {% else %}
-                                        <span style="color: #9ca3af; font-size: 0.875rem;">—</span>
-                                    {% endif %}
-                                </td>
-                                <td style="padding: 0.75rem 1rem;">
-                                    {% if user.preferred_communication_channels %}
-                                        <span style="
-                                            padding: 0.25rem 0.5rem;
-                                            border-radius: 4px;
-                                            background: #f3e8ff;
-                                            color: #6b21a8;
-                                            font-size: 0.75rem;
-                                            font-weight: 500;
-                                            white-space: nowrap;
-                                        ">
-                                            {{ user.preferred_communication_channels|title }}
-                                        </span>
-                                    {% else %}
-                                        <span style="color: #9ca3af; font-size: 0.875rem;">—</span>
-                                    {% endif %}
                                 </td>
                                 <td style="padding: 0.75rem 1rem;">
                                     {% if user.created_at %}
@@ -349,6 +269,16 @@
                                     {% else %}
                                         <span style="color: #9ca3af; font-size: 0.875rem;">—</span>
                                     {% endif %}
+                                </td>
+                                <td style="padding: 0.75rem 1rem;">
+                                    <div style="color: #6b7280; font-size: 0.875rem; line-height: 1.25rem;">
+                                        {{ user.mobile_no|default:"—" }}
+                                    </div>
+                                </td>
+                                <td style="padding: 0.75rem 1rem;">
+                                    <div style="color: #6b7280; font-size: 0.875rem; line-height: 1.25rem;">
+                                        {{ user.email_id|default:user.liaison_email|default:"—" }}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -535,7 +465,7 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
                 <div class="form-group">
                     <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
-                        Department (Category) <span style="color: #ef4444;">*</span>
+                                    Dept (Category) <span style="color: #ef4444;">*</span>
                     </label>
                     <select name="department" id="department" required style="
                         width: 100%;
@@ -662,14 +592,13 @@
                         </label>
                         <input type="text" name="agency_name" id="agency_name" required 
                                value="{% if logged_in_user_data %}{{ logged_in_user_data.agency_name }}{% endif %}"
-                               disabled style="
+                               {% if logged_in_user_data %}readonly{% endif %} style="
                             width: 100%;
                             padding: 0.75rem;
                             border: 1px solid #dee2e6;
                             border-radius: 6px;
                             font-size: 0.95rem;
-                            background-color: #f8f9fa;
-                            color: #6c757d;
+                            {% if logged_in_user_data %}background-color: #f8f9fa; color: #6c757d;{% else %}background-color: white; color: #212529;{% endif %}
                         " placeholder="Enter agency name">
                     </div>
                     
@@ -679,14 +608,13 @@
                         </label>
                         <input type="text" name="primary_liaison_name" id="primary_liaison_name" required 
                                value="{% if logged_in_user_data %}{{ logged_in_user_data.primary_liaison_name }}{% endif %}"
-                               disabled style="
+                               {% if logged_in_user_data %}readonly{% endif %} style="
                             width: 100%;
                             padding: 0.75rem;
                             border: 1px solid #dee2e6;
                             border-radius: 6px;
                             font-size: 0.95rem;
-                            background-color: #f8f9fa;
-                            color: #6c757d;
+                            {% if logged_in_user_data %}background-color: #f8f9fa; color: #6c757d;{% else %}background-color: white; color: #212529;{% endif %}
                         " placeholder="Enter liaison name">
                     </div>
                 </div>
@@ -698,14 +626,13 @@
                         </label>
                         <input type="email" name="liaison_email" id="liaison_email" required 
                                value="{% if logged_in_user_data %}{{ logged_in_user_data.liaison_email }}{% endif %}"
-                               disabled style="
+                               {% if logged_in_user_data %}readonly{% endif %} style="
                             width: 100%;
                             padding: 0.75rem;
                             border: 1px solid #dee2e6;
                             border-radius: 6px;
                             font-size: 0.95rem;
-                            background-color: #f8f9fa;
-                            color: #6c757d;
+                            {% if logged_in_user_data %}background-color: #f8f9fa; color: #6c757d;{% else %}background-color: white; color: #212529;{% endif %}
                         " placeholder="Enter email address">
                     </div>
                 </div>
@@ -905,37 +832,48 @@ function showCreateUserModal() {
 }
 
 function toggleAgencyInfoEdit() {
-    const agencyFields = ['agency_name', 'primary_liaison_name', 'liaison_email', 'key_incident_types', 'preferred_communication_channels'];
+    const requiredAgencyFields = ['agency_name', 'primary_liaison_name', 'liaison_email'];
+    const optionalAgencyFields = ['key_incident_types', 'preferred_communication_channels'];
     const editBtn = document.getElementById('editAgencyInfoBtn');
     const editIcon = document.getElementById('editAgencyIcon');
     let isEditing = false;
-    
-    // Check if any field is disabled to determine current state
+
     const firstField = document.getElementById('agency_name');
-    if (firstField && firstField.disabled) {
-        isEditing = false; // Currently read-only, switch to edit mode
+    if (firstField && (firstField.readOnly || firstField.disabled)) {
+        isEditing = false;
     } else {
-        isEditing = true; // Currently editable, switch to read-only mode
+        isEditing = true;
     }
-    
-    agencyFields.forEach(function(fieldId) {
+
+    requiredAgencyFields.forEach(function(fieldId) {
         const field = document.getElementById(fieldId);
         if (field) {
             if (isEditing) {
-                // Switch to read-only mode
+                field.readOnly = true;
+                field.style.backgroundColor = '#f8f9fa';
+                field.style.color = '#6c757d';
+            } else {
+                field.readOnly = false;
+                field.style.backgroundColor = 'white';
+                field.style.color = '#212529';
+            }
+        }
+    });
+    optionalAgencyFields.forEach(function(fieldId) {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            if (isEditing) {
                 field.disabled = true;
                 field.style.backgroundColor = '#f8f9fa';
                 field.style.color = '#6c757d';
             } else {
-                // Switch to edit mode
                 field.disabled = false;
                 field.style.backgroundColor = 'white';
                 field.style.color = '#212529';
             }
         }
     });
-    
-    // Update icon
+
     if (editIcon) {
         if (isEditing) {
             editIcon.className = 'fa-solid fa-pencil';
@@ -973,9 +911,18 @@ function closeCreateUserModal() {
     const flexibleEndInput = document.getElementById('flexible_end_datetime');
     if (flexibleStartInput) flexibleStartInput.required = false;
     if (flexibleEndInput) flexibleEndInput.required = false;
-    // Reset agency info fields to read-only
-    const agencyFields = ['agency_name', 'primary_liaison_name', 'liaison_email', 'key_incident_types', 'preferred_communication_channels'];
-    agencyFields.forEach(function(fieldId) {
+    // Reset agency info: after reset, make required fields editable so user can fill them next time
+    const requiredAgencyFields = ['agency_name', 'primary_liaison_name', 'liaison_email'];
+    const optionalAgencyFields = ['key_incident_types', 'preferred_communication_channels'];
+    requiredAgencyFields.forEach(function(fieldId) {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.readOnly = false;
+            field.style.backgroundColor = 'white';
+            field.style.color = '#212529';
+        }
+    });
+    optionalAgencyFields.forEach(function(fieldId) {
         const field = document.getElementById(fieldId);
         if (field) {
             field.disabled = true;
