@@ -2782,7 +2782,12 @@ def incident_detail(request, incident_id):
 
 @csrf_exempt
 def search_users_for_assignment(request):
-    """AJAX endpoint to search users from ExternalUser (users table) for incident assignment"""
+    """AJAX endpoint to search users from UsersTable for incident assignment.
+
+    IMPORTANT:
+    - This now uses the same UsersTable dataset as the Admin → User Management page,
+      so any user created via "Create New User" will be searchable here.
+    """
     if request.method != 'GET':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
@@ -2794,18 +2799,20 @@ def search_users_for_assignment(request):
     if not query:
         return JsonResponse({'users': []})
     
-    # Search ExternalUser table by name or email
-    users = ExternalUser.objects.filter(
-        Q(primary_liaison_name__icontains=query) | Q(liaison_email__icontains=query)
-    )[:20]  # Limit to 20 results
+    # Search UsersTable by name, email, or agency
+    users = UsersTable.objects.filter(
+        Q(primary_liaison_name__icontains=query) |
+        Q(liaison_email__icontains=query) |
+        Q(agency_name__icontains=query)
+    ).order_by('-created_at')[:50]  # Limit to 50 results
     
     results = []
-    for ext_user in users:
+    for user_row in users:
         results.append({
-            'id': ext_user.id,
-            'name': ext_user.primary_liaison_name,
-            'email': ext_user.liaison_email,
-            'agency': ext_user.agency_name,
+            'id': user_row.id,
+            'name': user_row.primary_liaison_name or user_row.name,
+            'email': user_row.liaison_email or user_row.email_id,
+            'agency': user_row.agency_name,
         })
     
     return JsonResponse({'users': results})

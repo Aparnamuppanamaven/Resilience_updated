@@ -15,7 +15,7 @@
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
             <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
             <li class="nav-item active"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents</a></li>
-            <li class="nav-item"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
@@ -49,10 +49,46 @@
         </header>
 
         <div class="view-container">
-            <div style="margin-bottom: 1rem;">
+            <div style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
                 <a href="{% url 'incidents_list' %}" style="color: #6366f1; text-decoration: none;">
                     <i class="fa-solid fa-arrow-left"></i> Back to Incidents List
                 </a>
+                <!-- View toggle: List (current) and Grid (Incident Copy) -->
+                <div style="display: inline-flex; align-items: center; gap: 0.25rem;">
+                    <!-- List view: current page (active) -->
+                    <button type="button" aria-label="List view" title="List view" style="
+                        border: 1px solid #cbd5e1;
+                        background: #e0ecff;
+                        color: #2563eb;
+                        border-radius: 6px;
+                        width: 32px;
+                        height: 32px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: default;
+                        font-size: 0.9rem;
+                    ">
+                        <i class="fa-solid fa-list"></i>
+                    </button>
+                    <!-- Grid view: navigates to Incident Copy with this incident selected -->
+                    <a href="{% url 'incident_copy' %}?incident_id={{ incident.id }}" aria-label="Grid view" title="Grid view" style="
+                        border: 1px solid #cbd5e1;
+                        background: white;
+                        color: #64748b;
+                        border-radius: 6px;
+                        width: 32px;
+                        height: 32px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: pointer;
+                        font-size: 0.9rem;
+                        text-decoration: none;
+                    " onmouseover="this.style.backgroundColor='#f1f5f9'; this.style.color='#2563eb';" onmouseout="this.style.backgroundColor='white'; this.style.color='#64748b';">
+                        <i class="fa-solid fa-border-all"></i>
+                    </a>
+                </div>
             </div>
 
             {% if messages %}
@@ -98,7 +134,7 @@
                     ">
                         <div style="padding: 1.75rem 1.5rem 1.5rem;">
                         <div class="form-group" style="margin-bottom: 1.5rem;">
-                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Update Title</label>
+                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Title</label>
                             <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; border-left: 3px solid #667eea;">
                                 {{ incident.title }}
                             </div>
@@ -389,18 +425,18 @@
                                                         <i class="fa-solid fa-building" style="margin-right: 0.5rem; color: #667eea;"></i>Agency
                                                     </th>
                                                     <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
-                                                        <i class="fa-solid fa-user" style="margin-right: 0.5rem; color: #f5576c;"></i>Name
+                                                        <i class="fa-solid fa-user" style="margin-right: 0.5rem; color: #f5576c;"></i>User Name
                                                     </th>
                                                     <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
-                                                        <i class="fa-solid fa-envelope" style="margin-right: 0.5rem; color: #4facfe;"></i>Email
+                                                        <i class="fa-solid fa-envelope" style="margin-right: 0.5rem; color: #4facfe;"></i>User Email
                                                     </th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {% for user in all_users %}
-                                                <tr class="user-select-row" data-name="{{ user.primary_liaison_name|lower }}" data-department="{{ user.department|default_if_none:''|lower }}" style="border-bottom: 1px solid #f1f3f5; background: white;">
+                                                <tr class="user-select-row" data-name="{{ user.name|default:user.primary_liaison_name|lower }}" data-department="{{ user.department|default_if_none:''|lower }}" style="border-bottom: 1px solid #f1f3f5; background: white;">
                                                     <td style="padding: 0.75rem 1rem; text-align: center;">
-                                                        <input type="checkbox" class="user-checkbox" value="{{ user.id }}" data-user-name="{{ user.primary_liaison_name }}" data-user-email="{{ user.liaison_email }}" {% for liaison in assigned_liaisons %}{% if liaison.user.email|lower == user.liaison_email|lower %}checked{% endif %}{% endfor %}>
+                                                        <input type="checkbox" class="user-checkbox" value="{{ user.id }}" data-user-name="{{ user.name|default:user.primary_liaison_name }}" data-user-email="{{ user.email_id|default:user.liaison_email }}" {% for liaison in assigned_liaisons %}{% if liaison.user.email|lower == user.liaison_email|lower %}checked{% endif %}{% endfor %}>
                                                     </td>
                                                     <td style="padding: 0.75rem 1rem;">
                                                         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -422,10 +458,10 @@
                                                         </div>
                                                     </td>
                                                     <td style="padding: 0.75rem 1rem; font-weight: 500; color: #212529; font-size: 0.9rem;">
-                                                        {{ user.primary_liaison_name }}
+                                                        {{ user.name|default:user.primary_liaison_name }}
                                                     </td>
                                                     <td style="padding: 0.75rem 1rem; color: #6c757d; font-size: 0.875rem;">
-                                                        {{ user.liaison_email }}
+                                                        {{ user.email_id|default:user.liaison_email }}
                                                     </td>
                                                 </tr>
                                                 {% endfor %}

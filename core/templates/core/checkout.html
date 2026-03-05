@@ -27,6 +27,45 @@
         color: var(--primary-color);
         font-weight: 600;
     }
+
+    /* Password strength rules */
+    .password-rules {
+        list-style: none;
+        padding-left: 0;
+        margin-top: 0.5rem;
+        font-size: 0.85rem;
+        /* Hidden by default; shown when user starts typing a password */
+        display: none;
+    }
+
+    .password-rules li {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        margin-bottom: 0.15rem;
+    }
+
+    .password-rules .icon {
+        font-weight: 700;
+        width: 1rem;
+        text-align: center;
+    }
+
+    .password-rules li.invalid {
+        color: #b91c1c;
+    }
+
+    .password-rules li.invalid .icon {
+        color: #b91c1c;
+    }
+
+    .password-rules li.valid {
+        color: #15803d;
+    }
+
+    .password-rules li.valid .icon {
+        color: #15803d;
+    }
 </style>
 {% endblock %}
 
@@ -100,9 +139,23 @@
         <div class="form-group">
             <label class="form-label">{{ form.password.label }}</label>
             {{ form.password }}
-            {% if form.password.help_text %}
-            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">{{ form.password.help_text }}</div>
-            {% endif %}
+            <ul class="password-rules" id="passwordRules">
+                <li id="rule-length" class="invalid">
+                    <span class="icon">✖</span> At least 6 characters
+                </li>
+                <li id="rule-upper" class="invalid">
+                    <span class="icon">✖</span> One uppercase letter
+                </li>
+                <li id="rule-lower" class="invalid">
+                    <span class="icon">✖</span> One lowercase letter
+                </li>
+                <li id="rule-number" class="invalid">
+                    <span class="icon">✖</span> One number
+                </li>
+                <li id="rule-special" class="invalid">
+                    <span class="icon">✖</span> One special character
+                </li>
+            </ul>
             {% if form.password.errors %}
             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">
                 {% for error in form.password.errors %}
@@ -219,8 +272,20 @@
 
         const proceedBtn = document.getElementById('proceed-button');
         let hasSubmitted = false;
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
         const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}$/;
+
+        // Elements for password strength rules
+        const passwordField = getField('password');
+        const confirmField = getField('confirm_password');
+        const passwordRulesContainer = document.getElementById('passwordRules');
+        const passwordRules = {
+            length: document.getElementById('rule-length'),
+            upper: document.getElementById('rule-upper'),
+            lower: document.getElementById('rule-lower'),
+            number: document.getElementById('rule-number'),
+            special: document.getElementById('rule-special'),
+        };
 
         const fieldNames = [
             'agency',
@@ -256,6 +321,54 @@
             }
         }
 
+        function setRuleState(liElement, isValid) {
+            if (!liElement) return;
+            const iconSpan = liElement.querySelector('.icon');
+            if (isValid) {
+                liElement.classList.remove('invalid');
+                liElement.classList.add('valid');
+                if (iconSpan) iconSpan.textContent = '✔';
+            } else {
+                liElement.classList.remove('valid');
+                liElement.classList.add('invalid');
+                if (iconSpan) iconSpan.textContent = '✖';
+            }
+        }
+
+        function updatePasswordRules(value) {
+            if (!passwordRulesContainer) return;
+
+            // If the field is empty, hide the rules and reset them to invalid
+            if (!value) {
+                passwordRulesContainer.style.display = 'none';
+                setRuleState(passwordRules.length, false);
+                setRuleState(passwordRules.upper, false);
+                setRuleState(passwordRules.lower, false);
+                setRuleState(passwordRules.number, false);
+                setRuleState(passwordRules.special, false);
+                return;
+            }
+
+            // Show rules once the user starts typing
+            passwordRulesContainer.style.display = 'block';
+
+            const hasLength = value.length >= 6;
+            const hasUpper = /[A-Z]/.test(value);
+            const hasLower = /[a-z]/.test(value);
+            const hasNumber = /[0-9]/.test(value);
+            const hasSpecial = /[^A-Za-z0-9]/.test(value);
+
+            setRuleState(passwordRules.length, hasLength);
+            setRuleState(passwordRules.upper, hasUpper);
+            setRuleState(passwordRules.lower, hasLower);
+            setRuleState(passwordRules.number, hasNumber);
+            setRuleState(passwordRules.special, hasSpecial);
+
+            // If all rules are satisfied, hide the list again to reduce noise
+            const allValid = hasLength && hasUpper && hasLower && hasNumber && hasSpecial;
+            passwordRulesContainer.style.display = allValid ? 'none' : 'block';
+        }
+
         function validateField(name, showMessage) {
             showMessage = !!showMessage;
             const input = getField(name);
@@ -279,7 +392,7 @@
             if (name === 'liaison_email') {
                 if (!emailRegex.test(value)) {
                     if (showMessage) {
-                        setError(name, 'Please enter a valid email address.');
+                        setError(name, 'Please enter a valid email address');
                     }
                     return false;
                 }
@@ -297,6 +410,7 @@
 
             // Password strength
             if (name === 'password') {
+                updatePasswordRules(value);
                 if (!passwordRegex.test(value)) {
                     if (showMessage) {
                         setError(
@@ -313,7 +427,7 @@
                 const pwd = getField('password').value;
                 if (pwd !== value) {
                     if (showMessage) {
-                        setError(name, 'Passwords do not match.');
+                        setError(name, 'Passwords do not match');
                     }
                     return false;
                 }
@@ -365,12 +479,23 @@
             if (!input) return;
 
             input.addEventListener('input', function () {
-                validateField(name, hasSubmitted);
+                // For email + confirm password, always show messages while typing.
+                const alwaysShow =
+                    name === 'liaison_email' ||
+                    name === 'confirm_password';
+                validateField(name, alwaysShow || hasSubmitted);
+                // Keep confirm password in sync if password changes
+                if (name === 'password') {
+                    validateField('confirm_password', true);
+                }
                 updateButtonState();
             });
 
             input.addEventListener('blur', function () {
-                validateField(name, hasSubmitted);
+                const alwaysShow =
+                    name === 'liaison_email' ||
+                    name === 'confirm_password';
+                validateField(name, alwaysShow || hasSubmitted);
                 updateButtonState();
             });
         });

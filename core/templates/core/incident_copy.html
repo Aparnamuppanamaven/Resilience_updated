@@ -15,7 +15,7 @@
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
             <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
             <li class="nav-item"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents</a></li>
-            <li class="nav-item active"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
+            <li class="nav-item active nav-item-hidden"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
@@ -28,7 +28,7 @@
 
     <main class="main-content" style="background: white; min-height: 100vh;">
         <header class="top-header" style="display: flex; justify-content: space-between; align-items: center; background: white;">
-            <h2 style="color: #111827;">Incident Copy View</h2>
+            <h2 style="color: #111827; margin: 0;">Incident Copy View</h2>
             {% if incident %}
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <!-- Status dropdown button (In-progress) -->
@@ -92,27 +92,66 @@
         </header>
 
         <div class="view-container" style="background: white;">
-            <!-- Incident selector -->
-            <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
-                <label for="incidentSelect" style="font-weight: 600; color: #374151;">Select Incident:</label>
-                <form method="get" style="display: inline-flex; align-items: center; gap: 0.5rem;">
-                    <select id="incidentSelect" name="incident_id" onchange="this.form.submit()" style="
-                        min-width: 260px;
-                        padding: 0.5rem 0.75rem;
+            <div style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+                <a href="{% url 'incidents_list' %}" style="color: #6366f1; text-decoration: none;">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Incidents List
+                </a>
+                <!-- View toggle: List (Incident Details) and Grid (current) -->
+                <div style="display: inline-flex; align-items: center; gap: 0.25rem;">
+                    {% if incident %}
+                    <!-- List view: go to Incident Details for this incident -->
+                    <a href="{% url 'incident_detail' incident.id %}" aria-label="List view" title="List view" style="
+                        border: 1px solid #cbd5e1;
+                        background: white;
+                        color: #64748b;
                         border-radius: 6px;
-                        border: 1px solid #e5e7eb;
+                        width: 32px;
+                        height: 32px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: pointer;
                         font-size: 0.9rem;
-                        background-color: #ffffff;
-                        color: #111827;
+                        text-decoration: none;
+                    " onmouseover="this.style.backgroundColor='#f1f5f9'; this.style.color='#2563eb';" onmouseout="this.style.backgroundColor='white'; this.style.color='#64748b';">
+                        <i class="fa-solid fa-list"></i>
+                    </a>
+                    {% else %}
+                    <!-- If no incident selected, List goes to main incidents list -->
+                    <a href="{% url 'incidents_list' %}" aria-label="List view" title="List view" style="
+                        border: 1px solid #cbd5e1;
+                        background: white;
+                        color: #64748b;
+                        border-radius: 6px;
+                        width: 32px;
+                        height: 32px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: pointer;
+                        font-size: 0.9rem;
+                        text-decoration: none;
+                    " onmouseover="this.style.backgroundColor='#f1f5f9'; this.style.color='#2563eb';" onmouseout="this.style.backgroundColor='white'; this.style.color='#64748b';">
+                        <i class="fa-solid fa-list"></i>
+                    </a>
+                    {% endif %}
+                    <!-- Grid view: current page (active) -->
+                    <button type="button" aria-label="Grid view" title="Grid view" style="
+                        border: 1px solid #cbd5e1;
+                        background: #e0ecff;
+                        color: #2563eb;
+                        border-radius: 6px;
+                        width: 32px;
+                        height: 32px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: default;
+                        font-size: 0.9rem;
                     ">
-                        <option value="">-- Choose an incident --</option>
-                        {% for inc in incidents %}
-                            <option value="{{ inc.id }}" {% if incident and inc.id == incident.id %}selected{% endif %}>
-                                INC-{{ inc.id }} - {{ inc.title }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </form>
+                        <i class="fa-solid fa-border-all"></i>
+                    </button>
+                </div>
             </div>
 
             {% if incident %}
