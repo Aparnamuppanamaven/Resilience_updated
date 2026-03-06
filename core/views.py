@@ -42,6 +42,7 @@ from .models import (
     ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials, UsersTable, Shift, Department,
     Payment, Invoice,
     StripePayment, UserProfile,
+    log_system_action,
 )
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm, ProfileEditForm, LegacyProfileEditForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
@@ -296,6 +297,14 @@ def checkout(request):
                         )
                 except Exception as e:
                     print(f"Error creating UserCredentials record: {e}")
+
+            log_system_action(
+                tenant_id=org.pk,
+                entity='User',
+                actionby=user.id,
+                actionon=username,
+                action='Create',
+            )
 
             # Placeholder subscription
             try:
@@ -1075,6 +1084,20 @@ def capture(request):
                 created_by=liaison if liaison else None,
                 is_synthesized=False,  # Required field, default to False
             )
+            actionby_id = None
+            if liaison:
+                actionby_id = getattr(liaison.user, 'id', None)
+            if actionby_id is None and getattr(request.user, 'id', None) is not None:
+                actionby_id = request.user.id
+            if actionby_id is None and request.session.get('user_credentials_id'):
+                actionby_id = request.session.get('user_credentials_id')
+            log_system_action(
+                tenant_id=getattr(organization, 'tenant_id', None) or (organization.pk if organization else None),
+                entity='Incident',
+                actionby=actionby_id,
+                actionon=f"{incident.id}:{incident.title}",
+                action='Create',
+            )
             messages.success(request, 'Update captured successfully!')
             return redirect('dashboard')
     else:
@@ -1505,7 +1528,14 @@ def register_view(request):
         form = UserSignupForm(request.POST)
         if form.is_valid():
             try:
-                form.save()
+                user = form.save()
+                log_system_action(
+                    tenant_id=getattr(user, 'tenant_id', None),
+                    entity='User',
+                    actionby=user.user_id,
+                    actionon=user.username,
+                    action='Create',
+                )
                 messages.success(request, 'Registration successful! Please login.')
                 return redirect('login')
             except Exception as e:
@@ -1556,6 +1586,14 @@ def login_view(request):
                 request.session['user_credentials_id'] = user_cred.user_id
                 request.session['user_credentials_username'] = user_cred.username
                 
+                log_system_action(
+                    tenant_id=user_cred.tenant_id,
+                    entity='User',
+                    actionby=user_cred.user_id,
+                    actionon=user_cred.username,
+                    action='Login',
+                )
+                
                 # Clear any renewal flags after successful login
                 request.session.pop('is_existing_user', None)
                 request.session.pop('existing_user_email', None)
@@ -1588,6 +1626,20 @@ def login_view(request):
 
                 # Log in the user
                 login(request, user)
+                
+                try:
+                    liaison = user.liaison_profile
+                    org = getattr(liaison, 'organization', None)
+                    tenant_id = org.pk if org else None
+                except (Liaison.DoesNotExist, AttributeError):
+                    tenant_id = None
+                log_system_action(
+                    tenant_id=tenant_id,
+                    entity='User',
+                    actionby=user.id,
+                    actionon=user.username,
+                    action='Login',
+                )
                 
                 # Clear any UserCredentials session if exists
                 request.session.pop('user_credentials_id', None)
@@ -1753,7 +1805,7 @@ def admin_module(request):
                         return redirect('admin_module')
                 
                 # Create new user in users table
-                UsersTable.objects.create(
+                created_user = UsersTable.objects.create(
                     name=name or None,
                     mobile_no=mobile_no or None,
                     email_id=email_id or None,
@@ -1768,6 +1820,18 @@ def admin_module(request):
                     preferred_communication_channels=preferred_communication_channels,
                     created_at=timezone.now(),
                     user_image=user_image_path,
+                )
+                actionby_id = None
+                if getattr(request.user, 'id', None) is not None:
+                    actionby_id = request.user.id
+                elif request.session.get('user_credentials_id'):
+                    actionby_id = request.session.get('user_credentials_id')
+                log_system_action(
+                    tenant_id=getattr(created_user, 'tenant_id', None),
+                    entity='User',
+                    actionby=actionby_id,
+                    actionon=created_user.primary_liaison_name or created_user.liaison_email or str(created_user.id),
+                    action='Create',
                 )
                 if user_image_path:
                     messages.success(request, f'User "{name}" from "{agency_name}" created successfully! Profile picture saved.')
@@ -3076,6 +3140,14 @@ def add_incident_event_log(request, incident_id):
         # Final fallback: if still no tenant_id, try from incident's tenant_id
         if not tenant_id and incident and hasattr(incident, 'tenant_id') and incident.tenant_id:
             tenant_id = incident.tenant_id
+        # Fallback: from incident's organization (same as incident creation logging)
+        if not tenant_id and incident:
+            try:
+                org = getattr(incident, 'organization', None)
+                if org is not None:
+                    tenant_id = getattr(org, 'tenant_id', None) or getattr(org, 'pk', None)
+            except Exception:
+                pass
         
         # Create incident event log
         # Note: IncidentEvent has ForeignKey to Incident, but we're using IncidentCapture
@@ -3090,6 +3162,14 @@ def add_incident_event_log(request, incident_id):
                 [incident.id, log_description, user_id, timezone.now(), tenant_id]
             )
             log_id = cursor.lastrowid
+        
+        log_system_action(
+            tenant_id=tenant_id,
+            entity='SituationUpdate',
+            actionby=user_id,
+            actionon=str(incident.id),
+            action='Create',
+        )
         
         # Fetch the created log entry for response using raw SQL to avoid ForeignKey issues
         # Since user_id is from core_users, not auth_user, we can't use IncidentEvent.user_log
