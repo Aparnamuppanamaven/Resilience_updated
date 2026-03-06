@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Incident Log History — {{ incident_id }}</title>
+<style>
+  /* Dynamic-height single page: fixed width, auto height */
+  @page { size: 8.5in auto; margin: 0.5in; }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #ffffff;
+    color: #1e2a3a;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  /* Header: rounded box, white background, centered title (match first image) */
+  .report-branding {
+    border: 2px solid #6366f1;
+    border-radius: 18px;
+    background: #ffffff;
+    padding: 18px 22px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  .brand-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 180px;
+  }
+  .logo-wrap svg { display: block; width: 34px; height: 34px; }
+  .brand-name {
+    font-size: 18px;
+    font-weight: 800;
+    color: #2563eb;
+    letter-spacing: -0.2px;
+  }
+  .brand-center {
+    flex: 1;
+    text-align: center;
+    padding-top: 2px;
+  }
+  .report-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: #0a1f44;
+    margin: 0;
+    line-height: 1.2;
+  }
+  .brand-right {
+    min-width: 260px;
+    text-align: right;
+  }
+  .platform-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .report-meta {
+    font-size: 10px;
+    color: #94a3b8;
+    white-space: nowrap;
+    margin-top: 3px;
+  }
+
+  /* Incident card: bordered light panel + meta strip with dividers (match first image) */
+  .incident-card {
+    margin: 0 0 18px;
+    padding: 18px 20px;
+    background: #f8fafc;
+    border: 1px solid #6366f1;
+    border-radius: 12px;
+    break-inside: avoid;
+  }
+  .incident-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 28px;
+  }
+  .incident-field { flex: 1; }
+  .incident-field.right { text-align: right; }
+  .incident-field-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .incident-field-value {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0a1f44;
+  }
+  .incident-field-title .incident-field-value {
+    font-size: 18px;
+    color: #0a1f44;
+  }
+  .incident-desc {
+    font-size: 12px;
+    color: #475569;
+    line-height: 1.7;
+    margin-top: 10px;
+  }
+  .incident-card-divider {
+    height: 1px;
+    background: #cbd5e1;
+    margin: 14px 0 12px;
+  }
+  .incident-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+  }
+  .incident-meta-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .incident-meta-group.meta-left { align-items: flex-start; text-align: left; }
+  .incident-meta-group.meta-center { align-items: center; text-align: center; }
+  .incident-meta-group.meta-right { align-items: flex-end; text-align: right; }
+  .incident-meta-divider {
+    width: 2px;
+    height: 42px;
+    background: #cbd5e1;
+    border-radius: 2px;
+  }
+  .incident-meta-value {
+    font-size: 18px;
+    font-weight: 900;
+    color: #0a1f44;
+  }
+  .incident-period-value {
+    font-size: 12px;
+    font-weight: 800;
+    color: #0a1f44;
+    line-height: 1.25;
+  }
+  .incident-period-start, .incident-period-end { display: inline-block; }
+  .incident-period-sep { font-weight: 900; margin: 0 6px; }
+
+  .table-section-label {
+    padding: 16px 0 10px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #0a1f44;
+    text-transform: uppercase;
+  }
+  .table-wrap { padding: 0 0 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead th { padding: 11px 14px; text-align: left; color: #93b4d8; font-weight: 600; font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; background: #0a1f44; }
+  thead th:nth-child(1) { width: 4%; }
+  thead th:nth-child(2) { width: 9%; }
+  thead th:nth-child(3) { width: 18%; }
+  tbody tr:nth-of-type(even) { background: #f8fafc; }
+  tbody tr:nth-of-type(odd) { background: #fff; }
+  tbody td { padding: 12px 14px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  .log-num { color: #9ca3af; font-size: 11px; font-family: monospace; }
+  .log-ts { font-weight: 700; color: #0a1f44; white-space: nowrap; font-size: 12px; }
+  .dept-badge { display: inline-block; padding: 3px 9px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+  .log-desc { color: #1e2a3a; line-height: 1.65; margin-bottom: 8px; }
+  .log-author { font-size: 10.5px; font-weight: 600; color: #94a3b8; font-style: italic; text-align: right; }
+  .status-badge { padding: 3px 9px; border-radius: 10px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+  .status-DETECTED { background: #7f1d1d; color: #fca5a5; }
+  .status-ESCALATED { background: #78350f; color: #fcd34d; }
+  .status-IN_PROGRESS { background: #78350f; color: #fcd34d; }
+  .status-LOGGED { background: #1e3a5f; color: #93c5fd; }
+  .status-COMPLETE { background: #064e3b; color: #6ee7b7; }
+  .status-NOTIFIED { background: #1e3a5f; color: #93c5fd; }
+  .status-CONTAINED { background: #064e3b; color: #6ee7b7; }
+  .status-CLOSED { background: #1e3a5f; color: #93c5fd; }
+  .status-CRITICAL { background: #7f1d1d; color: #fca5a5; }
+  .status-HIGH { background: #78350f; color: #fcd34d; }
+  .status-MEDIUM { background: #1e3a5f; color: #93c5fd; }
+  .status-LOW { background: #64748b; color: #e2e8f0; }
+
+  .footer {
+    padding: 4px 0;
+    background: #0a1f44;
+    border-top: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-txt { font-size: 10px; color: #e5edff; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="report-branding">
+    <div class="brand-left">
+      <div class="logo-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" role="img" aria-label="Resilience">
+          <!-- Outer shield with blue stroke and white fill -->
+          <path
+            d="M12 2L4 5v6c0 4.97 3.04 9.16 7.76 10.99.15.06.33.06.48 0C16.96 20.16 20 15.97 20 11V5l-8-3z"
+            fill="#ffffff"
+            stroke="#2563eb"
+            stroke-width="1.4"
+            stroke-linejoin="round"
+          />
+          <!-- Right half filled in blue -->
+          <path
+            d="M12 3.3v16.9c3.17-1.6 5.6-4.84 5.6-8.62V5.76L12 3.3z"
+            fill="#2563eb"
+            transform="scale(-1,1) translate(-24,0)"
+          />
+        </svg>
+      </div>
+      <div class="brand-name">Resilience</div>
+    </div>
+    <div class="brand-center"></div>
+    <div class="brand-right">
+      <div class="platform-label">EMERGENCY &amp; INCIDENT MANAGEMENT PLATFORM</div>
+      <div class="report-title">Incident Log History</div>
+      <div class="report-meta">Report Generated: {{ report_generated_at }}</div>
+    </div>
+  </div>
+
+  <div class="incident-card">
+    <div class="incident-card-header">
+      <div class="incident-field">
+        <div class="incident-field-label">Incident ID</div>
+        <div class="incident-field-value">{{ incident_id }}</div>
+      </div>
+      <div class="incident-field incident-field-title right">
+        <div class="incident-field-label">Incident Title</div>
+        <div class="incident-field-value">{{ incident_title }}</div>
+      </div>
+    </div>
+    {% if incident_description %}
+    <div class="incident-desc">{{ incident_description }}</div>
+    {% endif %}
+    <div class="incident-card-divider"></div>
+    <div class="incident-meta-row">
+      <div class="incident-meta-group meta-left">
+        <div class="incident-field-label">Total Entries</div>
+        <div class="incident-meta-value">{{ total_logs }}</div>
+      </div>
+      <div class="incident-meta-divider"></div>
+      <div class="incident-meta-group meta-center">
+        <div class="incident-field-label">Period</div>
+        <div class="incident-period-value">
+          <span class="incident-period-start">{{ period_start|slice:":12" }}<br>{{ period_start|slice:"13:" }}</span>
+          <span class="incident-period-sep">&mdash;</span>
+          <span class="incident-period-end">{{ period_end|slice:":12" }}<br>{{ period_end|slice:"13:" }} hrs</span>
+        </div>
+      </div>
+      <div class="incident-meta-divider"></div>
+      <div class="incident-meta-group meta-right">
+        <div class="incident-field-label">Severity</div>
+        <div class="incident-field-value">
+          <span class="status-badge status-{{ severity_css }}">{{ severity_display }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-section-label">Incident events</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Timestamp</th>
+          <th>Department</th>
+          <th>Action / Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td class="log-num">{{ forloop.counter|stringformat:"03d" }}</td>
+          <td class="log-ts">{{ log.timestamp|safe }}</td>
+          <td><span class="dept-badge" style="background:{{ log.dept_bg }};color:{{ log.dept_color }};">{{ log.department }}</span></td>
+          <td>
+            <div class="log-desc">{{ log.description }}</div>
+            {% if log.author %}<div class="log-author">&mdash; {{ log.author }}</div>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" style="padding:1rem;color:#6b7280;text-align:center;">No incident events yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <div class="footer-txt">{{ incident_id }} | Log History Report</div>
+    <div class="footer-txt">{{ organization_name }} EIMP | {{ report_generated_at }}</div>
+  </div>
+</div>
+</body>
+</html>
