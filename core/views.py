@@ -42,6 +42,7 @@ from .models import (
     ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials, UsersTable, Shift, Department,
     Payment, Invoice,
     StripePayment, UserProfile,
+    TenantDomain,
 )
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm, ProfileEditForm, LegacyProfileEditForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
@@ -207,7 +208,6 @@ def checkout(request):
         form = CheckoutForm(request.POST)
         if form.is_valid():
             liaison_email = form.cleaned_data['liaison_email']
-
             # Check if user already exists
             user_check = detect_existing_user(liaison_email)
 
@@ -225,9 +225,24 @@ def checkout(request):
                     'existing_email': liaison_email
                 })
 
+            # ---------------- TENANT / ORGANIZATION DUPLICATE CHECK ----------------
+            # In a multi-tenant setup, avoid creating multiple tenants for the same organization/domain.
+            agency = form.cleaned_data.get('agency', '').strip()
+            liaison_name = form.cleaned_data.get('liaison_name', '').strip()
+            if agency:
+                # Treat TenantDomain as the canonical tenant table.
+                if TenantDomain.objects.filter(org_name__iexact=agency).exists():
+                    form.add_error(
+                        'agency',
+                        'An account for this organization already exists. Please sign in or contact support.'
+                    )
+                    return render(request, 'core/checkout.html', {
+                        'form': form,
+                        'show_login_button': False,
+                    })
+
             # ---------------- NEW USER FLOW ----------------
-            liaison_name = form.cleaned_data.get('liaison_name', '')
-            agency = form.cleaned_data.get('agency', '')
+            # liaison_name and agency already normalized above
             password = form.cleaned_data.get('password', 'resilience2024!')
             channels = form.cleaned_data.get('channels')
             incidents = form.cleaned_data.get('incidents')
@@ -241,102 +256,136 @@ def checkout(request):
                 n += 1
                 username = f"{liaison_email.strip()}{n}"
 
-            with transaction.atomic():
-                org = Organization.objects.create(
-                    name=agency,
-                    license_type='foundation',
-                    foundation_purchase_date=timezone.now()
-                )
+            try:
+                with transaction.atomic():
+                    # 1) Create organization record (acts as internal tenant owner)
+                    org = Organization.objects.create(
+                        name=agency,
+                        license_type='foundation',
+                        foundation_purchase_date=timezone.now()
+                    )
+                    tenant_id = org.tenant_id
 
-                user = User.objects.create(
-                    username=username,
-                    email=liaison_email,
-                    first_name=liaison_name.split()[0] if liaison_name.split() else '',
-                    last_name=' '.join(liaison_name.split()[1:]) if len(liaison_name.split()) > 1 else '',
-                )
-                user.set_password(password)
-                user.save()
+                    # 2) Ensure a matching row exists in tenant_domains so legacy tables
+                    #    (core_users, core_incident_events, etc.) can safely reference tenant_id
+                    if not TenantDomain.objects.filter(tenant_id=tenant_id).exists():
+                        TenantDomain.objects.create(
+                            tenant_id=tenant_id,
+                            org_name=agency,
+                            department=dept or '',
+                            location='',
+                            contact_person=liaison_name or '',
+                            mobile='',
+                            is_active=True,
+                            created_at=timezone.now(),
+                        )
 
-                Liaison.objects.update_or_create(
-                    user=user,
-                    defaults={
-                        'organization': org,
-                        'preferred_channels': channels,
-                        'incident_types': incidents,
-                        'role': role,
-                        'dept': dept,
-                        'countee': countee,
-                    }
-                )
+                    user = User.objects.create(
+                        username=username,
+                        email=liaison_email,
+                        first_name=liaison_name.split()[0] if liaison_name.split() else '',
+                        last_name=' '.join(liaison_name.split()[1:]) if len(liaison_name.split()) > 1 else '',
+                    )
+                    user.set_password(password)
+                    user.save()
 
-                SystemSettings.objects.get_or_create(
-                    organization=org,
-                    defaults={'cadence_hours': 24}
-                )
+                    Liaison.objects.update_or_create(
+                        user=user,
+                        defaults={
+                            'organization': org,
+                            'tenant_id': tenant_id,
+                            'preferred_channels': channels,
+                            'incident_types': incidents,
+                            'role': role,
+                            'dept': dept,
+                            'countee': countee,
+                        }
+                    )
 
-                try:
+                    settings_obj, _ = SystemSettings.objects.get_or_create(
+                        organization=org,
+                        defaults={
+                            'cadence_hours': 24,
+                            'tenant_id': tenant_id,
+                        }
+                    )
+
+                    # If settings existed without tenant_id, backfill it.
+                    if settings_obj.tenant_id is None:
+                        settings_obj.tenant_id = tenant_id
+                        settings_obj.save(update_fields=['tenant_id'])
+
                     ExternalUser.objects.create(
                         agency_name=agency,
                         primary_liaison_name=liaison_name,
                         liaison_email=liaison_email,
                         key_incident_types=incidents,
                         preferred_communication_channels=channels,
-                        created_at=timezone.now()
+                        created_at=timezone.now(),
+                        tenant_id=tenant_id,
                     )
-                except Exception as e:
-                    print(f"Error creating legacy user: {e}")
 
-                # Also create legacy UserCredentials entry so this account can log in via username/password.
-                try:
+                    # Also create legacy UserCredentials entry so this account can log in via username/password.
                     legacy_username = (liaison_email or '').strip()
                     if legacy_username and not UserCredentials.objects.filter(username=legacy_username).exists():
                         UserCredentials.objects.create(
                             username=legacy_username,
                             password_hash=password,
+                            tenant_id=tenant_id,
                         )
+
+                # Placeholder subscription (non-critical; failures are logged but don't break registration)
+                try:
+                    placeholder_payment = ExternalPayment.objects.create(
+                        username=username,
+                        payment_status='Pending',
+                        payment_method='N/A',
+                        amount=0,
+                        payment_time=timezone.now(),
+                    )
+                    ExternalSubscription.objects.create(
+                        username=username,
+                        payment=placeholder_payment,
+                        subscription_type='Foundation',
+                        duration=0,
+                        subscription_start_date=timezone.now().date(),
+                        subscription_end_date=timezone.now().date(),
+                        subscription_status='Inactive',
+                        created_at=timezone.now(),
+                    )
                 except Exception as e:
-                    print(f"Error creating UserCredentials record: {e}")
+                    print(f"Error creating placeholder subscription: {e}")
 
-            # Placeholder subscription
-            try:
-                placeholder_payment = ExternalPayment.objects.create(
-                    username=username,
-                    payment_status='Pending',
-                    payment_method='N/A',
-                    amount=0,
-                    payment_time=timezone.now()
-                )
-                ExternalSubscription.objects.create(
-                    username=username,
-                    payment=placeholder_payment,
-                    subscription_type='Foundation',
-                    duration=0,
-                    subscription_start_date=timezone.now().date(),
-                    subscription_end_date=timezone.now().date(),
-                    subscription_status='Inactive',
-                    created_at=timezone.now()
-                )
+                # Send notification email (NEW FEATURE)
+                try:
+                    success, message = send_new_user_notification_email(
+                        liaison_email=liaison_email,
+                        liaison_name=liaison_name,
+                        agency_name=agency
+                    )
+                    if not success:
+                        print(f"Notification email failed: {message}")
+                except Exception as e:
+                    print(f"Exception while sending notification email: {e}")
+
+                request.session['checkout_data'] = form.cleaned_data
+                request.session['is_existing_user'] = False
+                request.session['checkout_user_id'] = user.id
+                request.session.pop('existing_user_email', None)
+
+                return redirect('payment')
+
             except Exception as e:
-                print(f"Error creating placeholder subscription: {e}")
-
-            # Send notification email (NEW FEATURE)
-            try:
-                success, message = send_new_user_notification_email(
-                    liaison_email=liaison_email,
-                    liaison_name=liaison_name,
-                    agency_name=agency
+                # Any error in the registration flow should keep the user on the registration page
+                print(f"Error during checkout registration flow: {e}")
+                messages.error(
+                    request,
+                    'There was a problem completing your registration. Please review your details and try again, or contact support.'
                 )
-                if not success:
-                    print(f"Notification email failed: {message}")
-            except Exception as e:
-                print(f"Exception while sending notification email: {e}")
-
-            request.session['checkout_data'] = form.cleaned_data
-            request.session['is_existing_user'] = False
-            request.session['checkout_user_id'] = user.id
-            request.session.pop('existing_user_email', None)
-
-            return redirect('payment')
+                return render(request, 'core/checkout.html', {
+                    'form': form,
+                    'show_login_button': False,
+                })
 
     else:
         form = CheckoutForm()
@@ -463,20 +512,21 @@ def payment(request):
                             [new_end_date, existing_subscription.subscription_id]
                         )
                 
-                # Create ExternalPayment record
+                # Create ExternalPayment record (renewal) with tenant context
                 try:
                     payment_method_legacy = {
                         'INVOICE': 'Invoice',
                         'ACH': 'ACH',
                         'CARD': 'Credit Card'
                     }.get(payment_method, 'Credit Card')
-
+                    tenant_id = getattr(existing_org, 'tenant_id', None) if existing_org else None
                     ExternalPayment.objects.create(
                         username=existing_user.username,
                         payment_status='Completed',
                         payment_method=payment_method_legacy,
                         amount=amount,
-                        payment_time=timezone.now()
+                        payment_time=timezone.now(),
+                        tenant_id=tenant_id,
                     )
                 except Exception as e:
                     print(f"Error creating legacy payment: {e}")
@@ -500,6 +550,7 @@ def payment(request):
                     return redirect('checkout')
                 liaison = user.liaison_profile
                 org = liaison.organization
+                tenant_id = getattr(org, 'tenant_id', None)
                 username = user.username
 
                 payment_status = 'INVOICED' if payment_method == 'INVOICE' else ('PROCESSING' if payment_method == 'ACH' else 'PAID')
@@ -512,7 +563,8 @@ def payment(request):
                     payment_method=payment_method,
                     status=payment_status,
                     invoice_id=invoice_id,
-                    organization=org
+                    organization=org,
+                    tenant_id=tenant_id,
                 )
                 if payment_method == 'INVOICE':
                     Invoice.objects.create(
@@ -538,7 +590,8 @@ def payment(request):
                         payment_status='Completed',
                         payment_method=payment_method_legacy,
                         amount=amount,
-                        payment_time=timezone.now()
+                        payment_time=timezone.now(),
+                        tenant_id=tenant_id,
                     )
                     # Activate existing Inactive subscription from checkout, or create new
                     inactive_sub = ExternalSubscription.objects.filter(
@@ -561,7 +614,8 @@ def payment(request):
                             subscription_start_date=timezone.now().date(),
                             subscription_end_date=timezone.now().date() + timedelta(days=365),
                             subscription_status='Active',
-                            created_at=timezone.now()
+                            created_at=timezone.now(),
+                            tenant_id=tenant_id,
                         )
                 except Exception as e:
                     print(f"Error populating legacy tables: {e}") 
@@ -797,6 +851,15 @@ def dashboard(request):
         # show all incidents (no org filter) so previously captured data is visible.
         all_incidents = IncidentCapture.objects.all().order_by('-created_at')
     
+    # Users count (from core_users table)
+    try:
+        if organization and getattr(organization, "tenant_id", None) is not None:
+            users_count = UsersTable.objects.filter(tenant_id=organization.tenant_id).count()
+        else:
+            users_count = UsersTable.objects.count()
+    except Exception:
+        users_count = 0
+    
     context = {
         'organization': organization,
         'settings': settings_obj,
@@ -808,6 +871,7 @@ def dashboard(request):
         ).count(),
         'is_admin': True,  # Always show admin link - access controlled by view decorator
         'all_incidents': all_incidents,  # Add incidents for dropdown
+        'users_count': users_count,
     }
     
     return render(request, 'core/dashboard.html', context)
@@ -1063,6 +1127,7 @@ def capture(request):
             if form.cleaned_data.get('end_time'):
                 end_time = form.cleaned_data['end_time']
             
+            tenant_id = getattr(organization, 'tenant_id', None)
             incident = IncidentCapture.objects.create(
                 organization=organization,
                 title=form.cleaned_data['title'],
@@ -1074,6 +1139,7 @@ def capture(request):
                 created_at=timezone.now(),  # Set Created_at explicitly
                 created_by=liaison if liaison else None,
                 is_synthesized=False,  # Required field, default to False
+                tenant_id=tenant_id,
             )
             messages.success(request, 'Update captured successfully!')
             return redirect('dashboard')
@@ -2090,16 +2156,18 @@ def stripe_webhook(request):
                                 [new_end_date, existing_subscription.subscription_id]
                             )
                         
-                        # Create Payment record linked to existing organization
+                        # Create Payment record linked to existing organization and tenant
                         try:
                             liaison = user.liaison_profile
                             org = liaison.organization
+                            tenant_id = getattr(org, 'tenant_id', None)
                             
                             Payment.objects.create(
                                 amount=stripe_payment.amount / 100.0,  # Convert cents to dollars
                                 payment_method='CARD',
                                 status='PAID',
-                                organization=org
+                                organization=org,
+                                tenant_id=tenant_id,
                             )
                             
                             # Create ExternalPayment
@@ -2108,7 +2176,8 @@ def stripe_webhook(request):
                                 payment_status='Completed',
                                 payment_method='Credit Card',
                                 amount=stripe_payment.amount / 100.0,
-                                payment_time=timezone.now()
+                                payment_time=timezone.now(),
+                                tenant_id=tenant_id,
                             )
                         except Exception as e:
                             import logging
@@ -2119,19 +2188,22 @@ def stripe_webhook(request):
                         try:
                             liaison = user.liaison_profile
                             org = liaison.organization
+                            tenant_id = getattr(org, 'tenant_id', None)
                             
                             Payment.objects.create(
                                 amount=stripe_payment.amount / 100.0,
                                 payment_method='CARD',
                                 status='PAID',
-                                organization=org
+                                organization=org,
+                                tenant_id=tenant_id,
                             )
                             ext_payment = ExternalPayment.objects.create(
                                 username=username,
                                 payment_status='Completed',
                                 payment_method='Credit Card',
                                 amount=stripe_payment.amount / 100.0,
-                                payment_time=timezone.now()
+                                payment_time=timezone.now(),
+                                tenant_id=tenant_id,
                             )
                             inactive_sub = ExternalSubscription.objects.filter(
                                 username=username,
@@ -2153,7 +2225,8 @@ def stripe_webhook(request):
                                     subscription_start_date=timezone.now().date(),
                                     subscription_end_date=timezone.now().date() + timedelta(days=365),
                                     subscription_status='Active',
-                                    created_at=timezone.now()
+                                    created_at=timezone.now(),
+                                    tenant_id=tenant_id,
                                 )
                         except Exception as e:
                             import logging
@@ -2940,6 +3013,13 @@ def assign_users_to_incident(request, incident_id):
             except Exception:
                 pass  # Table might not exist yet
         
+        # Resolve tenant_id for assignments (from incident or organization)
+        tenant_id = None
+        if hasattr(incident, 'tenant_id') and incident.tenant_id:
+            tenant_id = incident.tenant_id
+        elif organization and hasattr(organization, 'tenant_id'):
+            tenant_id = organization.tenant_id
+        
         # Insert new active assignments (create new row each time for history)
         assignment_errors = []
         for liaison in assigned_liaisons:
@@ -2948,10 +3028,10 @@ def assign_users_to_incident(request, incident_id):
                     cursor.execute(
                         """
                         INSERT INTO core_incident_user_mapping 
-                        (user_id, incident_id, mapped_user_id, is_active, created_at) 
-                        VALUES (%s, %s, %s, 1, NOW())
+                        (user_id, incident_id, mapped_user_id, is_active, created_at, tenant_id) 
+                        VALUES (%s, %s, %s, 1, NOW(), %s)
                         """,
-                        [liaison.id, incident.id, mapped_user_id]
+                        [liaison.id, incident.id, mapped_user_id, tenant_id]
                     )
             except Exception as e:
                 assignment_errors.append(f'Error assigning {liaison.user.email}: {str(e)}')

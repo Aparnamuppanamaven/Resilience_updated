@@ -19,10 +19,10 @@
                 <a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
             </li>
             <li class="nav-item">
-                <a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a>
+                <a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Incidents</a>
             </li>
             <li class="nav-item">
-                <a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents</a>
+                <a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents List</a>
             </li>
             <li class="nav-item nav-item-hidden">
                 <a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a>
@@ -51,9 +51,9 @@
         <header class="top-header" style="display: flex; align-items: center; justify-content: space-between;">
             <h2 id="page-title">Dashboard</h2>
             <div style="display: flex; align-items: center; gap: 1rem;">
-            <div class="header-status">
-                <span class="status-label">Current Status:</span>
-                <span class="status-badge status-{{ settings.current_status|lower|slugify }}">{{ settings.current_status }}</span>
+                <div class="header-status">
+                    <span class="status-label">Current Status:</span>
+                    <span class="status-badge status-{{ settings.current_status|lower|slugify }}">{{ settings.current_status }}</span>
                 </div>
                 <button type="button" onclick="confirmLogout()" style="
                     display: flex;
@@ -78,143 +78,158 @@
             </div>
         </header>
 
-        <!-- Dynamic View Container -->
-        <div id="view-container" class="view-container">
-            <div class="dashboard-grid">
-                <div class="card stat-card">
-                    <div class="stat-label">Current Status</div>
-                    <div class="stat-value stat-value-large">{{ settings.current_status }}</div>
-                    <div class="stat-sublabel">{% if settings.current_phase == 0 %}Standard Operations{% else %}Escalation Protocol{% endif %} Active</div>
+        <!-- Scrollable area: Incidents + Recent Activity -->
+        <div class="dashboard-scroll-area">
+        <!-- Open Incidents card -->
+        <div class="view-container view-container-open-incidents">
+            <div class="card" style="
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+                border: 1px solid #e5e7eb;
+                display: flex;
+                flex-direction: column;
+                min-height: auto;
+                height: max-content;
+            ">
+                <div class="card-header" style="
+                    padding: 0.9rem 1.5rem;
+                    border-bottom: 1px solid #e5e7eb;
+                ">
+                    <h3 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; color: #111827;">
+                        Incidents
+                    </h3>
                 </div>
-                <div class="card stat-card">
-                    <div class="stat-label">Next Shift Packet Due</div>
-                    <div class="stat-value stat-value-large">{{ time_remaining|floatformat:0 }}h</div>
-                    <div class="stat-sublabel">Cadence: Every {{ settings.cadence_hours }}h</div>
-                </div>
-            </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Quick Actions</h3>
-                </div>
-                <div class="action-buttons">
-                    <button type="button" class="btn btn-primary" onclick="openCreateUpdateModal()">
-                        <i class="fa-solid fa-plus"></i> Capture Update
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="openGenerateShiftPacketModal()">
-                        <i class="fa-solid fa-file-export"></i> Generate Shift Packet
-                    </button>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Audit Pack (Export Ready)</h3>
-                </div>
-                <div class="action-buttons">
-                    <button type="button" class="btn btn-primary" onclick="openDecisionPacketModal()">
-                        <i class="fa-solid fa-file-pdf"></i> Generate Decision Packet PDF
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="openCaseHistoryModal()">
-                        <i class="fa-solid fa-download"></i> Generate Case History Export (CSV)
-                    </button>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Recent Activity</h3>
-                </div>
-                <div class="activity-list">
-                    {% for update in recent_updates %}
-                        <div class="activity-item">
-                            <div class="activity-time">{{ update.timestamp|date:"g:i A" }}</div>
-                            <div class="activity-content">
-                                <div class="activity-title">{{ update.title }}</div>
-                                <div class="activity-description">{{ update.description|truncatewords:15 }}</div>
-                            </div>
-                        </div>
-                    {% empty %}
-                        <div class="activity-item">
-                            <div class="activity-time">{{ "now"|date:"g:i A" }}</div>
-                            <div class="activity-content">
-                                <div class="activity-title">Routine System Check</div>
-                                <div class="activity-description">All communication channels operational. No anomalies detected.</div>
-                            </div>
-                        </div>
-                    {% endfor %}
+                <div class="card-body open-incidents-card-body" style="
+                    padding: 0;
+                    flex: 0 0 auto;
+                    padding-bottom: 1.25rem;
+                ">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
+                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #6b7280; width: 3rem; min-width: 1rem;">SNO</th>
+                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #6b7280;">Incident</th>
+                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #6b7280;">Status</th>
+                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #6b7280;">Location</th>
+                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #6b7280;">Severity</th>
+                                <th style="padding: 0.6rem 1rem; text-align: center; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: #6b7280; background: #f9fafb;">Shift Packet,Logs</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for incident in all_incidents %}
+                            <tr style="border-bottom: 1px solid #e5e7eb;">
+                                <td style="padding: 0.9rem 1rem;">{{ forloop.counter }}</td>
+                                <td style="padding: 0.9rem 1rem;">
+                                    <a href="{% url 'incident_detail' incident.id %}" style="color: #2563eb; text-decoration: none;">
+                                        {{ incident.title }}
+                                    </a>
+                                </td>
+                                <td style="padding: 0.9rem 1rem;">Open</td>
+                                <td style="padding: 0.9rem 1rem;">—</td>
+                                <td style="padding: 0.9rem 1rem;">
+                                    {{ incident.get_severity_display|default:incident.severity }}
+                                </td>
+                                <td style="padding: 0.6rem 1rem; text-align: center; vertical-align: middle;">
+                                    <div class="open-incidents-actions">
+                                        <button type="button" class="btn-action-update" data-incident-id="{{ incident.id }}" data-incident-title="{{ incident.title }}" title="Update Incident">Update Incident</button>
+                                        <a href="/incidents/{{ incident.id }}/generate-shift-packet/" target="_blank" class="btn-action-icon btn-action-pdf" title="Generate Shift Packet (PDF)"><i class="fa-solid fa-file-pdf"></i></a>
+                                        <a href="/incidents/{{ incident.id }}/case-history.csv" class="btn-action-icon btn-action-excel" title="Generate Case History (CSV)" download><i class="fa-solid fa-file-excel"></i></a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" style="padding: 0.9rem 1rem; color: #6b7280;">
+                                    No incidents captured yet.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
+
+        </div>
+        <!-- end dashboard-scroll-area -->
     </main>
 </div>
 
-<!-- Create Update Modal -->
+<!-- Capture Update Modal (incident selected from dashboard table; only event form shown) -->
 <div id="createUpdateModal" class="modal" style="display: none;">
     <div class="modal-content" style="max-width: 600px;">
         <div class="modal-header">
-            <h3>Capture Update - Select Incident</h3>
+            <h3>Capture Update</h3>
             <span class="close" onclick="closeCreateUpdateModal()">&times;</span>
         </div>
         <div class="modal-body">
-            <div style="margin-bottom: 1rem;">
-                <input type="text" id="incidentSearch" placeholder="Search incidents..." 
-                       style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem;"
-                       onkeyup="filterIncidents()">
+            <!-- Hidden: incident select kept for submit; selection comes from dashboard table -->
+            <input type="hidden" id="captureUpdateIncidentId" value="">
+            <div id="captureUpdateSelectArea" style="display: none;">
+                <div style="margin-bottom: 1rem;">
+                    <input type="text" id="incidentSearch" placeholder="Search incidents..." 
+                           style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem;"
+                           onkeyup="filterIncidents()">
+                </div>
+                <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 1rem;">
+                    <select id="incidentSelect" size="8" style="width: 100%; padding: 0.5rem; border: none; font-size: 0.95rem;" onchange="showIncidentEventForm()">
+                        <option value="">-- Select an incident --</option>
+                        {% for incident in all_incidents %}
+                            <option value="{{ incident.id }}" data-title="{{ incident.title|lower }}" data-description="{{ incident.description|lower|default:'' }}">
+                                {{ incident.title }} - {{ incident.created_at|date:"M d, Y H:i" }}
+                            </option>
+                        {% empty %}
+                            <option disabled>No incidents available</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 1rem;">
-                <select id="incidentSelect" size="8" style="width: 100%; padding: 0.5rem; border: none; font-size: 0.95rem;"
-                        onchange="showIncidentEventForm()">
-                    <option value="">-- Select an incident --</option>
-                    {% for incident in all_incidents %}
-                        <option value="{{ incident.id }}" data-title="{{ incident.title|lower }}" data-description="{{ incident.description|lower|default:'' }}">
-                            {{ incident.title }} - {{ incident.created_at|date:"M d, Y H:i" }}
-                        </option>
-                    {% empty %}
-                        <option disabled>No incidents available</option>
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <!-- Incident Event Form (shown when incident is selected) -->
-            <div id="incidentEventFormContainer" style="display: none; margin-top: 1.5rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #4facfe;">
-                <h4 style="margin: 0 0 1rem 0; color: #212529; font-size: 1rem; font-weight: 600;">
-                    <i class="fa-solid fa-pen" style="margin-right: 0.5rem; color: #4facfe;"></i>Incident Event
-                </h4>
-                <form id="incidentEventForm" onsubmit="submitIncidentEventFromModal(event)" style="display: flex; gap: 0.75rem; align-items: flex-start;">
-                    {% csrf_token %}
-                    <textarea 
-                        id="logDescription" 
-                        name="log_description" 
-                        placeholder="Enter incident event log description..." 
-                        required
-                        style="
-                            flex: 1;
-                            padding: 0.75rem;
-                            border: 2px solid #e2e8f0;
+            <!-- Shown: incident from table + event form -->
+            <div id="captureUpdateFormArea">
+                <div id="captureUpdateIncidentLabel" style="margin-bottom: 1rem; font-size: 0.95rem; color: #374151;">
+                    <strong>Incident:</strong> <span id="captureUpdateIncidentName"></span>
+                </div>
+                <div id="incidentEventFormContainer" style="padding: 1rem 0;">
+                    <h4 style="margin: 0 0 1rem 0; color: #212529; font-size: 1rem; font-weight: 600;">
+                        <i class="fa-solid fa-pen" style="margin-right: 0.5rem; color: #4facfe;"></i>Incident Event
+                    </h4>
+                    <form id="incidentEventForm" onsubmit="submitIncidentEventFromModal(event)" style="display: flex; gap: 0.75rem; align-items: flex-start;">
+                        {% csrf_token %}
+                        <textarea 
+                            id="logDescription" 
+                            name="log_description" 
+                            placeholder="Enter incident event log description..." 
+                            required
+                            style="
+                                flex: 1;
+                                padding: 0.75rem;
+                                border: 2px solid #e2e8f0;
+                                border-radius: 8px;
+                                font-size: 0.9rem;
+                                font-family: inherit;
+                                resize: vertical;
+                                min-height: 80px;
+                            "></textarea>
+                        <button type="submit" class="btn btn-primary" style="
+                            padding: 0.75rem 1.5rem;
+                            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                            color: white;
+                            border: none;
                             border-radius: 8px;
+                            font-weight: 600;
                             font-size: 0.9rem;
-                            font-family: inherit;
-                            resize: vertical;
-                            min-height: 80px;
-                        "></textarea>
-                    <button type="submit" class="btn btn-primary" style="
-                        padding: 0.75rem 1.5rem;
-                        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        font-weight: 600;
-                        font-size: 0.9rem;
-                        cursor: pointer;
-                        white-space: nowrap;
-                        display: flex;
-                        align-items: center;
-                        gap: 0.5rem;
-                    ">
-                        <i class="fa-solid fa-paper-plane"></i> Submit
-                    </button>
-                </form>
+                            cursor: pointer;
+                            white-space: nowrap;
+                            display: flex;
+                            align-items: center;
+                            gap: 0.5rem;
+                        ">
+                            <i class="fa-solid fa-paper-plane"></i> Submit
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
         <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem;">
@@ -456,13 +471,141 @@
     background-color: #6366f1;
     color: white;
 }
+
+/* Open Incidents Actions column */
+.open-incidents-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+}
+.btn-action-update {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #111827;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s, border-color 0.2s;
+}
+.btn-action-update:hover {
+    background: #e5e7eb;
+    border-color: #d1d5db;
+}
+.btn-action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: opacity 0.2s;
+}
+.btn-action-icon:hover {
+    opacity: 0.85;
+}
+.btn-action-pdf {
+    color: #dc2626;
+    background: #fef2f2;
+}
+.btn-action-pdf:hover {
+    background: #fee2e2;
+}
+.btn-action-excel {
+    color: #2563eb;
+    background: #eff6ff;
+}
+.btn-action-excel:hover {
+    background: #dbeafe;
+}
+
+/* Open Incidents section: height = content only, no internal scroll */
+.view-container-open-incidents {
+    flex: 0 0 auto !important;
+    overflow: visible !important;
+    min-height: 0;
+}
+
+/* Summary cards (Users + Open Incidents count): fixed at top, no scrollbar */
+.view-container-summary-cards {
+    flex: 0 0 auto !important;
+    overflow: visible !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 2;
+    background: var(--background-color, #f8fafc);
+    padding-bottom: 0.25rem;
+}
+
+/* Single scrollable area for Open Incidents table + Recent Activity */
+.dashboard-scroll-area {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
 </style>
 
 {% block extra_js %}
 <script>
     function openCreateUpdateModal() {
-        document.getElementById('createUpdateModal').style.display = 'block';
-        document.getElementById('incidentSearch').focus();
+        const modal = document.getElementById('createUpdateModal');
+        const selectArea = document.getElementById('captureUpdateSelectArea');
+        const formArea = document.getElementById('captureUpdateFormArea');
+        const incidentSelect = document.getElementById('incidentSelect');
+        const incidentIdInput = document.getElementById('captureUpdateIncidentId');
+        const incidentNameSpan = document.getElementById('captureUpdateIncidentName');
+        const logDesc = document.getElementById('logDescription');
+
+        // Selection comes from dashboard table only
+        const tableCheckbox = document.querySelector('input[name="open_incident_select"]:checked');
+        if (!tableCheckbox || !tableCheckbox.value) {
+            return;
+        }
+
+        const incidentId = tableCheckbox.value;
+        const incidentTitle = tableCheckbox.getAttribute('data-title') || ('Incident #' + incidentId);
+
+        // Hide select list; show only incident name + event form
+        if (selectArea) selectArea.style.display = 'none';
+        if (formArea) formArea.style.display = 'block';
+
+        if (incidentSelect) incidentSelect.value = incidentId;
+        if (incidentIdInput) incidentIdInput.value = incidentId;
+        if (incidentNameSpan) incidentNameSpan.textContent = incidentTitle;
+        if (logDesc) {
+            logDesc.value = '';
+            logDesc.focus();
+        }
+
+        modal.style.display = 'block';
+    }
+
+    function openCreateUpdateModalForIncident(incidentId, incidentTitle) {
+        const modal = document.getElementById('createUpdateModal');
+        const selectArea = document.getElementById('captureUpdateSelectArea');
+        const formArea = document.getElementById('captureUpdateFormArea');
+        const incidentSelect = document.getElementById('incidentSelect');
+        const incidentIdInput = document.getElementById('captureUpdateIncidentId');
+        const incidentNameSpan = document.getElementById('captureUpdateIncidentName');
+        const logDesc = document.getElementById('logDescription');
+
+        if (selectArea) selectArea.style.display = 'none';
+        if (formArea) formArea.style.display = 'block';
+
+        if (incidentSelect) incidentSelect.value = incidentId;
+        if (incidentIdInput) incidentIdInput.value = incidentId;
+        if (incidentNameSpan) incidentNameSpan.textContent = incidentTitle || ('Incident #' + incidentId);
+        if (logDesc) {
+            logDesc.value = '';
+            logDesc.focus();
+        }
+
+        modal.style.display = 'block';
     }
 
     // Decision Packet modal helpers (download only, no preview)
@@ -584,11 +727,17 @@
 
     function closeCreateUpdateModal() {
         document.getElementById('createUpdateModal').style.display = 'none';
-        document.getElementById('incidentSearch').value = '';
-        document.getElementById('incidentSelect').value = '';
-        document.getElementById('logDescription').value = '';
-        document.getElementById('incidentEventFormContainer').style.display = 'none';
-        filterIncidents(); // Reset filter
+        const search = document.getElementById('incidentSearch');
+        const select = document.getElementById('incidentSelect');
+        const logDesc = document.getElementById('logDescription');
+        const incidentIdInput = document.getElementById('captureUpdateIncidentId');
+        const incidentNameSpan = document.getElementById('captureUpdateIncidentName');
+        if (search) search.value = '';
+        if (select) select.value = '';
+        if (logDesc) logDesc.value = '';
+        if (incidentIdInput) incidentIdInput.value = '';
+        if (incidentNameSpan) incidentNameSpan.textContent = '';
+        filterIncidents();
     }
 
     function filterIncidents() {
@@ -812,6 +961,15 @@
                             e.preventDefault();
                         }
                     });
+        }
+    });
+
+    // Actions column: Update Incident button (opens Capture Update modal for that row)
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-action-update');
+        if (btn && btn.dataset.incidentId) {
+            e.preventDefault();
+            openCreateUpdateModalForIncident(btn.dataset.incidentId, btn.dataset.incidentTitle || '');
         }
     });
 </script>

@@ -1,7 +1,7 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
-{% block title %}Incidents - Resilience System{% endblock %}
+{% block title %}Incidents List - Resilience System{% endblock %}
 
 {% block content %}
 <div class="app-container">
@@ -13,8 +13,8 @@
         <ul class="nav-links">
             <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a></li>
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
-            <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Capture</a></li>
-            <li class="nav-item active"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents</a></li>
+            <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Incidents</a></li>
+            <li class="nav-item active"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents List</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
@@ -28,7 +28,7 @@
 
     <main class="main-content">
         <header class="top-header" style="display: flex; align-items: center; justify-content: space-between;">
-            <h2>Incidents</h2>
+            <h2>Incidents List</h2>
             <div style="display: flex; align-items: center; gap: 1rem;">
                 <div class="header-status">
                     <div class="status-indicator">
@@ -78,7 +78,7 @@
                     <div style="display: flex; align-items: center; justify-content: space-between;">
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <i class="fa-solid fa-list-ul" style="font-size: 1rem; color: #667eea;"></i>
-                            <h3 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; color: #111827;">Incidents</h3>
+                            <h3 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; color: #111827;">Incidents List</h3>
                             <span style="font-size: 0.875rem; color: #6b7280; margin-left: 0.5rem;">({{ incidents|length }})</span>
                         </div>
                     </div>

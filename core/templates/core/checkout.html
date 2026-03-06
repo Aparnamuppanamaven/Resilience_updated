@@ -375,7 +375,9 @@
             if (!input) return true;
 
             let value = input.value || '';
-            if (input.type === 'text' || input.type === 'email') {
+            // Only trim and normalize on blur/submit (when we show messages),
+            // so users can type spaces naturally while filling the form.
+            if ((input.type === 'text' || input.type === 'email') && showMessage) {
                 value = value.trim();
                 input.value = value;
             }
