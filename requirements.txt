@@ -11,9 +11,6 @@ stripe>=7.0.0
 # PDF generation for invoices
 reportlab>=4.0.0
 
-# HTML-to-PDF for Incident Log History (WeasyPrint)
-weasyprint>=60.0
-
 # Environment variables
 python-dotenv>=1.0.0
 
