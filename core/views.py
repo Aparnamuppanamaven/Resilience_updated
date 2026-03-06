@@ -30,6 +30,9 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.colors import HexColor
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from django.template.loader import render_to_string
+from weasyprint import HTML
+from weasyprint.text.fonts import FontConfiguration
 import csv
 import os
 
@@ -3779,6 +3782,216 @@ def generate_incident_shift_packet_pdf(request, incident_id):
         response['Content-Disposition'] = f'inline; filename="Incident_Log_History_INC-{incident.id}.pdf"'
         return response
         
+    except IncidentCapture.DoesNotExist:
+        return HttpResponse('Incident not found', status=404)
+    except Exception as e:
+        return HttpResponse(f'Error generating PDF: {str(e)}', status=500)
+
+
+def generate_incident_shift_packet_pdf(request, incident_id):
+    """Generate Incident Log History PDF from HTML template (WeasyPrint)."""
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return HttpResponse('Unauthorized', status=401)
+
+    try:
+        organization = None
+        if request.user.is_authenticated:
+            try:
+                liaison = request.user.liaison_profile
+                organization = liaison.organization
+            except (Liaison.DoesNotExist, AttributeError):
+                return HttpResponse('Organization not found', status=400)
+        elif 'user_credentials_id' in request.session:
+            organization = Organization.objects.first()
+
+        # Resolve incident for both Django auth and legacy session users
+        if 'user_credentials_id' in request.session:
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id)
+                organization = incident.organization
+            except IncidentCapture.DoesNotExist:
+                return HttpResponse('Incident not found', status=404)
+        else:
+            if not organization:
+                return HttpResponse('Organization not found', status=400)
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+            except IncidentCapture.DoesNotExist:
+                return HttpResponse('Incident not found', status=404)
+
+        # Fetch incident logs from core_incident_events (newest first)
+        incident_logs = []
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, event_description, created_time, user_id
+                    FROM core_incident_events
+                    WHERE incident_id = %s
+                    ORDER BY created_time DESC
+                    """,
+                    [incident.id]
+                )
+                for row in cursor.fetchall():
+                    log_id, event_desc, created_time, user_id = row
+                    user = None
+                    if user_id:
+                        try:
+                            user = User.objects.get(id=user_id)
+                        except User.DoesNotExist:
+                            user = None
+                    incident_logs.append({
+                        'log_id': log_id,
+                        'log_description': event_desc,
+                        'created_time': created_time,
+                        'user_log': user,
+                    })
+        except Exception:
+            incident_logs = []
+
+        # Ensure there is a "created" entry (place it as the oldest entry)
+        has_created_log = any('created' in (log.get('log_description') or '').lower() for log in incident_logs)
+        if not has_created_log:
+            incident_logs.append({
+                'log_id': 0,
+                'log_description': f'Incident "{incident.title}" was created with severity level {incident.get_severity_display()}.',
+                'created_time': incident.created_at,
+                'user_log': incident.created_by.user if getattr(incident, 'created_by', None) else None,
+            })
+
+        # Build enriched log rows for template
+        dept_colors = {
+            'SIEM / SOC Platform': ('#e0f2fe', '#0369a1'),
+            'Security Operations': ('#fce7f3', '#9d174d'),
+            'Incident Management': ('#ede9fe', '#5b21b6'),
+            'Infrastructure': ('#dcfce7', '#14532d'),
+            'External — Cyber IR': ('#f1f5f9', '#334155'),
+            'Business Continuity': ('#fef3c7', '#92400e'),
+            'Legal & Compliance': ('#fef9c3', '#713f12'),
+            'Communications': ('#fef9c3', '#713f12'),
+            'External — Regulator': ('#f1f5f9', '#334155'),
+        }
+        status_map = {
+            'DETECTED': 'DETECTED',
+            'ESCALATED': 'ESCALATED',
+            'IN PROGRESS': 'IN_PROGRESS',
+            'LOGGED': 'LOGGED',
+            'COMPLETE': 'COMPLETE',
+            'NOTIFIED': 'NOTIFIED',
+            'CONTAINED': 'CONTAINED',
+            'CLOSED': 'CLOSED',
+        }
+
+        logs = []
+        for log in incident_logs:
+            ts = log['created_time']
+            if isinstance(ts, str):
+                try:
+                    from datetime import datetime
+                    ts = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    ts = timezone.now()
+            date_str = ts.strftime('%d %b') if hasattr(ts, 'strftime') else str(ts)[:6]
+            time_str = ts.strftime('%H:%M') if hasattr(ts, 'strftime') else str(ts)[-5:]
+            timestamp_html = f"{date_str}<br>{time_str}"
+
+            user = log.get('user_log')
+            department = 'System'
+            dept_bg, dept_color = '#f1f5f9', '#334155'
+            if user:
+                try:
+                    liaison = user.liaison_profile
+                    department = liaison.organization.name if liaison.organization else 'Operations'
+                    for dept_key, (bg, txt) in dept_colors.items():
+                        if dept_key.lower() in department.lower() or department.lower() in dept_key.lower():
+                            dept_bg, dept_color = bg, txt
+                            department = dept_key
+                            break
+                except Exception:
+                    department = getattr(user, 'username', 'User')
+
+            desc = log.get('log_description') or ''
+            author = None
+            if '—' in desc:
+                parts = desc.rsplit('—', 1)
+                if len(parts) == 2:
+                    desc = parts[0].strip()
+                    author = parts[1].strip()
+
+            status = 'LOGGED'
+            d_lower = desc.lower()
+            if 'detected' in d_lower or 'fired' in d_lower:
+                status = 'DETECTED'
+            elif 'escalated' in d_lower:
+                status = 'ESCALATED'
+            elif 'complete' in d_lower or 'completed' in d_lower:
+                status = 'COMPLETE'
+            elif 'in progress' in d_lower or 'progress' in d_lower:
+                status = 'IN_PROGRESS'
+            elif 'notified' in d_lower:
+                status = 'NOTIFIED'
+            elif 'contained' in d_lower:
+                status = 'CONTAINED'
+            elif 'closed' in d_lower:
+                status = 'CLOSED'
+            status_class = status_map.get(status, 'LOGGED')
+
+            logs.append({
+                'timestamp': timestamp_html,
+                'department': department,
+                'description': desc,
+                'author': author,
+                'status': status,
+                'status_class': status_class,
+                'dept_bg': dept_bg,
+                'dept_color': dept_color,
+            })
+
+        first_ts = incident_logs[0]['created_time'] if incident_logs else incident.created_at
+        last_ts = incident_logs[-1]['created_time'] if incident_logs else timezone.now()
+        if hasattr(first_ts, 'strftime'):
+            period_start = first_ts.strftime('%d %b %Y, %H:%M')
+        else:
+            period_start = str(first_ts)[:16]
+        if hasattr(last_ts, 'strftime'):
+            period_end = last_ts.strftime('%d %b %Y, %H:%M')
+        else:
+            period_end = str(last_ts)[:16]
+
+        severity = getattr(incident, 'severity', 'MEDIUM')
+        severity_display = f"{severity} — P1" if severity == 'CRITICAL' else severity
+        severity_css = severity.replace(' ', '_').upper() if severity else 'MEDIUM'
+
+        report_generated_at = timezone.now().strftime('%d %b %Y, %H:%M hrs')
+        organization_name = organization.name if organization else 'Resilience System'
+
+        context = {
+            'incident_id': f'INC-{incident.id}',
+            'incident_title': incident.title,
+            'incident_description': getattr(incident, 'description', '') or '',
+            'report_generated_at': report_generated_at,
+            'period_start': period_start,
+            'period_end': period_end,
+            'total_logs': len(incident_logs),
+            'severity': severity,
+            'severity_css': severity_css,
+            'severity_display': severity_display,
+            'organization_name': organization_name,
+            'logs': logs,
+        }
+
+        html_string = render_to_string('core/incident_log_history_pdf.html', context)
+        font_config = FontConfiguration()
+        pdf_doc = HTML(string=html_string).render(font_config=font_config)
+        buffer = BytesIO()
+        pdf_doc.write_pdf(buffer)
+        buffer.seek(0)
+
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="Incident_Log_History_INC-{incident.id}.pdf"'
+        return response
+
     except IncidentCapture.DoesNotExist:
         return HttpResponse('Incident not found', status=404)
     except Exception as e:
