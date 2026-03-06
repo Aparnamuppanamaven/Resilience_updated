@@ -73,16 +73,16 @@ body {
     gap: var(--spacing-sm);
     padding: var(--spacing-md) var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
-    font-size: 1.25rem;
+    font-size: 1.65rem;
     font-weight: 700;
-    color: var(--primary-color);
+    color: #f05724;
     border-radius: 8px;
 }
 
 /* Sidebar logo colors */
 .sidebar-header .logo-icon,
 .sidebar-header .logo-text {
-    color: var(--primary-color) !important;
+    color: #f05724;
 }
 
 .sidebar-header:hover .logo-icon,
@@ -785,8 +785,9 @@ body {
 
 .logo {
     font-weight: 700;
-    font-size: 1.25rem;
-    color: var(--primary-color);
+    font-size: 2.25rem;
+   /* color: var(--primary-color);*/
+    color: #f05724;
     display: flex;
     align-items: center;
     gap: 0.5rem;
