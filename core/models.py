@@ -618,3 +618,25 @@ class StripePayment(models.Model):
     
     def __str__(self):
         return f"Stripe Payment {self.stripe_payment_intent_id} - {self.status} - ${self.amount / 100}"
+
+
+def log_system_action(tenant_id, entity, actionby, actionon, action, metadata=None):
+    """
+    Lightweight system action logger.
+    Currently writes to the Django logger so it is safe to call
+    even if no dedicated audit table exists.
+    """
+    import logging
+    from django.utils import timezone
+
+    logger = logging.getLogger("resilience.system_actions")
+    payload = {
+        "tenant_id": tenant_id,
+        "entity": entity,
+        "actionby": actionby,
+        "actionon": actionon,
+        "action": action,
+        "metadata": metadata or {},
+        "timestamp": timezone.now().isoformat(),
+    }
+    logger.info("System action", extra={"system_action": payload})
