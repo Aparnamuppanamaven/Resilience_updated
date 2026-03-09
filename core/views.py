@@ -43,6 +43,11 @@ from .models import (
     Payment, Invoice,
     StripePayment, UserProfile,
     TenantDomain,
+
+
+    TenantDomain,
+    log_system_action,
+
 )
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm, ProfileEditForm, LegacyProfileEditForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
@@ -201,18 +206,19 @@ def index(request):
     """Landing page"""
     return render(request, 'core/index.html')
 
-
 def checkout(request):
     """Checkout page for Foundation purchase"""
+
     if request.method == 'POST':
         form = CheckoutForm(request.POST)
+
         if form.is_valid():
             liaison_email = form.cleaned_data['liaison_email']
+
             # Check if user already exists
             user_check = detect_existing_user(liaison_email)
 
             if user_check['exists']:
-                # Existing user detected
                 request.session['checkout_data'] = form.cleaned_data
                 request.session['is_existing_user'] = True
                 request.session['existing_user_email'] = liaison_email
@@ -226,11 +232,10 @@ def checkout(request):
                 })
 
             # ---------------- TENANT / ORGANIZATION DUPLICATE CHECK ----------------
-            # In a multi-tenant setup, avoid creating multiple tenants for the same organization/domain.
             agency = form.cleaned_data.get('agency', '').strip()
             liaison_name = form.cleaned_data.get('liaison_name', '').strip()
+
             if agency:
-                # Treat TenantDomain as the canonical tenant table.
                 if TenantDomain.objects.filter(org_name__iexact=agency).exists():
                     form.add_error(
                         'agency',
@@ -242,7 +247,6 @@ def checkout(request):
                     })
 
             # ---------------- NEW USER FLOW ----------------
-            # liaison_name and agency already normalized above
             password = form.cleaned_data.get('password', 'resilience2024!')
             channels = form.cleaned_data.get('channels')
             incidents = form.cleaned_data.get('incidents')
@@ -258,16 +262,17 @@ def checkout(request):
 
             try:
                 with transaction.atomic():
-                    # 1) Create organization record (acts as internal tenant owner)
+
+                    # 1️⃣ Create organization
                     org = Organization.objects.create(
                         name=agency,
                         license_type='foundation',
                         foundation_purchase_date=timezone.now()
                     )
+
                     tenant_id = org.tenant_id
 
-                    # 2) Ensure a matching row exists in tenant_domains so legacy tables
-                    #    (core_users, core_incident_events, etc.) can safely reference tenant_id
+                    # 2️⃣ Ensure tenant_domains record exists
                     if not TenantDomain.objects.filter(tenant_id=tenant_id).exists():
                         TenantDomain.objects.create(
                             tenant_id=tenant_id,
@@ -280,15 +285,18 @@ def checkout(request):
                             created_at=timezone.now(),
                         )
 
+                    # 3️⃣ Create Django user
                     user = User.objects.create(
                         username=username,
                         email=liaison_email,
                         first_name=liaison_name.split()[0] if liaison_name.split() else '',
                         last_name=' '.join(liaison_name.split()[1:]) if len(liaison_name.split()) > 1 else '',
                     )
+
                     user.set_password(password)
                     user.save()
 
+                    # 4️⃣ Liaison record
                     Liaison.objects.update_or_create(
                         user=user,
                         defaults={
@@ -302,6 +310,7 @@ def checkout(request):
                         }
                     )
 
+                    # 5️⃣ System Settings
                     settings_obj, _ = SystemSettings.objects.get_or_create(
                         organization=org,
                         defaults={
@@ -310,11 +319,11 @@ def checkout(request):
                         }
                     )
 
-                    # If settings existed without tenant_id, backfill it.
                     if settings_obj.tenant_id is None:
                         settings_obj.tenant_id = tenant_id
                         settings_obj.save(update_fields=['tenant_id'])
 
+                    # 6️⃣ External user
                     ExternalUser.objects.create(
                         agency_name=agency,
                         primary_liaison_name=liaison_name,
@@ -325,8 +334,9 @@ def checkout(request):
                         tenant_id=tenant_id,
                     )
 
-                    # Also create legacy UserCredentials entry so this account can log in via username/password.
-                    legacy_username = (liaison_email or '').strip()
+                    # 7️⃣ Legacy login support
+                    legacy_username = liaison_email.strip()
+
                     if legacy_username and not UserCredentials.objects.filter(username=legacy_username).exists():
                         UserCredentials.objects.create(
                             username=legacy_username,
@@ -334,7 +344,16 @@ def checkout(request):
                             tenant_id=tenant_id,
                         )
 
-                # Placeholder subscription (non-critical; failures are logged but don't break registration)
+                    # 8️⃣ Log system action
+                    log_system_action(
+                        tenant_id=org.pk,
+                        entity='User',
+                        actionby=user.id,
+                        actionon=username,
+                        action='Create',
+                    )
+
+                # ---------------- Placeholder Subscription ----------------
                 try:
                     placeholder_payment = ExternalPayment.objects.create(
                         username=username,
@@ -343,6 +362,7 @@ def checkout(request):
                         amount=0,
                         payment_time=timezone.now(),
                     )
+
                     ExternalSubscription.objects.create(
                         username=username,
                         payment=placeholder_payment,
@@ -353,21 +373,25 @@ def checkout(request):
                         subscription_status='Inactive',
                         created_at=timezone.now(),
                     )
-                except Exception as e:
-                    print(f"Error creating placeholder subscription: {e}")
 
-                # Send notification email (NEW FEATURE)
+                except Exception as e:
+                    print(f"Subscription creation error: {e}")
+
+                # ---------------- Send Notification Email ----------------
                 try:
                     success, message = send_new_user_notification_email(
                         liaison_email=liaison_email,
                         liaison_name=liaison_name,
                         agency_name=agency
                     )
+
                     if not success:
                         print(f"Notification email failed: {message}")
-                except Exception as e:
-                    print(f"Exception while sending notification email: {e}")
 
+                except Exception as e:
+                    print(f"Email sending error: {e}")
+
+                # ---------------- Session data ----------------
                 request.session['checkout_data'] = form.cleaned_data
                 request.session['is_existing_user'] = False
                 request.session['checkout_user_id'] = user.id
@@ -376,12 +400,13 @@ def checkout(request):
                 return redirect('payment')
 
             except Exception as e:
-                # Any error in the registration flow should keep the user on the registration page
                 print(f"Error during checkout registration flow: {e}")
+
                 messages.error(
                     request,
                     'There was a problem completing your registration. Please review your details and try again, or contact support.'
                 )
+
                 return render(request, 'core/checkout.html', {
                     'form': form,
                     'show_login_button': False,
@@ -390,14 +415,13 @@ def checkout(request):
     else:
         form = CheckoutForm()
         checkout_data = request.session.get('checkout_data')
+
         if checkout_data:
             for field in form.fields:
                 if field in checkout_data:
                     form.fields[field].initial = checkout_data[field]
 
     return render(request, 'core/checkout.html', {'form': form})
-
-
 @transaction.atomic
 def payment(request):
     """Payment page - handles both new users and existing users (renewal)"""
