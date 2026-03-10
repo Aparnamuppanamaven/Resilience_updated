@@ -735,3 +735,66 @@ class StripePayment(models.Model):
     
     def __str__(self):
         return f"Stripe Payment {self.stripe_payment_intent_id} - {self.status} - ${self.amount / 100}"
+
+
+class TxLog(models.Model):
+    """
+    System log / audit trail for important activities.
+    Tracks user login, user creation, incident creation, situation updates, etc.
+    """
+    ACTION_CHOICES = [
+        ('Create', 'Create'),
+        ('Update', 'Update'),
+        ('Delete', 'Delete'),
+        ('Login', 'Login'),
+    ]
+
+    id = models.BigAutoField(primary_key=True, auto_created=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
+    entity = models.CharField(
+        max_length=100,
+        help_text="Module or object affected, e.g. User, Incident, SituationUpdate",
+    )
+    actionby = models.BigIntegerField(
+        null=True,
+        blank=True,
+        db_column='actionby',
+        help_text="User ID who performed the action (auth User or UserCredentials)",
+    )
+    actionon = models.CharField(
+        max_length=255,
+        blank=True,
+        db_column='actionon',
+        help_text="ID or name of the entity on which action was performed",
+    )
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    created_date = models.DateTimeField(auto_now_add=True, db_column='created_date')
+
+    class Meta:
+        db_table = 'tx_log'
+        ordering = ['-created_date']
+        verbose_name = 'System log'
+        verbose_name_plural = 'System logs'
+
+    def __str__(self):
+        return f"{self.action} {self.entity} by {self.actionby} on {self.actionon}"
+
+
+def log_system_action(tenant_id=None, entity=None, actionby=None, actionon=None, action='Create'):
+    """
+    Create a system log entry for audit trail.
+    All arguments except entity and action are optional to support legacy/anonymous flows.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        TxLog.objects.create(
+            tenant_id=tenant_id,
+            entity=entity or 'Unknown',
+            actionby=actionby,
+            actionon=str(actionon) if actionon is not None else '',
+            action=action,
+        )
+    except Exception as e:
+        logger.warning("TxLog audit write failed: %s", e, exc_info=True)
+

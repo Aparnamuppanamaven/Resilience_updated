@@ -30,6 +30,9 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.colors import HexColor
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from django.template.loader import render_to_string
+from weasyprint import HTML
+from weasyprint.text.fonts import FontConfiguration
 import csv
 import os
 
@@ -42,7 +45,10 @@ from .models import (
     ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials, UsersTable, Shift, Department,
     Payment, Invoice,
     StripePayment, UserProfile,
+
     TenantDomain,
+    log_system_action,
+
 )
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm, ProfileEditForm, LegacyProfileEditForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
@@ -201,18 +207,19 @@ def index(request):
     """Landing page"""
     return render(request, 'core/index.html')
 
-
 def checkout(request):
     """Checkout page for Foundation purchase"""
+
     if request.method == 'POST':
         form = CheckoutForm(request.POST)
+
         if form.is_valid():
             liaison_email = form.cleaned_data['liaison_email']
+
             # Check if user already exists
             user_check = detect_existing_user(liaison_email)
 
             if user_check['exists']:
-                # Existing user detected
                 request.session['checkout_data'] = form.cleaned_data
                 request.session['is_existing_user'] = True
                 request.session['existing_user_email'] = liaison_email
@@ -226,11 +233,10 @@ def checkout(request):
                 })
 
             # ---------------- TENANT / ORGANIZATION DUPLICATE CHECK ----------------
-            # In a multi-tenant setup, avoid creating multiple tenants for the same organization/domain.
             agency = form.cleaned_data.get('agency', '').strip()
             liaison_name = form.cleaned_data.get('liaison_name', '').strip()
+
             if agency:
-                # Treat TenantDomain as the canonical tenant table.
                 if TenantDomain.objects.filter(org_name__iexact=agency).exists():
                     form.add_error(
                         'agency',
@@ -242,7 +248,6 @@ def checkout(request):
                     })
 
             # ---------------- NEW USER FLOW ----------------
-            # liaison_name and agency already normalized above
             password = form.cleaned_data.get('password', 'resilience2024!')
             channels = form.cleaned_data.get('channels')
             incidents = form.cleaned_data.get('incidents')
@@ -258,16 +263,17 @@ def checkout(request):
 
             try:
                 with transaction.atomic():
-                    # 1) Create organization record (acts as internal tenant owner)
+
+                    # 1️⃣ Create organization
                     org = Organization.objects.create(
                         name=agency,
                         license_type='foundation',
                         foundation_purchase_date=timezone.now()
                     )
+
                     tenant_id = org.tenant_id
 
-                    # 2) Ensure a matching row exists in tenant_domains so legacy tables
-                    #    (core_users, core_incident_events, etc.) can safely reference tenant_id
+                    # 2️⃣ Ensure tenant_domains record exists
                     if not TenantDomain.objects.filter(tenant_id=tenant_id).exists():
                         TenantDomain.objects.create(
                             tenant_id=tenant_id,
@@ -280,15 +286,18 @@ def checkout(request):
                             created_at=timezone.now(),
                         )
 
+                    # 3️⃣ Create Django user
                     user = User.objects.create(
                         username=username,
                         email=liaison_email,
                         first_name=liaison_name.split()[0] if liaison_name.split() else '',
                         last_name=' '.join(liaison_name.split()[1:]) if len(liaison_name.split()) > 1 else '',
                     )
+
                     user.set_password(password)
                     user.save()
 
+                    # 4️⃣ Liaison record
                     Liaison.objects.update_or_create(
                         user=user,
                         defaults={
@@ -302,6 +311,7 @@ def checkout(request):
                         }
                     )
 
+                    # 5️⃣ System Settings
                     settings_obj, _ = SystemSettings.objects.get_or_create(
                         organization=org,
                         defaults={
@@ -310,11 +320,11 @@ def checkout(request):
                         }
                     )
 
-                    # If settings existed without tenant_id, backfill it.
                     if settings_obj.tenant_id is None:
                         settings_obj.tenant_id = tenant_id
                         settings_obj.save(update_fields=['tenant_id'])
 
+                    # 6️⃣ External user
                     ExternalUser.objects.create(
                         agency_name=agency,
                         primary_liaison_name=liaison_name,
@@ -325,8 +335,9 @@ def checkout(request):
                         tenant_id=tenant_id,
                     )
 
-                    # Also create legacy UserCredentials entry so this account can log in via username/password.
-                    legacy_username = (liaison_email or '').strip()
+                    # 7️⃣ Legacy login support
+                    legacy_username = liaison_email.strip()
+
                     if legacy_username and not UserCredentials.objects.filter(username=legacy_username).exists():
                         UserCredentials.objects.create(
                             username=legacy_username,
@@ -334,7 +345,16 @@ def checkout(request):
                             tenant_id=tenant_id,
                         )
 
-                # Placeholder subscription (non-critical; failures are logged but don't break registration)
+                    # 8️⃣ Log system action
+                    log_system_action(
+                        tenant_id=org.pk,
+                        entity='User',
+                        actionby=user.id,
+                        actionon=username,
+                        action='Create',
+                    )
+
+                # ---------------- Placeholder Subscription ----------------
                 try:
                     placeholder_payment = ExternalPayment.objects.create(
                         username=username,
@@ -343,6 +363,7 @@ def checkout(request):
                         amount=0,
                         payment_time=timezone.now(),
                     )
+
                     ExternalSubscription.objects.create(
                         username=username,
                         payment=placeholder_payment,
@@ -353,21 +374,25 @@ def checkout(request):
                         subscription_status='Inactive',
                         created_at=timezone.now(),
                     )
-                except Exception as e:
-                    print(f"Error creating placeholder subscription: {e}")
 
-                # Send notification email (NEW FEATURE)
+                except Exception as e:
+                    print(f"Subscription creation error: {e}")
+
+                # ---------------- Send Notification Email ----------------
                 try:
                     success, message = send_new_user_notification_email(
                         liaison_email=liaison_email,
                         liaison_name=liaison_name,
                         agency_name=agency
                     )
+
                     if not success:
                         print(f"Notification email failed: {message}")
-                except Exception as e:
-                    print(f"Exception while sending notification email: {e}")
 
+                except Exception as e:
+                    print(f"Email sending error: {e}")
+
+                # ---------------- Session data ----------------
                 request.session['checkout_data'] = form.cleaned_data
                 request.session['is_existing_user'] = False
                 request.session['checkout_user_id'] = user.id
@@ -376,12 +401,13 @@ def checkout(request):
                 return redirect('payment')
 
             except Exception as e:
-                # Any error in the registration flow should keep the user on the registration page
                 print(f"Error during checkout registration flow: {e}")
+
                 messages.error(
                     request,
                     'There was a problem completing your registration. Please review your details and try again, or contact support.'
                 )
+
                 return render(request, 'core/checkout.html', {
                     'form': form,
                     'show_login_button': False,
@@ -390,13 +416,13 @@ def checkout(request):
     else:
         form = CheckoutForm()
         checkout_data = request.session.get('checkout_data')
+
         if checkout_data:
             for field in form.fields:
                 if field in checkout_data:
                     form.fields[field].initial = checkout_data[field]
 
     return render(request, 'core/checkout.html', {'form': form})
-
 
 @transaction.atomic
 def payment(request):
@@ -1141,6 +1167,20 @@ def capture(request):
                 is_synthesized=False,  # Required field, default to False
                 tenant_id=tenant_id,
             )
+            actionby_id = None
+            if liaison:
+                actionby_id = getattr(liaison.user, 'id', None)
+            if actionby_id is None and getattr(request.user, 'id', None) is not None:
+                actionby_id = request.user.id
+            if actionby_id is None and request.session.get('user_credentials_id'):
+                actionby_id = request.session.get('user_credentials_id')
+            log_system_action(
+                tenant_id=getattr(organization, 'tenant_id', None) or (organization.pk if organization else None),
+                entity='Incident',
+                actionby=actionby_id,
+                actionon=f"{incident.id}:{incident.title}",
+                action='Create',
+            )
             messages.success(request, 'Update captured successfully!')
             return redirect('dashboard')
     else:
@@ -1571,7 +1611,14 @@ def register_view(request):
         form = UserSignupForm(request.POST)
         if form.is_valid():
             try:
-                form.save()
+                user = form.save()
+                log_system_action(
+                    tenant_id=getattr(user, 'tenant_id', None),
+                    entity='User',
+                    actionby=user.user_id,
+                    actionon=user.username,
+                    action='Create',
+                )
                 messages.success(request, 'Registration successful! Please login.')
                 return redirect('login')
             except Exception as e:
@@ -1622,6 +1669,14 @@ def login_view(request):
                 request.session['user_credentials_id'] = user_cred.user_id
                 request.session['user_credentials_username'] = user_cred.username
                 
+                log_system_action(
+                    tenant_id=user_cred.tenant_id,
+                    entity='User',
+                    actionby=user_cred.user_id,
+                    actionon=user_cred.username,
+                    action='Login',
+                )
+                
                 # Clear any renewal flags after successful login
                 request.session.pop('is_existing_user', None)
                 request.session.pop('existing_user_email', None)
@@ -1654,6 +1709,20 @@ def login_view(request):
 
                 # Log in the user
                 login(request, user)
+                
+                try:
+                    liaison = user.liaison_profile
+                    org = getattr(liaison, 'organization', None)
+                    tenant_id = org.pk if org else None
+                except (Liaison.DoesNotExist, AttributeError):
+                    tenant_id = None
+                log_system_action(
+                    tenant_id=tenant_id,
+                    entity='User',
+                    actionby=user.id,
+                    actionon=user.username,
+                    action='Login',
+                )
                 
                 # Clear any UserCredentials session if exists
                 request.session.pop('user_credentials_id', None)
@@ -1819,7 +1888,7 @@ def admin_module(request):
                         return redirect('admin_module')
                 
                 # Create new user in users table
-                UsersTable.objects.create(
+                created_user = UsersTable.objects.create(
                     name=name or None,
                     mobile_no=mobile_no or None,
                     email_id=email_id or None,
@@ -1834,6 +1903,18 @@ def admin_module(request):
                     preferred_communication_channels=preferred_communication_channels,
                     created_at=timezone.now(),
                     user_image=user_image_path,
+                )
+                actionby_id = None
+                if getattr(request.user, 'id', None) is not None:
+                    actionby_id = request.user.id
+                elif request.session.get('user_credentials_id'):
+                    actionby_id = request.session.get('user_credentials_id')
+                log_system_action(
+                    tenant_id=getattr(created_user, 'tenant_id', None),
+                    entity='User',
+                    actionby=actionby_id,
+                    actionon=created_user.primary_liaison_name or created_user.liaison_email or str(created_user.id),
+                    action='Create',
                 )
                 if user_image_path:
                     messages.success(request, f'User "{name}" from "{agency_name}" created successfully! Profile picture saved.')
@@ -3156,6 +3237,14 @@ def add_incident_event_log(request, incident_id):
         # Final fallback: if still no tenant_id, try from incident's tenant_id
         if not tenant_id and incident and hasattr(incident, 'tenant_id') and incident.tenant_id:
             tenant_id = incident.tenant_id
+        # Fallback: from incident's organization (same as incident creation logging)
+        if not tenant_id and incident:
+            try:
+                org = getattr(incident, 'organization', None)
+                if org is not None:
+                    tenant_id = getattr(org, 'tenant_id', None) or getattr(org, 'pk', None)
+            except Exception:
+                pass
         
         # Create incident event log
         # Note: IncidentEvent has ForeignKey to Incident, but we're using IncidentCapture
@@ -3170,6 +3259,14 @@ def add_incident_event_log(request, incident_id):
                 [incident.id, log_description, user_id, timezone.now(), tenant_id]
             )
             log_id = cursor.lastrowid
+        
+        log_system_action(
+            tenant_id=tenant_id,
+            entity='SituationUpdate',
+            actionby=user_id,
+            actionon=str(incident.id),
+            action='Create',
+        )
         
         # Fetch the created log entry for response using raw SQL to avoid ForeignKey issues
         # Since user_id is from core_users, not auth_user, we can't use IncidentEvent.user_log
@@ -3779,6 +3876,216 @@ def generate_incident_shift_packet_pdf(request, incident_id):
         response['Content-Disposition'] = f'inline; filename="Incident_Log_History_INC-{incident.id}.pdf"'
         return response
         
+    except IncidentCapture.DoesNotExist:
+        return HttpResponse('Incident not found', status=404)
+    except Exception as e:
+        return HttpResponse(f'Error generating PDF: {str(e)}', status=500)
+
+
+def generate_incident_shift_packet_pdf(request, incident_id):
+    """Generate Incident Log History PDF from HTML template (WeasyPrint)."""
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return HttpResponse('Unauthorized', status=401)
+
+    try:
+        organization = None
+        if request.user.is_authenticated:
+            try:
+                liaison = request.user.liaison_profile
+                organization = liaison.organization
+            except (Liaison.DoesNotExist, AttributeError):
+                return HttpResponse('Organization not found', status=400)
+        elif 'user_credentials_id' in request.session:
+            organization = Organization.objects.first()
+
+        # Resolve incident for both Django auth and legacy session users
+        if 'user_credentials_id' in request.session:
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id)
+                organization = incident.organization
+            except IncidentCapture.DoesNotExist:
+                return HttpResponse('Incident not found', status=404)
+        else:
+            if not organization:
+                return HttpResponse('Organization not found', status=400)
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+            except IncidentCapture.DoesNotExist:
+                return HttpResponse('Incident not found', status=404)
+
+        # Fetch incident logs from core_incident_events (newest first)
+        incident_logs = []
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, event_description, created_time, user_id
+                    FROM core_incident_events
+                    WHERE incident_id = %s
+                    ORDER BY created_time DESC
+                    """,
+                    [incident.id]
+                )
+                for row in cursor.fetchall():
+                    log_id, event_desc, created_time, user_id = row
+                    user = None
+                    if user_id:
+                        try:
+                            user = User.objects.get(id=user_id)
+                        except User.DoesNotExist:
+                            user = None
+                    incident_logs.append({
+                        'log_id': log_id,
+                        'log_description': event_desc,
+                        'created_time': created_time,
+                        'user_log': user,
+                    })
+        except Exception:
+            incident_logs = []
+
+        # Ensure there is a "created" entry (place it as the oldest entry)
+        has_created_log = any('created' in (log.get('log_description') or '').lower() for log in incident_logs)
+        if not has_created_log:
+            incident_logs.append({
+                'log_id': 0,
+                'log_description': f'Incident "{incident.title}" was created with severity level {incident.get_severity_display()}.',
+                'created_time': incident.created_at,
+                'user_log': incident.created_by.user if getattr(incident, 'created_by', None) else None,
+            })
+
+        # Build enriched log rows for template
+        dept_colors = {
+            'SIEM / SOC Platform': ('#e0f2fe', '#0369a1'),
+            'Security Operations': ('#fce7f3', '#9d174d'),
+            'Incident Management': ('#ede9fe', '#5b21b6'),
+            'Infrastructure': ('#dcfce7', '#14532d'),
+            'External — Cyber IR': ('#f1f5f9', '#334155'),
+            'Business Continuity': ('#fef3c7', '#92400e'),
+            'Legal & Compliance': ('#fef9c3', '#713f12'),
+            'Communications': ('#fef9c3', '#713f12'),
+            'External — Regulator': ('#f1f5f9', '#334155'),
+        }
+        status_map = {
+            'DETECTED': 'DETECTED',
+            'ESCALATED': 'ESCALATED',
+            'IN PROGRESS': 'IN_PROGRESS',
+            'LOGGED': 'LOGGED',
+            'COMPLETE': 'COMPLETE',
+            'NOTIFIED': 'NOTIFIED',
+            'CONTAINED': 'CONTAINED',
+            'CLOSED': 'CLOSED',
+        }
+
+        logs = []
+        for log in incident_logs:
+            ts = log['created_time']
+            if isinstance(ts, str):
+                try:
+                    from datetime import datetime
+                    ts = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    ts = timezone.now()
+            date_str = ts.strftime('%d %b') if hasattr(ts, 'strftime') else str(ts)[:6]
+            time_str = ts.strftime('%H:%M') if hasattr(ts, 'strftime') else str(ts)[-5:]
+            timestamp_html = f"{date_str}<br>{time_str}"
+
+            user = log.get('user_log')
+            department = 'System'
+            dept_bg, dept_color = '#f1f5f9', '#334155'
+            if user:
+                try:
+                    liaison = user.liaison_profile
+                    department = liaison.organization.name if liaison.organization else 'Operations'
+                    for dept_key, (bg, txt) in dept_colors.items():
+                        if dept_key.lower() in department.lower() or department.lower() in dept_key.lower():
+                            dept_bg, dept_color = bg, txt
+                            department = dept_key
+                            break
+                except Exception:
+                    department = getattr(user, 'username', 'User')
+
+            desc = log.get('log_description') or ''
+            author = None
+            if '—' in desc:
+                parts = desc.rsplit('—', 1)
+                if len(parts) == 2:
+                    desc = parts[0].strip()
+                    author = parts[1].strip()
+
+            status = 'LOGGED'
+            d_lower = desc.lower()
+            if 'detected' in d_lower or 'fired' in d_lower:
+                status = 'DETECTED'
+            elif 'escalated' in d_lower:
+                status = 'ESCALATED'
+            elif 'complete' in d_lower or 'completed' in d_lower:
+                status = 'COMPLETE'
+            elif 'in progress' in d_lower or 'progress' in d_lower:
+                status = 'IN_PROGRESS'
+            elif 'notified' in d_lower:
+                status = 'NOTIFIED'
+            elif 'contained' in d_lower:
+                status = 'CONTAINED'
+            elif 'closed' in d_lower:
+                status = 'CLOSED'
+            status_class = status_map.get(status, 'LOGGED')
+
+            logs.append({
+                'timestamp': timestamp_html,
+                'department': department,
+                'description': desc,
+                'author': author,
+                'status': status,
+                'status_class': status_class,
+                'dept_bg': dept_bg,
+                'dept_color': dept_color,
+            })
+
+        first_ts = incident_logs[0]['created_time'] if incident_logs else incident.created_at
+        last_ts = incident_logs[-1]['created_time'] if incident_logs else timezone.now()
+        if hasattr(first_ts, 'strftime'):
+            period_start = first_ts.strftime('%d %b %Y, %H:%M')
+        else:
+            period_start = str(first_ts)[:16]
+        if hasattr(last_ts, 'strftime'):
+            period_end = last_ts.strftime('%d %b %Y, %H:%M')
+        else:
+            period_end = str(last_ts)[:16]
+
+        severity = getattr(incident, 'severity', 'MEDIUM')
+        severity_display = f"{severity} — P1" if severity == 'CRITICAL' else severity
+        severity_css = severity.replace(' ', '_').upper() if severity else 'MEDIUM'
+
+        report_generated_at = timezone.now().strftime('%d %b %Y, %H:%M hrs')
+        organization_name = organization.name if organization else 'Resilience System'
+
+        context = {
+            'incident_id': f'INC-{incident.id}',
+            'incident_title': incident.title,
+            'incident_description': getattr(incident, 'description', '') or '',
+            'report_generated_at': report_generated_at,
+            'period_start': period_start,
+            'period_end': period_end,
+            'total_logs': len(incident_logs),
+            'severity': severity,
+            'severity_css': severity_css,
+            'severity_display': severity_display,
+            'organization_name': organization_name,
+            'logs': logs,
+        }
+
+        html_string = render_to_string('core/incident_log_history_pdf.html', context)
+        font_config = FontConfiguration()
+        pdf_doc = HTML(string=html_string).render(font_config=font_config)
+        buffer = BytesIO()
+        pdf_doc.write_pdf(buffer)
+        buffer.seek(0)
+
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="Incident_Log_History_INC-{incident.id}.pdf"'
+        return response
+
     except IncidentCapture.DoesNotExist:
         return HttpResponse('Incident not found', status=404)
     except Exception as e:
