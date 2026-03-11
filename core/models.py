@@ -50,7 +50,7 @@ class Liaison(models.Model):
     incident_types = models.TextField(help_text="Key incident types of concern")
     role = models.CharField(max_length=100, blank=True, help_text="User role")
     dept = models.CharField(max_length=100, blank=True, help_text="Department")
-    countee = models.CharField(max_length=100, blank=True, help_text="Countee")
+    county = models.CharField(max_length=100, blank=True, help_text="County")
     created_at = models.DateTimeField(auto_now_add=True)
     tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
