@@ -10,13 +10,12 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Only update Django's migration graph; Tenant was a legacy model/table
-        # already cleaned up earlier, so we don't execute any DB operation here.
+        # Only keep this migration in the graph; Tenant was already removed
+        # earlier, so we avoid mutating state again to prevent KeyError when
+        # rebuilding the migration state.
         migrations.SeparateDatabaseAndState(
             state_operations=[
-                migrations.DeleteModel(
-                    name='Tenant',
-                ),
+                # No-op: Tenant model already removed in a prior migration.
             ],
             database_operations=[
                 # No-op at DB level: table/core_tenants already gone.
