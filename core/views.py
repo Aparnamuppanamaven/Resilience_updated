@@ -870,11 +870,11 @@ def dashboard(request):
         # that belong to their organization.
         all_incidents = IncidentCapture.objects.filter(
             organization=organization
-        ).order_by('-created_at')
+        ).order_by('-reported_time')
     else:
         # Legacy UserCredentials users and any fallback case:
         # show all incidents (no org filter) so previously captured data is visible.
-        all_incidents = IncidentCapture.objects.all().order_by('-created_at')
+        all_incidents = IncidentCapture.objects.all().order_by('-reported_time')
     
     # Users count (from core_users table)
     try:
@@ -2551,10 +2551,13 @@ def incidents_list(request):
                 description=form.cleaned_data.get('description') or '',
                 severity=form.cleaned_data['severity'],
                 impact=form.cleaned_data.get('impact') or '',
-                start_time=reported_time,
-                created_at=reported_time,
+                reported_time=reported_time,
                 created_by=liaison,
-                is_synthesized=False,
+                reported_by=form.cleaned_data.get('reported_by') or '',
+                category=form.cleaned_data.get('category') or '',
+                location=form.cleaned_data.get('location') or '',
+                casualties=form.cleaned_data.get('casualties') or None,
+                source=form.cleaned_data.get('source') or '',
                 tenant_id=tenant_id,
             )
             actionby_id = None
@@ -2586,11 +2589,11 @@ def incidents_list(request):
         # that belong to their organization.
         incidents = IncidentCapture.objects.filter(
             organization=organization
-        ).order_by('-created_at')
+        ).order_by('-reported_time')
     else:
         # Legacy UserCredentials users and any fallback case:
         # show all incidents (no org filter) so previously captured data is visible.
-        incidents = IncidentCapture.objects.all().order_by('-created_at')
+        incidents = IncidentCapture.objects.all().order_by('-reported_time')
     
     # Get or create system settings for status display
     settings_obj, created = SystemSettings.objects.get_or_create(
