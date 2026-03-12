@@ -1,0 +1,334 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Situation Updates - Resilience System{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    <nav class="sidebar">
+        <a href="{% url 'dashboard' %}" class="sidebar-header" style="text-decoration: none; color: var(--primary-color); display: flex; align-items: center; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </a>
+        <ul class="nav-links">
+            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a></li>
+            <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incident Management</a></li>
+            <li class="nav-item active"><a href="{% url 'situation_updates' %}"><i class="fa-solid fa-clipboard-list"></i> Situation Updates</a></li>
+            <li class="nav-item"><a href="{% url 'shift_packets' %}"><i class="fa-solid fa-file-lines"></i> Shift Packets</a></li>
+            <li class="nav-item"><a href="{% url 'reports' %}"><i class="fa-solid fa-chart-bar"></i> Reports</a></li>
+            <li class="nav-item"><a href="{% url 'system_logs' %}"><i class="fa-solid fa-list-check"></i> System Logs</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            {% include 'core/_profile_dropdown.html' %}
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-header" style="display: flex; align-items: center; justify-content: space-between;">
+            <h2>Situation Updates</h2>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="header-status">
+                    <div class="status-indicator">
+                        <span class="status-label">Current Status:</span>
+                        <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                    </div>
+                    <div class="sync-time">
+                        <span>Last detailed sync: {{ last_sync_display }}</span>
+                    </div>
+                </div>
+                <button type="button" onclick="confirmLogout()" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.25rem;
+                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(239, 68, 68, 0.4)'" 
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.3)'"
+                   title="Logout">
+                    <i class="fa-solid fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="view-container">
+            <div class="card" style="margin-bottom: 1rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Select Incident</h3>
+                </div>
+                <div class="card-body" style="padding: 1rem;">
+                    <div class="dashboard-grid" style="grid-template-columns: 2fr 1.5fr; gap: 1rem;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Incident</label>
+                            <select class="form-control" name="incident_id">
+                                <option value="" selected disabled>Select Incident</option>
+                                {% for inc in incidents %}
+                                    <option value="{{ inc.id }}">[INC-{{ inc.id }}] {{ inc.title }}</option>
+                                {% empty %}
+                                    <option>No incidents available</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Search</label>
+                            <input type="text" class="form-control" placeholder="Search incidents by title or ID (UI only)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 1rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Add Situation Update</h3>
+                </div>
+                <div class="card-body" style="padding: 1rem;">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="dashboard-grid" style="grid-template-columns: 1.5fr 1.5fr; gap: 1rem;">
+                            <div class="form-group">
+                                <label class="form-label" for="situationupdate_title">Update Title</label>
+                                <input
+                                    type="text"
+                                    id="situationupdate_title"
+                                    name="situationupdate_title"
+                                    class="form-control"
+                                    placeholder="Short title for this situation update"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="update_time">Update Time</label>
+                                <input
+                                    type="datetime-local"
+                                    id="update_time"
+                                    name="update_time"
+                                    class="form-control"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 0.75rem;">
+                            <label class="form-label" for="situationupdate_description">Description</label>
+                            <textarea
+                                id="situationupdate_description"
+                                name="situationupdate_description"
+                                class="form-control"
+                                rows="3"
+                                placeholder="What changed since the last update? Key operational notes, impacts, and actions."
+                            ></textarea>
+                        </div>
+
+                        <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+                            <div class="form-group">
+                                <label class="form-label" for="reported_by">Reported By</label>
+                                <input
+                                    type="text"
+                                    id="reported_by"
+                                    name="reported_by"
+                                    class="form-control"
+                                    placeholder="Name"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="department">Department</label>
+                                <input
+                                    type="text"
+                                    id="department"
+                                    name="department"
+                                    class="form-control"
+                                    placeholder="e.g. Operations, Planning"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="affected_area">Affected Area</label>
+                                <input
+                                    type="text"
+                                    id="affected_area"
+                                    name="affected_area"
+                                    class="form-control"
+                                    placeholder="Geography, facility, or impact area"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                            <div class="form-group">
+                                <label class="form-label" for="severity_change">Severity Change</label>
+                                <select id="severity_change" name="severity_change" class="form-control">
+                                    <option value="">No change</option>
+                                    <option value="INCREASED">Increased</option>
+                                    <option value="DECREASED">Decreased</option>
+                                    <option value="STABLE">Stable</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="status_change">Status Change</label>
+                                <select id="status_change" name="status_change" class="form-control">
+                                    <option value="">No change</option>
+                                    <option value="ACTIVATED">Activated</option>
+                                    <option value="ESCALATED">Escalated</option>
+                                    <option value="CONTAINED">Contained</option>
+                                    <option value="RESOLVED">Resolved</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="casualties_injured">Casualties – Injured</label>
+                                <input
+                                    type="number"
+                                    id="casualties_injured"
+                                    name="casualties_injured"
+                                    class="form-control"
+                                    min="0"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="casualties_dead">Casualties – Dead</label>
+                                <input
+                                    type="number"
+                                    id="casualties_dead"
+                                    name="casualties_dead"
+                                    class="form-control"
+                                    min="0"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+                            <div class="form-group">
+                                <label class="form-label" for="actions_taken">Actions Taken</label>
+                                <textarea
+                                    id="actions_taken"
+                                    name="actions_taken"
+                                    class="form-control"
+                                    rows="2"
+                                ></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="resources_deployed">Resources Deployed</label>
+                                <textarea
+                                    id="resources_deployed"
+                                    name="resources_deployed"
+                                    class="form-control"
+                                    rows="2"
+                                ></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="next_steps">Next Steps</label>
+                                <textarea
+                                    id="next_steps"
+                                    name="next_steps"
+                                    class="form-control"
+                                    rows="2"
+                                ></textarea>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div class="form-group">
+                                <label class="form-label" for="confidence_level">Confidence Level</label>
+                                <select id="confidence_level" name="confidence_level" class="form-control">
+                                    <option value="">Select</option>
+                                    <option value="LOW">Low</option>
+                                    <option value="MEDIUM">Medium</option>
+                                    <option value="HIGH">High</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="attachments">Attachments (reference)</label>
+                                <input
+                                    type="text"
+                                    id="attachments"
+                                    name="attachments"
+                                    class="form-control"
+                                    placeholder="File names, links, or IDs"
+                                >
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
+                            <button type="submit" class="btn btn-submit" data-disable-text="Adding...">
+                                Add Update
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Situation Logs List</h3>
+                    <span style="font-size: 0.85rem; color: #6b7280;">Sample log entries</span>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div class="table-responsive" style="max-height: 60vh;">
+                        <table class="incidents-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                            <thead>
+                                <tr style="background: #f9fafb;">
+                                    <th style="padding: 0.6rem 1rem;">#</th>
+                                    <th style="padding: 0.6rem 1rem;">Timestamp</th>
+                                    <th style="padding: 0.6rem 1rem;">Department</th>
+                                    <th style="padding: 0.6rem 1rem;">Action / Description</th>
+                                    <th style="padding: 0.6rem 1rem;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 0.75rem 1rem;">1</td>
+                                    <td style="padding: 0.75rem 1rem;">03/09/2026 06:20</td>
+                                    <td style="padding: 0.75rem 1rem;">Operations</td>
+                                    <td style="padding: 0.75rem 1rem;">Crews dispatched to restore power in Zone C; ETA 2 hours.</td>
+                                    <td style="padding: 0.75rem 1rem;">
+                                        <span class="status-badge status-alert">Active</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.75rem 1rem;">2</td>
+                                    <td style="padding: 0.75rem 1rem;">03/09/2026 04:00</td>
+                                    <td style="padding: 0.75rem 1rem;">Planning</td>
+                                    <td style="padding: 0.75rem 1rem;">Updated projection for weather front arrival; potential extension of activation.</td>
+                                    <td style="padding: 0.75rem 1rem;">
+                                        <span class="status-badge status-alert">Active</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.75rem 1rem;">3</td>
+                                    <td style="padding: 0.75rem 1rem;">03/08/2026 23:15</td>
+                                    <td style="padding: 0.75rem 1rem;">Logistics</td>
+                                    <td style="padding: 0.75rem 1rem;">Additional generators delivered to Riverfront shelter; fuel inventory updated.</td>
+                                    <td style="padding: 0.75rem 1rem;">
+                                        <span class="status-badge status-normal">Resolved</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+

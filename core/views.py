@@ -31,8 +31,14 @@ from reportlab.lib.colors import HexColor
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from django.template.loader import render_to_string
-from weasyprint import HTML
-from weasyprint.text.fonts import FontConfiguration
+try:
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
+    WEASYPRINT_IMPORT_ERROR = None
+except (ImportError, OSError) as e:
+    HTML = None
+    FontConfiguration = None
+    WEASYPRINT_IMPORT_ERROR = e
 import csv
 import os
 
@@ -50,7 +56,7 @@ from .models import (
     log_system_action,
 
 )
-from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm, ProfileEditForm, LegacyProfileEditForm
+from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, CreateIncidentForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm, ProfileEditForm, LegacyProfileEditForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
 from .payment_utils import generate_invoice_id, calculate_due_date, ensure_unique_invoice_id
 from .email_utils import send_checkout_confirmation_email, send_new_user_notification_email
@@ -1950,6 +1956,21 @@ def admin_module(request):
             departments_by_category[category] = []
         departments_by_category[category].append(dept.service_name)
     
+    # Simple, UI-focused agency summary for the Agency Information tab
+    agency_map = {}
+    for u in users_list:
+        key = u.agency_name or "Unassigned Agency"
+        if key not in agency_map:
+            agency_map[key] = {
+                "agency_id": f"AG-{len(agency_map) + 2001}",
+                "agency_name": key,
+                "admin_user_id": u.liaison_email or u.email_id or "",
+                "allowed": 25,
+                "current": 0,
+            }
+        agency_map[key]["current"] += 1
+    agency_list = list(agency_map.values())
+
     # Get logged-in user's data from UsersTable for pre-populating Agency & Contact Information
     logged_in_user_data = None
     if 'user_credentials_id' in request.session:
@@ -1982,6 +2003,7 @@ def admin_module(request):
         'departments': departments,
         'departments_by_category': departments_by_category,
         'logged_in_user_data': logged_in_user_data,
+        'agency_list': agency_list,
         'is_admin': True,
         'user': request.user,
     })
@@ -2522,6 +2544,50 @@ def incidents_list(request):
         except Exception:
             organization = None
     
+    create_incident_form = None  # set below for GET or when POST create_incident fails
+    
+    # Handle New Incident Creation POST from the form on this page
+    if request.method == 'POST' and request.POST.get('action') == 'create_incident':
+        form = CreateIncidentForm(request.POST)
+        if form.is_valid() and organization:
+            reported_time = form.cleaned_data.get('reported_time') or timezone.now()
+            tenant_id = getattr(organization, 'tenant_id', None)
+            incident = IncidentCapture.objects.create(
+                organization=organization,
+                title=form.cleaned_data['title'],
+                description=form.cleaned_data.get('description') or '',
+                severity=form.cleaned_data['severity'],
+                impact=form.cleaned_data.get('impact') or '',
+                start_time=reported_time,
+                created_at=reported_time,
+                created_by=liaison,
+                is_synthesized=False,
+                tenant_id=tenant_id,
+            )
+            actionby_id = None
+            if liaison:
+                actionby_id = getattr(liaison.user, 'id', None)
+            if actionby_id is None and getattr(request.user, 'id', None) is not None:
+                actionby_id = request.user.id
+            if actionby_id is None and request.session.get('user_credentials_id'):
+                actionby_id = request.session.get('user_credentials_id')
+            log_system_action(
+                tenant_id=getattr(organization, 'tenant_id', None) or (organization.pk if organization else None),
+                entity='Incident',
+                actionby=actionby_id,
+                actionon=f"{incident.id}:{incident.title}",
+                action='Create',
+            )
+            messages.success(request, 'Incident created successfully.')
+            return redirect('incidents_list')
+        else:
+            # Validation failed or no organization - keep bound form for re-display
+            if not organization:
+                messages.error(request, 'Unable to create incident: no organization context.')
+            create_incident_form = form
+    else:
+        create_incident_form = None  # will be set below for GET
+    
     if liaison is not None and organization is not None:
         # Standard Django auth users (with Liaison) only see incidents
         # that belong to their organization.
@@ -2558,12 +2624,18 @@ def incidents_list(request):
     else:
         sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
     
+    # Form for New Incident Creation: use bound form with errors if POST failed, else fresh with initial
+    if create_incident_form is None:
+        now = timezone.now()
+        create_incident_form = CreateIncidentForm(initial={'reported_time': now.strftime('%Y-%m-%dT%H:%M')})
+    
     return render(request, 'core/incidents_list.html', {
         'incidents': incidents,
         'organization': organization,
         'is_admin': True,  # Always show admin link - access controlled by view decorator
         'current_status': settings_obj.current_status,
         'last_sync_display': sync_time_display,
+        'create_incident_form': create_incident_form,
     })
 
 
@@ -4074,6 +4146,12 @@ def generate_incident_shift_packet_pdf(request, incident_id):
             'organization_name': organization_name,
             'logs': logs,
         }
+
+        if HTML is None or FontConfiguration is None:
+            return HttpResponse(
+                f'PDF generation is unavailable on this system: {WEASYPRINT_IMPORT_ERROR}',
+                status=500,
+            )
 
         html_string = render_to_string('core/incident_log_history_pdf.html', context)
         font_config = FontConfiguration()

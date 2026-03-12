@@ -524,6 +524,30 @@ class OperationalUpdateForm(forms.ModelForm):
         }),
         label='End Time'
     )
+    shift = forms.ChoiceField(
+        required=False,
+        choices=[
+            ('', 'Select Shift'),
+            ('1', '1'),
+            ('2', '2'),
+            ('3', '3'),
+            ('4', '4'),
+            ('6', '6'),
+            ('8', '8'),
+            ('10', '10'),
+            ('12', '12'),
+            ('16', '16'),
+            ('18', '18'),
+            ('24', '24'),
+            ('48', '48'),
+            ('72', '72'),
+        ],
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+            'style': 'width: auto; min-width: 120px; display: inline-block;',
+        }),
+        label='Shift'
+    )
     
     class Meta:
         model = OperationalUpdate
@@ -557,6 +581,103 @@ class OperationalUpdateForm(forms.ModelForm):
                 'placeholder': 'e.g., Dispatch team, Monitor sensors'
             }),
         }
+
+
+class CreateIncidentForm(forms.Form):
+    """Form for new incident creation - maps to incident management DB columns."""
+    title = forms.CharField(
+        required=True,
+        label='Title',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., WannaCry Ransomware Attack',
+        }),
+    )
+    description = forms.CharField(
+        required=False,
+        label='Description',
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Describe the incident...',
+        }),
+    )
+    category = forms.CharField(
+        required=False,
+        label='Category',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., Cybersecurity',
+        }),
+    )
+    severity = forms.ChoiceField(
+        required=True,
+        label='Severity',
+        choices=[
+            ('LOW', 'Low - Informational'),
+            ('MEDIUM', 'Medium - Potential Impact'),
+            ('HIGH', 'High - Critical Incident'),
+            ('CRITICAL', 'Critical'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+    status = forms.CharField(
+        required=False,
+        label='Status',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., Open, Investigating',
+        }),
+    )
+    reported_time = forms.DateTimeField(
+        required=False,
+        label='Reported Time',
+        widget=forms.DateTimeInput(attrs={
+            'class': 'form-control',
+            'type': 'datetime-local',
+        }),
+    )
+    reported_by = forms.CharField(
+        required=False,
+        label='Reported By',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Name or designation',
+        }),
+    )
+    location = forms.CharField(
+        required=False,
+        label='Location',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., County-wide',
+        }),
+    )
+    impact = forms.CharField(
+        required=False,
+        label='Impact',
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Why it matters - operational impact...',
+        }),
+    )
+    casualties = forms.CharField(
+        required=False,
+        label='Casualties',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'If applicable',
+        }),
+    )
+    source = forms.CharField(
+        required=False,
+        label='Source',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., Hotline, Email',
+        }),
+    )
 
 
 class UserSignupForm(forms.ModelForm):

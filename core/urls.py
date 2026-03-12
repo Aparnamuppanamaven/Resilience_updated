@@ -4,6 +4,7 @@ URL configuration for core app
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
+from . import extra_views
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -29,6 +30,15 @@ urlpatterns = [
     path('api/incidents/<int:incident_id>/add-event-log/', views.add_incident_event_log, name='add_incident_event_log'),
     path('api/toggle-alert/', views.toggle_alert, name='toggle_alert'),
     path('api/toggle-alert/', views.toggle_alert, name='toggle_alert'),
+    # UI-only pages for prototype workflows (no backend persistence yet)
+    path('situation-updates/', extra_views.situation_updates_page, name='situation_updates'),
+    path('shift-packets/', extra_views.shift_packets_page, name='shift_packets'),
+    path('reports/', extra_views.reports_page, name='reports'),
+    path('reports/pdf/', extra_views.reports_pdf, name='reports_pdf'),
+    path('api/situation-logs/', extra_views.api_situation_logs, name='api_situation_logs'),
+    path('system-logs/', extra_views.system_logs_page, name='system_logs'),
+    # User Management reuses the Admin Module UI and features
+    path('user-management/', views.admin_module, name='user_management'),
     path('login/', views.login_view, name='login'),
     path('register/', views.register_view, name='register'),
     path('logout/', views.logout_view, name='logout'),

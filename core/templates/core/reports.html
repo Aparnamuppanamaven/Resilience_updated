@@ -1,0 +1,303 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Reports - Resilience System{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    <nav class="sidebar">
+        <a href="{% url 'dashboard' %}" class="sidebar-header" style="text-decoration: none; color: var(--primary-color); display: flex; align-items: center; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </a>
+        <ul class="nav-links">
+            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a></li>
+            <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incident Management</a></li>
+            <li class="nav-item"><a href="{% url 'situation_updates' %}"><i class="fa-solid fa-clipboard-list"></i> Situation Updates</a></li>
+            <li class="nav-item"><a href="{% url 'shift_packets' %}"><i class="fa-solid fa-file-lines"></i> Shift Packets</a></li>
+            <li class="nav-item active"><a href="{% url 'reports' %}"><i class="fa-solid fa-chart-bar"></i> Reports</a></li>
+            <li class="nav-item"><a href="{% url 'system_logs' %}"><i class="fa-solid fa-list-check"></i> System Logs</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            {% include 'core/_profile_dropdown.html' %}
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-header" style="display: flex; align-items: center; justify-content: space-between;">
+            <h2>Reports</h2>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="header-status">
+                    <div class="status-indicator">
+                        <span class="status-label">Current Status:</span>
+                        <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                    </div>
+                    <div class="sync-time">
+                        <span>Last detailed sync: {{ last_sync_display }}</span>
+                    </div>
+                </div>
+                <button type="button" onclick="confirmLogout()" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.25rem;
+                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(239, 68, 68, 0.4)'" 
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.3)'"
+                   title="Logout">
+                    <i class="fa-solid fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="view-container">
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Select Incident</h3>
+                </div>
+                <div class="card-body">
+                    <form>
+                        <div class="dashboard-grid" style="grid-template-columns: 2fr auto auto auto; gap: 1rem; align-items: flex-end;">
+                            <div class="form-group">
+                                <label class="form-label">Incident</label>
+                                <select id="incidentSelect" class="form-control">
+                                    <option value="" selected disabled>Select Incident</option>
+                                    {% for inc in incidents %}
+                                        <option value="{{ inc.id }}" data-title="{{ inc.title }}" data-severity="{{ inc.get_severity_display }}">[INC-{{ inc.id }}] {{ inc.title }}</option>
+                                    {% empty %}
+                                        <option>No incidents available</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="button" id="generateReportBtn" class="btn btn-submit">Generate Summary Report</button>
+                            <a href="{% url 'reports_pdf' %}" class="btn btn-secondary">Download PDF</a>
+                            <div style="display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start;">
+                                <button type="button" id="viewLogsBtn" class="btn btn-secondary">View Situation Logs</button>
+                                <span style="font-size: 0.8rem; color: #6b7280;">
+                                    Total Logs in System: {{ total_situation_logs }}
+                                </span>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card" id="reportPreviewCard">
+                <div class="card-header">
+                    <h3 class="card-title">Report Preview</h3>
+                    <span style="font-size: 0.85rem; color: #6b7280;">Generated report content</span>
+                </div>
+                <div class="card-body">
+                    <div class="dashboard-grid" style="grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                        <div class="card" style="box-shadow: none; border: 1px solid #e5e7eb;">
+                            <div class="card-header" style="border-bottom: none; padding-bottom: 0.5rem;">
+                                <span class="card-title" style="font-size: 0.8rem; text-transform: uppercase; color: #6b7280;">Incident Title</span>
+                            </div>
+                            <div class="card-body" style="padding-top: 0;">
+                                <span id="previewIncidentTitle" style="font-weight: 600;">
+                                    {% if preview_incident %}
+                                        {{ preview_incident.title }}
+                                    {% else %}
+                                        Severe Weather – North Region
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card" style="box-shadow: none; border: 1px solid #e5e7eb;">
+                            <div class="card-header" style="border-bottom: none; padding-bottom: 0.5rem;">
+                                <span class="card-title" style="font-size: 0.8rem; text-transform: uppercase; color: #6b7280;">Severity</span>
+                            </div>
+                            <div class="card-body" style="padding-top: 0;">
+                                <span id="previewSeverity" class="status-badge status-alert">
+                                    {% if preview_incident %}
+                                        {{ preview_incident.get_severity_display }}
+                                    {% else %}
+                                        High
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card" style="box-shadow: none; border: 1px solid #e5e7eb;">
+                            <div class="card-header" style="border-bottom: none; padding-bottom: 0.5rem;">
+                                <span class="card-title" style="font-size: 0.8rem; text-transform: uppercase; color: #6b7280;">Total Situation Logs</span>
+                            </div>
+                            <div class="card-body" style="padding-top: 0;">
+                                <span style="font-weight: 600;">{{ total_situation_logs }}</span>
+                            </div>
+                        </div>
+                        <div class="card" style="box-shadow: none; border: 1px solid #e5e7eb;">
+                            <div class="card-header" style="border-bottom: none; padding-bottom: 0.5rem;">
+                                <span class="card-title" style="font-size: 0.8rem; text-transform: uppercase; color: #6b7280;">Total Shift Packets</span>
+                            </div>
+                            <div class="card-body" style="padding-top: 0;">
+                                <span style="font-weight: 600;">{{ total_shift_packets }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="card-title" style="margin-bottom: 0.5rem;">AI Generated Summary</h3>
+                        <p style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.75rem;">
+                            Example of an AI-generated narrative. In production this would be populated by backend logic.
+                        </p>
+                        <div id="previewAISummary">
+                            <p style="font-size: 0.95rem; color: #374151; margin-bottom: 0.5rem;">
+                                Over the last 48 hours, the North Region experienced severe weather conditions resulting in
+                                widespread power disruptions across Zones A, B, and C. Field crews successfully restored service
+                                to Zones A and B while Zone C remains partially impacted due to continued high winds and access
+                                limitations.
+                            </p>
+                            <p style="font-size: 0.95rem; color: #374151;">
+                                Coordination between Operations, Logistics, and Planning sections ensured continuous staffing
+                                of the Emergency Operations Center with timely shift handoffs. No fatalities have been reported,
+                                and all critical facilities (hospitals, shelters) remain operational with backup power support.
+                                The next operational period will focus on full restoration in Zone C and initiation of
+                                demobilization planning.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Situation Logs Modal -->
+<div id="situationLogsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;">
+    <div style="background: white; margin: 2rem auto; max-width: 90%; width: 1200px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 90vh; overflow-y: auto;">
+        <div style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0;">Situation Logs</h2>
+            <button id="closeLogsModal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;">&times;</button>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div style="margin-bottom: 1rem;">
+                <strong>Total Logs: {{ total_situation_logs }}</strong>
+            </div>
+            <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+                <table class="incidents-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                    <thead>
+                        <tr style="background: #f9fafb;">
+                            <th style="padding: 0.6rem 1rem;">#</th>
+                            <th style="padding: 0.6rem 1rem;">Timestamp</th>
+                            <th style="padding: 0.6rem 1rem;">Department</th>
+                            <th style="padding: 0.6rem 1rem;">Action / Description</th>
+                            <th style="padding: 0.6rem 1rem;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="situationLogsTableBody">
+                        <!-- Logs will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const incidentSelect = document.getElementById('incidentSelect');
+    const generateReportBtn = document.getElementById('generateReportBtn');
+    const viewLogsBtn = document.getElementById('viewLogsBtn');
+    const reportPreviewCard = document.getElementById('reportPreviewCard');
+    const situationLogsModal = document.getElementById('situationLogsModal');
+    const closeLogsModal = document.getElementById('closeLogsModal');
+    const logsTableBody = document.getElementById('situationLogsTableBody');
+
+    // Generate Summary Report button handler
+    generateReportBtn.addEventListener('click', function() {
+        const selectedOption = incidentSelect.options[incidentSelect.selectedIndex];
+        if (!selectedOption || !selectedOption.value) {
+            alert('Please select an incident first.');
+            return;
+        }
+
+        const incidentTitle = selectedOption.getAttribute('data-title') || selectedOption.text.replace(/^\[INC-\d+\]\s*/, '');
+        const severity = selectedOption.getAttribute('data-severity') || 'Unknown';
+
+        // Update preview
+        document.getElementById('previewIncidentTitle').textContent = incidentTitle;
+        const severityElement = document.getElementById('previewSeverity');
+        severityElement.textContent = severity;
+        
+        // Update severity badge class based on severity
+        severityElement.className = 'status-badge ';
+        if (severity.toLowerCase().includes('critical')) {
+            severityElement.className += 'status-alert';
+        } else if (severity.toLowerCase().includes('high')) {
+            severityElement.className += 'status-alert';
+        } else if (severity.toLowerCase().includes('medium')) {
+            severityElement.className += 'status-watch';
+        } else {
+            severityElement.className += 'status-normal';
+        }
+
+        // Show the preview card (in case it was hidden)
+        reportPreviewCard.style.display = 'block';
+        reportPreviewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    // View Situation Logs button handler
+    viewLogsBtn.addEventListener('click', function() {
+        // Fetch logs from API
+        fetch('{% url "api_situation_logs" %}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    logsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #ef4444;">' + data.error + '</td></tr>';
+                } else if (data.logs && data.logs.length > 0) {
+                    let html = '';
+                    data.logs.forEach((log, index) => {
+                        const statusClass = log.status === 'ACTIVE' ? 'status-normal' : 'status-watch';
+                        html += `
+                            <tr>
+                                <td style="padding: 0.75rem 1rem;">${index + 1}</td>
+                                <td style="padding: 0.75rem 1rem;">${log.timestamp}</td>
+                                <td style="padding: 0.75rem 1rem;">${log.department}</td>
+                                <td style="padding: 0.75rem 1rem;">${log.description}</td>
+                                <td style="padding: 0.75rem 1rem;"><span class="status-badge ${statusClass}">${log.status}</span></td>
+                            </tr>
+                        `;
+                    });
+                    logsTableBody.innerHTML = html;
+                } else {
+                    logsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">No logs available</td></tr>';
+                }
+                situationLogsModal.style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Error fetching logs:', error);
+                logsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #ef4444;">Error loading logs. Please try again.</td></tr>';
+                situationLogsModal.style.display = 'block';
+            });
+    });
+
+    // Close modal handlers
+    closeLogsModal.addEventListener('click', function() {
+        situationLogsModal.style.display = 'none';
+    });
+
+    situationLogsModal.addEventListener('click', function(e) {
+        if (e.target === situationLogsModal) {
+            situationLogsModal.style.display = 'none';
+        }
+    });
+});
+</script>
+
+{% endblock %}
+

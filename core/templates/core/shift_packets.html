@@ -1,0 +1,168 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Shift Packets - Resilience System{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    <nav class="sidebar">
+        <a href="{% url 'dashboard' %}" class="sidebar-header" style="text-decoration: none; color: var(--primary-color); display: flex; align-items: center; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </a>
+        <ul class="nav-links">
+            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a></li>
+            <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incident Management</a></li>
+            <li class="nav-item"><a href="{% url 'situation_updates' %}"><i class="fa-solid fa-clipboard-list"></i> Situation Updates</a></li>
+            <li class="nav-item active"><a href="{% url 'shift_packets' %}"><i class="fa-solid fa-file-lines"></i> Shift Packets</a></li>
+            <li class="nav-item"><a href="{% url 'reports' %}"><i class="fa-solid fa-chart-bar"></i> Reports</a></li>
+            <li class="nav-item"><a href="{% url 'system_logs' %}"><i class="fa-solid fa-list-check"></i> System Logs</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
+            <li class="nav-item nav-item-hidden"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            {% include 'core/_profile_dropdown.html' %}
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-header" style="display: flex; align-items: center; justify-content: space-between;">
+            <h2>Shift Packets</h2>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="header-status">
+                    <div class="status-indicator">
+                        <span class="status-label">Current Status:</span>
+                        <span class="status-badge status-{{ current_status|lower|slugify }}">{{ current_status|upper }}</span>
+                    </div>
+                    <div class="sync-time">
+                        <span>Last detailed sync: {{ last_sync_display }}</span>
+                    </div>
+                </div>
+                <button type="button" onclick="confirmLogout()" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.75rem 1.25rem;
+                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(239, 68, 68, 0.4)'" 
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(239, 68, 68, 0.3)'"
+                   title="Logout">
+                    <i class="fa-solid fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="view-container">
+            <div class="card" style="margin-bottom: 1rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Select Incident</h3>
+                </div>
+                <div class="card-body" style="padding: 1rem;">
+                    <div class="dashboard-grid" style="grid-template-columns: 2fr 1.5fr; gap: 1rem;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Incident</label>
+                            <select class="form-control">
+                                <option value="" selected disabled>Select Incident</option>
+                                {% for inc in incidents %}
+                                    <option value="{{ inc.id }}">[INC-{{ inc.id }}] {{ inc.title }}</option>
+                                {% empty %}
+                                    <option>No incidents available</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Search</label>
+                            <input type="text" class="form-control" placeholder="Search incidents (UI only)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 0.5rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Shift Packet Entries</h3>
+                    <span style="font-size: 0.85rem; color: #6b7280;">Example shift handoff rows</span>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div class="table-responsive" style="max-height: 340px; overflow-y: auto; overflow-x: auto;">
+                        <table class="incidents-table" style="min-width: 1800px; border-collapse: separate; border-spacing: 0;">
+                            <thead>
+                                <tr style="background: #f9fafb;">
+                                    <th style="padding: 0.6rem 1rem;">Shift Time</th>
+                                    <th style="padding: 0.6rem 1rem;">Previous Shift Info</th>
+                                    <th style="padding: 0.6rem 1rem;">What Happened</th>
+                                    <th style="padding: 0.6rem 1rem;">Next Steps Recommended</th>
+                                    <th style="padding: 0.6rem 1rem;">Generated Type</th>
+                                    <th style="padding: 0.6rem 1rem;">Created By</th>
+                                    <th style="padding: 0.6rem 1rem; text-align: center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 0.75rem 1rem;">03/09/2026 06:20</td>
+                                    <td style="padding: 0.75rem 1rem;">Power restoration ongoing in Zones A and B; crew Alpha on-site.</td>
+                                    <td style="padding: 0.75rem 1rem;">Zone C reported new outages; backup crews dispatched.</td>
+                                    <td style="padding: 0.75rem 1rem;">Monitor restoration progress; update status by 08:30; coordinate with utilities.</td>
+                                    <td style="padding: 0.75rem 1rem;"><span class="status-badge status-normal">AI</span></td>
+                                    <td style="padding: 0.75rem 1rem;">Paul</td>
+                                    <td style="padding: 0.75rem 1rem; text-align: center;">
+                                        <div class="open-incidents-actions">
+                                            <a href="#" class="btn-action-icon btn-action-update" title="Edit"><i class="fa-solid fa-pencil"></i></a>
+                                            <a href="#" class="btn-action-icon btn-action-pdf" title="ShiftPDF"><i class="fa-solid fa-file-pdf"></i></a>
+                                            <a href="#" class="btn-action-icon btn-action-excel" title="SituationLog"><i class="fa-solid fa-list"></i></a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.75rem 1rem;">03/09/2026 14:00</td>
+                                    <td style="padding: 0.75rem 1rem;">Containment measures in place for county network; external access limited.</td>
+                                    <td style="padding: 0.75rem 1rem;">Forensics identified phishing emails as primary vector; user list compiled.</td>
+                                    <td style="padding: 0.75rem 1rem;">Roll out password resets; schedule user training; finalize incident communications.</td>
+                                    <td style="padding: 0.75rem 1rem;"><span class="status-badge status-normal">AI</span></td>
+                                    <td style="padding: 0.75rem 1rem;">Alex</td>
+                                    <td style="padding: 0.75rem 1rem; text-align: center;">
+                                        <div class="open-incidents-actions">
+                                            <a href="#" class="btn-action-icon btn-action-update" title="Edit"><i class="fa-solid fa-pencil"></i></a>
+                                            <a href="#" class="btn-action-icon btn-action-pdf" title="ShiftPDF"><i class="fa-solid fa-file-pdf"></i></a>
+                                            <a href="#" class="btn-action-icon btn-action-excel" title="SituationLog"><i class="fa-solid fa-list"></i></a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.75rem 1rem;">03/08/2026 22:15</td>
+                                    <td style="padding: 0.75rem 1rem;">Sandbagging operations completed for Riverfront Sector 3; shelters activated.</td>
+                                    <td style="padding: 0.75rem 1rem;">Water levels plateaued; no new evacuations; dewatering started.</td>
+                                    <td style="padding: 0.75rem 1rem;">Plan demobilization of non-critical resources; maintain monitoring overnight.</td>
+                                    <td style="padding: 0.75rem 1rem;"><span class="status-badge status-watch">Manual</span></td>
+                                    <td style="padding: 0.75rem 1rem;">Jordan</td>
+                                    <td style="padding: 0.75rem 1rem; text-align: center;">
+                                        <div class="open-incidents-actions">
+                                            <a href="#" class="btn-action-icon btn-action-update" title="Edit"><i class="fa-solid fa-pencil"></i></a>
+                                            <a href="#" class="btn-action-icon btn-action-pdf" title="ShiftPDF"><i class="fa-solid fa-file-pdf"></i></a>
+                                            <a href="#" class="btn-action-icon btn-action-excel" title="SituationLog"><i class="fa-solid fa-list"></i></a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+

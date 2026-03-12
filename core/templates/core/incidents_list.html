@@ -1,7 +1,7 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
-{% block title %}Incidents List - Resilience System{% endblock %}
+{% block title %}Incident Management - Resilience System{% endblock %}
 
 {% block content %}
 <div class="app-container">
@@ -11,10 +11,13 @@
             <span class="logo-text">Resilience</span>
         </a>
         <ul class="nav-links">
-            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> Admin</a></li>
+            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a></li>
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
-            <li class="nav-item"><a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Incidents</a></li>
-            <li class="nav-item active"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incidents List</a></li>
+            <li class="nav-item active"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incident Management</a></li>
+            <li class="nav-item"><a href="{% url 'situation_updates' %}"><i class="fa-solid fa-clipboard-list"></i> Situation Updates</a></li>
+            <li class="nav-item"><a href="{% url 'shift_packets' %}"><i class="fa-solid fa-file-lines"></i> Shift Packets</a></li>
+            <li class="nav-item"><a href="{% url 'reports' %}"><i class="fa-solid fa-chart-bar"></i> Reports</a></li>
+            <li class="nav-item"><a href="{% url 'system_logs' %}"><i class="fa-solid fa-list-check"></i> System Logs</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
@@ -28,7 +31,7 @@
 
     <main class="main-content">
         <header class="top-header" style="display: flex; align-items: center; justify-content: space-between;">
-            <h2>Incidents List</h2>
+            <h2>Incident Management</h2>
             <div style="display: flex; align-items: center; gap: 1rem;">
                 <div class="header-status">
                     <div class="status-indicator">
@@ -75,12 +78,34 @@
                     padding: 0.75rem 1rem;
                     border-bottom: 1px solid #e5e7eb;
                 ">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex: 0 0 auto;">
                             <i class="fa-solid fa-list-ul" style="font-size: 1rem; color: #667eea;"></i>
-                            <h3 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; color: #111827;">Incidents List</h3>
+                            <h3 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 600; color: #111827;">Incident Management</h3>
                             <span style="font-size: 0.875rem; color: #6b7280; margin-left: 0.5rem;">({{ incidents|length }})</span>
                         </div>
+                        <div style="flex: 1;"></div>
+                        <button type="button" onclick="openCreateIncidentModal()" style="
+                            display: flex;
+                            align-items: center;
+                            gap: 0.5rem;
+                            padding: 0.5rem 1rem;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
+                            border: none;
+                            border-radius: 6px;
+                            font-weight: 600;
+                            font-size: 0.875rem;
+                            cursor: pointer;
+                            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+                            transition: transform 0.2s ease, box-shadow 0.2s ease;
+                            margin-left: auto;
+                        " onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(102, 126, 234, 0.3)'" 
+                           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(102, 126, 234, 0.2)'"
+                           title="Create New Incident">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Create Incident</span>
+                        </button>
                     </div>
                 </div>
                 
@@ -303,27 +328,158 @@
                     <p style="font-size: 1rem; margin: 0.5rem 0 1.5rem; color: #6c757d;">
                         Get started by creating your first incident
                     </p>
-                    <a href="{% url 'capture' %}" style="
+                    <button type="button" onclick="openCreateIncidentModal()" style="
                         display: inline-flex;
                         align-items: center;
                         gap: 0.5rem;
                         padding: 0.75rem 1.5rem;
                         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                         color: white;
-                        text-decoration: none;
+                        border: none;
                         border-radius: 8px;
                         font-weight: 500;
+                        cursor: pointer;
                         transition: transform 0.2s ease, box-shadow 0.2s ease;
                         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
                     ">
                         <i class="fa-solid fa-plus"></i>
                         Create Incident
-                    </a>
+                    </button>
                 </div>
                 {% endif %}
             </div>
         </div>
     </main>
+
+    <!-- New Incident Creation modal (popup) -->
+    <div id="createIncidentModal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    ">
+        <div style="
+            background: white;
+            border-radius: 12px;
+            max-width: 640px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        ">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb;">
+                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600; color: #111827;">New Incident Creation</h3>
+                <button type="button" onclick="closeCreateIncidentModal()" style="
+                    background: none;
+                    border: none;
+                    font-size: 1.5rem;
+                    color: #6b7280;
+                    cursor: pointer;
+                    padding: 0.25rem;
+                    line-height: 1;
+                " aria-label="Close">&times;</button>
+            </div>
+            <div style="padding: 1.25rem;">
+                <form method="post" action="{% url 'incidents_list' %}" id="createIncidentForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_incident">
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.title.label }}</label>
+                        {{ create_incident_form.title }}
+                        {% if create_incident_form.title.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.title.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.severity.label }}</label>
+                            {{ create_incident_form.severity }}
+                            {% if create_incident_form.severity.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.severity.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.status.label }}</label>
+                            {{ create_incident_form.status }}
+                            {% if create_incident_form.status.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.status.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.reported_time.label }}</label>
+                            {{ create_incident_form.reported_time }}
+                            {% if create_incident_form.reported_time.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.reported_time.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.reported_by.label }}</label>
+                            {{ create_incident_form.reported_by }}
+                            {% if create_incident_form.reported_by.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.reported_by.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.description.label }}</label>
+                        {{ create_incident_form.description }}
+                        {% if create_incident_form.description.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.description.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.category.label }}</label>
+                        {{ create_incident_form.category }}
+                        {% if create_incident_form.category.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.category.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.location.label }}</label>
+                        {{ create_incident_form.location }}
+                        {% if create_incident_form.location.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.location.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.impact.label }}</label>
+                        {{ create_incident_form.impact }}
+                        {% if create_incident_form.impact.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.impact.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.casualties.label }}</label>
+                            {{ create_incident_form.casualties }}
+                            {% if create_incident_form.casualties.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.casualties.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.source.label }}</label>
+                            {{ create_incident_form.source }}
+                            {% if create_incident_form.source.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.source.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-submit" style="width: 100%; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">
+                        Submit Incident to Timeline
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <style>
     .incident-row:hover {
@@ -395,6 +551,22 @@
     </style>
 
     <script>
+    function openCreateIncidentModal() {
+        document.getElementById('createIncidentModal').style.display = 'flex';
+    }
+    function closeCreateIncidentModal() {
+        document.getElementById('createIncidentModal').style.display = 'none';
+    }
+    // Close modal when clicking the backdrop
+    document.getElementById('createIncidentModal').addEventListener('click', function(e) {
+        if (e.target === this) closeCreateIncidentModal();
+    });
+    // Make modal visible as flex when open (for centering)
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if create_incident_form.errors %}
+        openCreateIncidentModal();
+        {% endif %}
+    });
     // Make incident rows clickable
     document.addEventListener('DOMContentLoaded', function() {
         const rows = document.querySelectorAll('.incident-row');
