@@ -95,7 +95,7 @@ def situation_updates_page(request):
         return auth_redirect
 
     organization, current_status, last_sync_display = _get_org_and_status(request)
-    incidents = IncidentCapture.objects.all().order_by("-created_at")[:50]
+    incidents = IncidentCapture.objects.all().order_by("-reported_time")[:50]
 
     context = {
         "organization": organization,
@@ -116,7 +116,7 @@ def shift_packets_page(request):
         return auth_redirect
 
     organization, current_status, last_sync_display = _get_org_and_status(request)
-    incidents = IncidentCapture.objects.all().order_by("-created_at")[:50]
+    incidents = IncidentCapture.objects.all().order_by("-reported_time")[:50]
 
     context = {
         "organization": organization,
@@ -135,7 +135,7 @@ def _build_report_context(request):
     as the preview data source.
     """
     organization, current_status, last_sync_display = _get_org_and_status(request)
-    incidents = IncidentCapture.objects.all().order_by("-created_at")[:50]
+    incidents = IncidentCapture.objects.all().order_by("-reported_time")[:50]
     preview_incident = incidents[0] if incidents else None
 
     # Global counts for situation logs and shift packets

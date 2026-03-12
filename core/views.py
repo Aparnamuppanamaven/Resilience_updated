@@ -2667,9 +2667,9 @@ def incident_copy_view(request):
     if liaison is not None and organization is not None:
         incidents = IncidentCapture.objects.filter(
             organization=organization
-        ).order_by('-created_at')
+        ).order_by('-reported_time')
     else:
-        incidents = IncidentCapture.objects.all().order_by('-created_at')
+        incidents = IncidentCapture.objects.all().order_by('-reported_time')
 
     # System status / sync info (same as incidents_list)
     settings_obj, created = SystemSettings.objects.get_or_create(
