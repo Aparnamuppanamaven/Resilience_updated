@@ -7,18 +7,19 @@ These do NOT persist data yet – they are meant for front-end review only.
 
 from datetime import timedelta
 import json
+from io import BytesIO
 
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.template.loader import render_to_string
 from django.utils import timezone
 
-try:
-    from weasyprint import HTML
-    WEASYPRINT_IMPORT_ERROR = None
-except (ImportError, OSError) as e:
-    HTML = None
-    WEASYPRINT_IMPORT_ERROR = e
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import inch
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+from reportlab.lib.enums import TA_LEFT
 
 from .models import (
     IncidentCapture,
@@ -177,24 +178,81 @@ def reports_page(request):
 def reports_pdf(request):
     """
     Generate a PDF snapshot of the current Report Preview and AI summary.
+    Uses ReportLab only (no WeasyPrint) so it works cross‑platform
+    without native GTK/Pango dependencies.
     """
     auth_redirect = _require_auth(request)
     if auth_redirect:
         return auth_redirect
 
-    if HTML is None:
-        return HttpResponse(
-            f"PDF generation is unavailable on this system: {WEASYPRINT_IMPORT_ERROR}",
-            status=500,
-        )
-
     context = _build_report_context(request)
+    buffer = BytesIO()
 
-    html_string = render_to_string("core/reports_pdf.html", context)
-    pdf_bytes = HTML(string=html_string, base_url=request.build_absolute_uri("/")).write_pdf()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=0.75 * inch,
+        rightMargin=0.75 * inch,
+        topMargin=0.75 * inch,
+        bottomMargin=0.75 * inch,
+    )
+
+    styles = getSampleStyleSheet()
+    body_style = styles["BodyText"]
+    body_style.alignment = TA_LEFT
+    title_style = styles["Heading1"]
+    subtitle_style = styles["Heading3"]
+
+    story = []
+
+    # Title
+    story.append(Paragraph("Incident Report Summary", title_style))
+    story.append(Spacer(1, 0.2 * inch))
+
+    # Organization / status
+    org = context.get("organization")
+    org_name = getattr(org, "name", "Resilience System")
+    current_status = context.get("current_status") or "NORMAL"
+    story.append(Paragraph(f"Organization: {org_name}", body_style))
+    story.append(Paragraph(f"Current Status: {current_status}", body_style))
+    story.append(Spacer(1, 0.2 * inch))
+
+    # Incident overview
+    preview_incident = context.get("preview_incident")
+    if preview_incident:
+        story.append(Paragraph("Preview Incident", subtitle_style))
+        story.append(Spacer(1, 0.1 * inch))
+        story.append(Paragraph(f"ID: INC-{preview_incident.id}", body_style))
+        story.append(Paragraph(f"Title: {preview_incident.title}", body_style))
+        desc = getattr(preview_incident, "description", "")
+        if desc:
+            story.append(Paragraph(f"Description: {desc}", body_style))
+        story.append(Spacer(1, 0.2 * inch))
+
+    # Situation logs and shift packets counts
+    total_situation_logs = context.get("total_situation_logs", 0)
+    total_shift_packets = context.get("total_shift_packets", 0)
+    story.append(Paragraph("Summary Metrics", subtitle_style))
+    story.append(Spacer(1, 0.1 * inch))
+    story.append(Paragraph(f"Total Situation Logs: {total_situation_logs}", body_style))
+    story.append(Paragraph(f"Total Shift Packets: {total_shift_packets}", body_style))
+
+    story.append(Spacer(1, 0.3 * inch))
+    story.append(
+        Paragraph(
+            "This PDF is a compact summary for quick sharing. "
+            "For full interactive details, use the web dashboard Incident Reports view.",
+            body_style,
+        )
+    )
+
+    doc.build(story)
+
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
 
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
-    response["Content-Disposition"] = 'inline; filename="incident_report_summary.pdf"'
+    response["Content-Disposition"] = 'inline; filename=\"incident_report_summary.pdf\"'
     return response
 
 

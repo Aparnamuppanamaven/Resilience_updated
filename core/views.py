@@ -31,14 +31,7 @@ from reportlab.lib.colors import HexColor
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from django.template.loader import render_to_string
-try:
-    from weasyprint import HTML
-    from weasyprint.text.fonts import FontConfiguration
-    WEASYPRINT_IMPORT_ERROR = None
-except (ImportError, OSError) as e:
-    HTML = None
-    FontConfiguration = None
-    WEASYPRINT_IMPORT_ERROR = e
+# WeasyPrint is imported lazily in generate_incident_shift_packet_pdf() to avoid startup warnings on Windows.
 import csv
 import os
 
@@ -3955,7 +3948,7 @@ def generate_incident_shift_packet_pdf(request, incident_id):
 
 
 def generate_incident_shift_packet_pdf(request, incident_id):
-    """Generate Incident Log History PDF from HTML template (WeasyPrint)."""
+    """Generate Incident Log History PDF using ReportLab (no WeasyPrint)."""
     if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
         return HttpResponse('Unauthorized', status=401)
 
@@ -4132,36 +4125,93 @@ def generate_incident_shift_packet_pdf(request, incident_id):
         report_generated_at = timezone.now().strftime('%d %b %Y, %H:%M hrs')
         organization_name = organization.name if organization else 'Resilience System'
 
-        context = {
-            'incident_id': f'INC-{incident.id}',
-            'incident_title': incident.title,
-            'incident_description': getattr(incident, 'description', '') or '',
-            'report_generated_at': report_generated_at,
-            'period_start': period_start,
-            'period_end': period_end,
-            'total_logs': len(incident_logs),
-            'severity': severity,
-            'severity_css': severity_css,
-            'severity_display': severity_display,
-            'organization_name': organization_name,
-            'logs': logs,
-        }
-
-        if HTML is None or FontConfiguration is None:
-            return HttpResponse(
-                f'PDF generation is unavailable on this system: {WEASYPRINT_IMPORT_ERROR}',
-                status=500,
-            )
-
-        html_string = render_to_string('core/incident_log_history_pdf.html', context)
-        font_config = FontConfiguration()
-        pdf_doc = HTML(string=html_string).render(font_config=font_config)
+        # Build PDF with ReportLab
         buffer = BytesIO()
-        pdf_doc.write_pdf(buffer)
-        buffer.seek(0)
+        pdf = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
 
-        response = HttpResponse(buffer, content_type='application/pdf')
-        response['Content-Disposition'] = f'inline; filename="Incident_Log_History_INC-{incident.id}.pdf"'
+        # Margins
+        left_margin = 0.75 * inch
+        right_margin = 0.75 * inch
+        top_margin = height - 0.75 * inch
+        bottom_margin = 0.75 * inch
+
+        y = top_margin
+
+        # Header
+        pdf.setFont("Helvetica-Bold", 16)
+        pdf.drawString(left_margin, y, "Incident Log History")
+        y -= 20
+
+        pdf.setFont("Helvetica", 10)
+        pdf.drawString(left_margin, y, f"Incident ID: INC-{incident.id}")
+        y -= 14
+        pdf.drawString(left_margin, y, f"Title: {incident.title}")
+        y -= 14
+        pdf.drawString(left_margin, y, f"Organization: {organization_name}")
+        y -= 14
+        pdf.drawString(left_margin, y, f"Severity: {severity_display}")
+        y -= 14
+        pdf.drawString(left_margin, y, f"Period: {period_start}  –  {period_end}")
+        y -= 14
+        pdf.drawString(left_margin, y, f"Total Logs: {len(incident_logs)}")
+        y -= 20
+
+        # Description
+        desc = getattr(incident, "description", "") or ""
+        if desc:
+            pdf.setFont("Helvetica-Bold", 11)
+            pdf.drawString(left_margin, y, "Incident Description")
+            y -= 14
+            pdf.setFont("Helvetica", 10)
+
+            from reportlab.platypus import Paragraph
+            from reportlab.lib.styles import getSampleStyleSheet
+            styles = getSampleStyleSheet()
+            p_style = styles["BodyText"]
+
+            # Use a simple Flowable on a temporary frame-like area
+            from reportlab.platypus import Frame
+            frame = Frame(left_margin, bottom_margin, width - left_margin - right_margin, y - bottom_margin, showBoundary=0)
+            story = [Paragraph(desc, p_style)]
+            frame.addFromList(story, pdf)
+            y = frame._y1 - 20
+
+        # Logs table (simple text rows)
+        pdf.setFont("Helvetica-Bold", 11)
+        pdf.drawString(left_margin, y, "Timeline")
+        y -= 16
+        pdf.setFont("Helvetica", 9)
+
+        for log in logs:
+            timestamp = log["timestamp"].replace("<br>", " ")
+            department = log["department"]
+            status = log["status"]
+            description = log["description"]
+
+            line = f"[{timestamp}] [{department}] ({status}) {description}"
+
+            # Wrap line manually
+            max_width = width - left_margin - right_margin
+            import textwrap
+            wrapped_lines = textwrap.wrap(line, width=110)
+
+            for wline in wrapped_lines:
+                if y < bottom_margin + 40:
+                    pdf.showPage()
+                    pdf.setFont("Helvetica", 9)
+                    y = top_margin
+                pdf.drawString(left_margin, y, wline)
+                y -= 12
+
+            y -= 6
+
+        pdf.showPage()
+        pdf.save()
+
+        buffer.seek(0)
+        response = HttpResponse(buffer, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="Incident_Log_History_INC-{incident.id}.pdf"'
         return response
 
     except IncidentCapture.DoesNotExist:
