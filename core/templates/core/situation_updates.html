@@ -69,12 +69,13 @@
             <div class="card" style="margin-bottom: 1rem;">
                 <div class="card-header">
                     <h3 class="card-title">Select Incident</h3>
+                    <span style="font-size: 0.85rem; color: #6b7280;">Select an incident to add a situation update</span>
                 </div>
                 <div class="card-body" style="padding: 1rem;">
                     <div class="dashboard-grid" style="grid-template-columns: 2fr 1.5fr; gap: 1rem;">
                         <div class="form-group" style="margin-bottom: 0;">
                             <label class="form-label">Incident</label>
-                            <select class="form-control" name="incident_id">
+                            <select class="form-control" name="incident_id" id="incident_id_select">
                                 <option value="" selected disabled>Select Incident</option>
                                 {% for inc in incidents %}
                                     <option value="{{ inc.id }}">[INC-{{ inc.id }}] {{ inc.title }}</option>
@@ -88,192 +89,6 @@
                             <input type="text" class="form-control" placeholder="Search incidents by title or ID (UI only)">
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <div class="card" style="margin-bottom: 1rem;">
-                <div class="card-header">
-                    <h3 class="card-title">Add Situation Update</h3>
-                </div>
-                <div class="card-body" style="padding: 1rem;">
-                    <form method="post">
-                        {% csrf_token %}
-
-                        <div class="dashboard-grid" style="grid-template-columns: 1.5fr 1.5fr; gap: 1rem;">
-                            <div class="form-group">
-                                <label class="form-label" for="situationupdate_title">Update Title</label>
-                                <input
-                                    type="text"
-                                    id="situationupdate_title"
-                                    name="situationupdate_title"
-                                    class="form-control"
-                                    placeholder="Short title for this situation update"
-                                >
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="update_time">Update Time</label>
-                                <input
-                                    type="datetime-local"
-                                    id="update_time"
-                                    name="update_time"
-                                    class="form-control"
-                                >
-                            </div>
-                        </div>
-
-                        <div class="form-group" style="margin-top: 0.75rem;">
-                            <label class="form-label" for="situationupdate_description">Description</label>
-                            <textarea
-                                id="situationupdate_description"
-                                name="situationupdate_description"
-                                class="form-control"
-                                rows="3"
-                                placeholder="What changed since the last update? Key operational notes, impacts, and actions."
-                            ></textarea>
-                        </div>
-
-                        <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
-                            <div class="form-group">
-                                <label class="form-label" for="reported_by">Reported By</label>
-                                <input
-                                    type="text"
-                                    id="reported_by"
-                                    name="reported_by"
-                                    class="form-control"
-                                    placeholder="Name"
-                                >
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="department">Department</label>
-                                <input
-                                    type="text"
-                                    id="department"
-                                    name="department"
-                                    class="form-control"
-                                    placeholder="e.g. Operations, Planning"
-                                >
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="affected_area">Affected Area</label>
-                                <input
-                                    type="text"
-                                    id="affected_area"
-                                    name="affected_area"
-                                    class="form-control"
-                                    placeholder="Geography, facility, or impact area"
-                                >
-                            </div>
-                        </div>
-
-                        <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
-                            <div class="form-group">
-                                <label class="form-label" for="severity_change">Severity Change</label>
-                                <select id="severity_change" name="severity_change" class="form-control">
-                                    <option value="">No change</option>
-                                    <option value="INCREASED">Increased</option>
-                                    <option value="DECREASED">Decreased</option>
-                                    <option value="STABLE">Stable</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="status_change">Status Change</label>
-                                <select id="status_change" name="status_change" class="form-control">
-                                    <option value="">No change</option>
-                                    <option value="ACTIVATED">Activated</option>
-                                    <option value="ESCALATED">Escalated</option>
-                                    <option value="CONTAINED">Contained</option>
-                                    <option value="RESOLVED">Resolved</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="casualties_injured">Casualties – Injured</label>
-                                <input
-                                    type="number"
-                                    id="casualties_injured"
-                                    name="casualties_injured"
-                                    class="form-control"
-                                    min="0"
-                                >
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="casualties_dead">Casualties – Dead</label>
-                                <input
-                                    type="number"
-                                    id="casualties_dead"
-                                    name="casualties_dead"
-                                    class="form-control"
-                                    min="0"
-                                >
-                            </div>
-                        </div>
-
-                        <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
-                            <div class="form-group">
-                                <label class="form-label" for="actions_taken">Actions Taken</label>
-                                <textarea
-                                    id="actions_taken"
-                                    name="actions_taken"
-                                    class="form-control"
-                                    rows="2"
-                                ></textarea>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="resources_deployed">Resources Deployed</label>
-                                <textarea
-                                    id="resources_deployed"
-                                    name="resources_deployed"
-                                    class="form-control"
-                                    rows="2"
-                                ></textarea>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="next_steps">Next Steps</label>
-                                <textarea
-                                    id="next_steps"
-                                    name="next_steps"
-                                    class="form-control"
-                                    rows="2"
-                                ></textarea>
-                            </div>
-                        </div>
-
-                        <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                            <div class="form-group">
-                                <label class="form-label" for="confidence_level">Confidence Level</label>
-                                <select id="confidence_level" name="confidence_level" class="form-control">
-                                    <option value="">Select</option>
-                                    <option value="LOW">Low</option>
-                                    <option value="MEDIUM">Medium</option>
-                                    <option value="HIGH">High</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label" for="attachments">Attachments (reference)</label>
-                                <input
-                                    type="text"
-                                    id="attachments"
-                                    name="attachments"
-                                    class="form-control"
-                                    placeholder="File names, links, or IDs"
-                                >
-                            </div>
-                        </div>
-
-                        <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
-                            <button type="submit" class="btn btn-submit" data-disable-text="Adding...">
-                                Add Update
-                            </button>
-                        </div>
-                    </form>
                 </div>
             </div>
 
@@ -329,6 +144,170 @@
             </div>
         </div>
     </main>
+
+    <!-- Add Situation Update modal (popup) - opened when user selects an incident -->
+    <div id="addSituationUpdateModal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    ">
+        <div style="
+            background: white;
+            border-radius: 12px;
+            max-width: 720px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        ">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb;">
+                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600; color: #111827;">Add Situation Update</h3>
+                <button type="button" onclick="closeAddSituationUpdateModal()" style="
+                    background: none;
+                    border: none;
+                    font-size: 1.5rem;
+                    color: #6b7280;
+                    cursor: pointer;
+                    padding: 0.25rem;
+                    line-height: 1;
+                " aria-label="Close">&times;</button>
+            </div>
+            <div style="padding: 1.25rem;">
+                <form method="post" action="{% url 'situation_updates' %}" id="addSituationUpdateForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="incident_id" id="modal_incident_id" value="">
+
+                    <div class="dashboard-grid" style="grid-template-columns: 1.5fr 1.5fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="situationupdate_title">Update Title</label>
+                            <input type="text" id="situationupdate_title" name="situationupdate_title" class="form-control" placeholder="Short title for this situation update">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="update_time">Update Time</label>
+                            <input type="datetime-local" id="update_time" name="update_time" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 0.75rem;">
+                        <label class="form-label" for="situationupdate_description">Description</label>
+                        <textarea id="situationupdate_description" name="situationupdate_description" class="form-control" rows="3" placeholder="What changed since the last update? Key operational notes, impacts, and actions."></textarea>
+                    </div>
+
+                    <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="reported_by">Reported By</label>
+                            <input type="text" id="reported_by" name="reported_by" class="form-control" placeholder="Name">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="department">Department</label>
+                            <input type="text" id="department" name="department" class="form-control" placeholder="e.g. Operations, Planning">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="affected_area">Affected Area</label>
+                            <input type="text" id="affected_area" name="affected_area" class="form-control" placeholder="Geography, facility, or impact area">
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="severity_change">Severity Change</label>
+                            <select id="severity_change" name="severity_change" class="form-control">
+                                <option value="">No change</option>
+                                <option value="INCREASED">Increased</option>
+                                <option value="DECREASED">Decreased</option>
+                                <option value="STABLE">Stable</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="status_change">Status Change</label>
+                            <select id="status_change" name="status_change" class="form-control">
+                                <option value="">No change</option>
+                                <option value="ACTIVATED">Activated</option>
+                                <option value="ESCALATED">Escalated</option>
+                                <option value="CONTAINED">Contained</option>
+                                <option value="RESOLVED">Resolved</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="casualties_injured">Casualties – Injured</label>
+                            <input type="number" id="casualties_injured" name="casualties_injured" class="form-control" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="casualties_dead">Casualties – Dead</label>
+                            <input type="number" id="casualties_dead" name="casualties_dead" class="form-control" min="0">
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="actions_taken">Actions Taken</label>
+                            <textarea id="actions_taken" name="actions_taken" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="resources_deployed">Resources Deployed</label>
+                            <textarea id="resources_deployed" name="resources_deployed" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="next_steps">Next Steps</label>
+                            <textarea id="next_steps" name="next_steps" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="confidence_level">Confidence Level</label>
+                            <select id="confidence_level" name="confidence_level" class="form-control">
+                                <option value="">Select</option>
+                                <option value="LOW">Low</option>
+                                <option value="MEDIUM">Medium</option>
+                                <option value="HIGH">High</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="attachments">Attachments (reference)</label>
+                            <input type="text" id="attachments" name="attachments" class="form-control" placeholder="File names, links, or IDs">
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
+                        <button type="submit" class="btn btn-submit" data-disable-text="Adding...">Add Update</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function openAddSituationUpdateModal(incidentId) {
+        document.getElementById('modal_incident_id').value = incidentId || '';
+        document.getElementById('addSituationUpdateModal').style.display = 'flex';
+    }
+    function closeAddSituationUpdateModal() {
+        document.getElementById('addSituationUpdateModal').style.display = 'none';
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        var selectEl = document.getElementById('incident_id_select');
+        if (selectEl) {
+            selectEl.addEventListener('change', function() {
+                var val = this.value;
+                if (val) {
+                    openAddSituationUpdateModal(val);
+                }
+            });
+        }
+        document.getElementById('addSituationUpdateModal').addEventListener('click', function(e) {
+            if (e.target === this) closeAddSituationUpdateModal();
+        });
+    });
+    </script>
 </div>
 {% endblock %}
 
