@@ -72,22 +72,24 @@
                     <span style="font-size: 0.85rem; color: #6b7280;">Select an incident to add a situation update</span>
                 </div>
                 <div class="card-body" style="padding: 1rem;">
-                    <div class="dashboard-grid" style="grid-template-columns: 2fr 1.5fr; gap: 1rem;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label class="form-label">Incident</label>
-                            <select class="form-control" name="incident_id" id="incident_id_select">
-                                <option value="" selected disabled>Select Incident</option>
-                                {% for inc in incidents %}
-                                    <option value="{{ inc.id }}">[INC-{{ inc.id }}] {{ inc.title }}</option>
-                                {% empty %}
-                                    <option>No incidents available</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label class="form-label">Search</label>
-                            <input type="text" class="form-control" placeholder="Search incidents by title or ID (UI only)">
-                        </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="incident_search_input">Incident</label>
+                        <!-- Single search box backed by a datalist (shows dropdown on focus/click) -->
+                        <input
+                            type="text"
+                            id="incident_search_input"
+                            class="form-control"
+                            list="incident_search_options"
+                            placeholder="Search or select incident by ID or title"
+                            autocomplete="off"
+                        >
+                        <datalist id="incident_search_options">
+                            {% for inc in incidents %}
+                                <option value="[INC-{{ inc.id }}] {{ inc.title }}" data-incident-id="{{ inc.id }}"></option>
+                            {% endfor %}
+                        </datalist>
+                        <!-- Hidden field that actually carries the selected incident id (used if needed later) -->
+                        <input type="hidden" id="incident_id_hidden" name="incident_id" value="">
                     </div>
                 </div>
             </div>
@@ -95,7 +97,15 @@
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Situation Logs List</h3>
-                    <span style="font-size: 0.85rem; color: #6b7280;">Sample log entries</span>
+                    {% if selected_incident %}
+                        <span style="font-size: 0.85rem; color: #6b7280;">
+                            Showing updates for [INC-{{ selected_incident.id }}] {{ selected_incident.title }}
+                        </span>
+                    {% else %}
+                        <span style="font-size: 0.85rem; color: #6b7280;">
+                            Select an incident above to view situation updates
+                        </span>
+                    {% endif %}
                 </div>
                 <div class="card-body" style="padding: 0;">
                     <div class="table-responsive" style="max-height: 60vh;">
@@ -110,33 +120,46 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td style="padding: 0.75rem 1rem;">1</td>
-                                    <td style="padding: 0.75rem 1rem;">03/09/2026 06:20</td>
-                                    <td style="padding: 0.75rem 1rem;">Operations</td>
-                                    <td style="padding: 0.75rem 1rem;">Crews dispatched to restore power in Zone C; ETA 2 hours.</td>
-                                    <td style="padding: 0.75rem 1rem;">
-                                        <span class="status-badge status-alert">Active</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 0.75rem 1rem;">2</td>
-                                    <td style="padding: 0.75rem 1rem;">03/09/2026 04:00</td>
-                                    <td style="padding: 0.75rem 1rem;">Planning</td>
-                                    <td style="padding: 0.75rem 1rem;">Updated projection for weather front arrival; potential extension of activation.</td>
-                                    <td style="padding: 0.75rem 1rem;">
-                                        <span class="status-badge status-alert">Active</span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 0.75rem 1rem;">3</td>
-                                    <td style="padding: 0.75rem 1rem;">03/08/2026 23:15</td>
-                                    <td style="padding: 0.75rem 1rem;">Logistics</td>
-                                    <td style="padding: 0.75rem 1rem;">Additional generators delivered to Riverfront shelter; fuel inventory updated.</td>
-                                    <td style="padding: 0.75rem 1rem;">
-                                        <span class="status-badge status-normal">Resolved</span>
-                                    </td>
-                                </tr>
+                                {% if situation_updates %}
+                                    {% for update in situation_updates %}
+                                        <tr>
+                                            <td style="padding: 0.75rem 1rem;">{{ forloop.counter }}</td>
+                                            <td style="padding: 0.75rem 1rem;">
+                                                {{ update.update_time|date:"d/m/Y H:i" }}
+                                            </td>
+                                            <td style="padding: 0.75rem 1rem;">
+                                                {{ update.department|default:"—" }}
+                                            </td>
+                                            <td style="padding: 0.75rem 1rem;">
+                                                <strong>{{ update.title }}</strong><br>
+                                                <span style="font-size: 0.85rem; color: #4b5563;">
+                                                    {{ update.description|default:"" }}
+                                                </span>
+                                            </td>
+                                            <td style="padding: 0.75rem 1rem;">
+                                                {% if update.status_change %}
+                                                    <span class="status-badge status-alert">
+                                                        {{ update.status_change|title }}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="status-badge status-normal">LOGGED</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% elif selected_incident %}
+                                    <tr>
+                                        <td colspan="5" style="padding: 1rem; text-align: center; color: #6b7280;">
+                                            No situation updates have been recorded for this incident yet.
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="5" style="padding: 1rem; text-align: center; color: #6b7280;">
+                                            Select an incident above to view situation updates.
+                                        </td>
+                                    </tr>
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
@@ -294,15 +317,33 @@
         document.getElementById('addSituationUpdateModal').style.display = 'none';
     }
     document.addEventListener('DOMContentLoaded', function() {
-        var selectEl = document.getElementById('incident_id_select');
-        if (selectEl) {
-            selectEl.addEventListener('change', function() {
+        var searchInput = document.getElementById('incident_search_input');
+        var hiddenId = document.getElementById('incident_id_hidden');
+        var dataList = document.getElementById('incident_search_options');
+
+        if (searchInput && hiddenId && dataList) {
+            searchInput.addEventListener('change', function() {
                 var val = this.value;
-                if (val) {
-                    openAddSituationUpdateModal(val);
+                var selectedId = null;
+
+                // Match against datalist options
+                for (var i = 0; i < dataList.options.length; i++) {
+                    var opt = dataList.options[i];
+                    if (opt.value === val) {
+                        selectedId = opt.getAttribute('data-incident-id');
+                        break;
+                    }
+                }
+
+                if (selectedId) {
+                    hiddenId.value = selectedId;
+                    // Navigate so backend can load situation updates for this incident
+                    var url = "{% url 'situation_updates' %}" + "?incident_id=" + encodeURIComponent(selectedId);
+                    window.location.href = url;
                 }
             });
         }
+
         document.getElementById('addSituationUpdateModal').addEventListener('click', function(e) {
             if (e.target === this) closeAddSituationUpdateModal();
         });

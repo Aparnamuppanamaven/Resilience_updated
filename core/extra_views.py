@@ -13,6 +13,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.urls import reverse
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -164,15 +165,34 @@ def situation_updates_page(request):
             from django.shortcuts import redirect
 
             messages.success(request, "Situation update added successfully.")
-            return redirect("situation_updates")
+            # After adding an update, reload page with this incident selected so its updates show
+            return redirect(f"{reverse('situation_updates')}?incident_id={incident.id}")
 
     incidents = IncidentCapture.objects.all().order_by("-reported_time")[:50]
+
+    # If an incident is selected (via query param), load its situation updates
+    selected_incident = None
+    situation_updates = []
+    incident_id_param = request.GET.get("incident_id")
+    if incident_id_param:
+        try:
+            selected_incident = IncidentCapture.objects.get(id=incident_id_param)
+            from .models import SituationUpdate
+
+            situation_updates = list(
+                SituationUpdate.objects.filter(incident=selected_incident).order_by("-update_time")
+            )
+        except (IncidentCapture.DoesNotExist, ValueError, TypeError):
+            selected_incident = None
+            situation_updates = []
 
     context = {
         "organization": organization,
         "current_status": current_status,
         "last_sync_display": last_sync_display,
         "incidents": incidents,
+        "selected_incident": selected_incident,
+        "situation_updates": situation_updates,
     }
     return render(request, "core/situation_updates.html", context)
 
