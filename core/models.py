@@ -132,8 +132,7 @@ class IncidentCapture(models.Model):
     description = models.TextField(blank=True)
     severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default='LOW')
     impact = models.TextField(blank=True, help_text="Why it matters - operational impact analysis")
-    start_time = models.DateTimeField(null=True, blank=True, db_column='start_time')
-    end_time = models.DateTimeField(null=True, blank=True, db_column='end_time')
+    reported_time = models.DateTimeField(db_column='reported_time')
     status = models.CharField(
         max_length=20,
         default='Open',
@@ -143,15 +142,17 @@ class IncidentCapture(models.Model):
             ('Resolved', 'Resolved'),
         ],
     )
-    resolved_at = models.DateTimeField(null=True, blank=True, db_column='resolved_at')
-    created_at = models.DateTimeField(db_column='Created_at')
     created_by = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, blank=True, db_column='Created_by', related_name='created_incidents')
-    is_synthesized = models.BooleanField(default=False, db_column='is_synthesized')
+    reported_by = models.CharField(max_length=255, null=True, blank=True, db_column='reportedby')
+    category = models.CharField(max_length=100, null=True, blank=True, db_column='category')
+    location = models.CharField(max_length=255, null=True, blank=True, db_column='location')
+    casualties = models.IntegerField(null=True, blank=True, db_column='casualties')
+    source = models.CharField(max_length=100, null=True, blank=True, db_column='source')
     tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
         db_table = 'core_incidents'
-        ordering = ['-created_at']
+        ordering = ['-reported_time']
         managed = False  # Don't let Django manage this table - it already exists
     
     def __str__(self):
