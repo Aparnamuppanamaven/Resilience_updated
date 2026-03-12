@@ -50,7 +50,7 @@ class Liaison(models.Model):
     incident_types = models.TextField(help_text="Key incident types of concern")
     role = models.CharField(max_length=100, blank=True, help_text="User role")
     dept = models.CharField(max_length=100, blank=True, help_text="Department")
-    countee = models.CharField(max_length=100, blank=True, help_text="Countee")
+    county = models.CharField(max_length=100, blank=True, help_text="County")
     created_at = models.DateTimeField(auto_now_add=True)
     tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
@@ -90,9 +90,18 @@ class Incident(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='incidents', db_column='organization_id')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='LOW')
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default='LOW')
     impact = models.TextField(blank=True, help_text="Why it matters - operational impact analysis")
     next_action = models.CharField(max_length=255, blank=True)
+    status = models.CharField(
+        max_length=20,
+        default='Open',
+        choices=[
+            ('Open', 'Open'),
+            ('Investigating', 'Investigating'),
+            ('Resolved', 'Resolved'),
+        ],
+    )
     timestamp = models.DateTimeField(auto_now_add=True)
     owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, blank=True, db_column='owner_id')
     assigned_users = models.ManyToManyField(Liaison, through='IncidentAssignedUser', related_name='assigned_incidents', blank=True)
@@ -121,10 +130,20 @@ class IncidentCapture(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='captured_incidents', db_column='organization_id')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='LOW')
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default='LOW')
     impact = models.TextField(blank=True, help_text="Why it matters - operational impact analysis")
     start_time = models.DateTimeField(null=True, blank=True, db_column='start_time')
     end_time = models.DateTimeField(null=True, blank=True, db_column='end_time')
+    status = models.CharField(
+        max_length=20,
+        default='Open',
+        choices=[
+            ('Open', 'Open'),
+            ('Investigating', 'Investigating'),
+            ('Resolved', 'Resolved'),
+        ],
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True, db_column='resolved_at')
     created_at = models.DateTimeField(db_column='Created_at')
     created_by = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, blank=True, db_column='Created_by', related_name='created_incidents')
     is_synthesized = models.BooleanField(default=False, db_column='is_synthesized')
@@ -172,10 +191,19 @@ class OperationalUpdate(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='updates', db_column='organization_id')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='LOW')
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default='LOW')
     owner = models.ForeignKey(Liaison, on_delete=models.SET_NULL, null=True, blank=True, related_name='owned_updates', db_column='owner_id')
     impact = models.TextField(blank=True, help_text="Why it matters - operational impact analysis")
     next_action = models.CharField(max_length=255, blank=True)
+    status = models.CharField(
+        max_length=20,
+        default='Open',
+        choices=[
+            ('Open', 'Open'),
+            ('Investigating', 'Investigating'),
+            ('Resolved', 'Resolved'),
+        ],
+    )
     timestamp = models.DateTimeField(auto_now_add=True)
     is_synthesized = models.BooleanField(default=False)
     tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
@@ -253,7 +281,19 @@ class ShiftPacket(models.Model):
     executive_summary = models.TextField()
     key_risks = models.TextField()
     next_actions = models.TextField()
+    previous_shift_info = models.TextField(blank=True)
+    what_happened = models.TextField(blank=True)
+    next_steps = models.TextField(blank=True)
+    tx_type = models.CharField(
+        max_length=20,
+        blank=True,
+        choices=[
+            ('AI', 'AI'),
+            ('Manual', 'Manual'),
+        ],
+    )
     sent_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
     tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:
@@ -261,6 +301,83 @@ class ShiftPacket(models.Model):
     
     def __str__(self):
         return f"Packet #{self.packet_number} - {self.organization.name}"
+
+
+class IncidentShiftSchedule(models.Model):
+    """Scheduler configuration for incident shift generation"""
+    id = models.BigAutoField(primary_key=True)
+    incident = models.ForeignKey(
+        Incident,
+        on_delete=models.CASCADE,
+        db_column='incident_id',
+        related_name='shift_schedules',
+    )
+    shift_hours = models.IntegerField()
+    created_by = models.BigIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
+
+    class Meta:
+        db_table = 'core_incident_shift_schedule'
+        ordering = ['-created_at']
+
+
+class ShiftPacketHistory(models.Model):
+    """History of edits to shift packets"""
+    id = models.BigAutoField(primary_key=True)
+    shiftpacket = models.ForeignKey(
+        ShiftPacket,
+        on_delete=models.CASCADE,
+        db_column='shiftpacket_id',
+        related_name='history',
+    )
+    incident = models.ForeignKey(
+        Incident,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='incident_id',
+        related_name='shiftpacket_history',
+    )
+    shift = models.BigIntegerField(
+        null=True,
+        blank=True,
+        db_column='shift_id',
+        help_text="Reference to legacy core_shifts.shift_id",
+    )
+    input = models.TextField(blank=True)
+    what_happened = models.TextField(blank=True)
+    next_steps = models.TextField(blank=True)
+    tx_type = models.CharField(max_length=20)
+    created_by = models.BigIntegerField(null=True, blank=True)
+    updated_by = models.BigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
+
+    class Meta:
+        db_table = 'core_shiftpacket_history'
+        ordering = ['-created_at']
+
+
+class AgencyUserCounter(models.Model):
+    """License/seat usage per agency/organization"""
+    id = models.BigAutoField(primary_key=True)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        db_column='organization_id',
+        related_name='user_counters',
+    )
+    admin_user_id = models.BigIntegerField()
+    cnt_allowed = models.IntegerField(default=2)
+    current_cnt = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
+
+    class Meta:
+        db_table = 'core_agency_user_counter'
+        ordering = ['-created_at']
 
 
 class Payment(models.Model):

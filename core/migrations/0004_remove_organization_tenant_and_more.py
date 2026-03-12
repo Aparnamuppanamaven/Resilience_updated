@@ -10,37 +10,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='organization',
-            name='tenant',
-        ),
-        migrations.AlterModelOptions(
-            name='stripepayment',
-            options={'ordering': ['-created_at']},
-        ),
-        migrations.AddField(
-            model_name='liaison',
-            name='countee',
-            field=models.CharField(blank=True, help_text='Countee', max_length=100),
-        ),
-        migrations.AddField(
-            model_name='liaison',
-            name='dept',
-            field=models.CharField(blank=True, help_text='Department', max_length=100),
-        ),
-        migrations.AddField(
-            model_name='liaison',
-            name='role',
-            field=models.CharField(blank=True, help_text='User role', max_length=100),
-        ),
-        migrations.AlterModelTable(
-            name='organization',
-            table=None,
-        ),
-        migrations.DeleteModel(
-            name='Incident',
-        ),
-        migrations.DeleteModel(
-            name='Tenant',
-        ),
+        # This migration originally removed Organization.tenant and some legacy
+        # models, but those responsibilities were moved to
+        # 0004_remove_organization_tenant_alter_incident_options_and_more and
+        # later safe migrations. We keep this file as a no-op to preserve the
+        # migration history without mutating state twice.
     ]

@@ -32,6 +32,10 @@ class Migration(migrations.Migration):
         ),
         migrations.SeparateDatabaseAndState(
             state_operations=[
+                # Keep Django's state in sync by removing the legacy tenant
+                # relation from Organization. The actual column was dropped
+                # safely in
+                # 0004_remove_organization_tenant_alter_incident_options_and_more.
                 migrations.RemoveField(
                     model_name='organization',
                     name='tenant',

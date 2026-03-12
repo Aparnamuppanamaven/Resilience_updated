@@ -313,7 +313,7 @@ def checkout(request):
                             'incident_types': incidents,
                             'role': role,
                             'dept': dept,
-                            'countee': countee,
+                            'county': countee,
                         }
                     )
 
