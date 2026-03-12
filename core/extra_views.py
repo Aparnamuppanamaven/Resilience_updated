@@ -96,6 +96,76 @@ def situation_updates_page(request):
         return auth_redirect
 
     organization, current_status, last_sync_display = _get_org_and_status(request)
+
+    if request.method == "POST":
+        incident_id = request.POST.get("incident_id")
+        try:
+            incident = IncidentCapture.objects.get(id=incident_id)
+        except (IncidentCapture.DoesNotExist, ValueError, TypeError):
+            incident = None
+
+        from django.utils import timezone
+        from datetime import datetime
+
+        raw_update_time = request.POST.get("update_time") or ""
+        parsed_update_time = None
+        if raw_update_time:
+            try:
+                parsed_update_time = datetime.fromisoformat(raw_update_time)
+            except ValueError:
+                parsed_update_time = timezone.now()
+        else:
+            parsed_update_time = timezone.now()
+
+        from .models import SituationUpdate
+
+        if incident:
+            SituationUpdate.objects.create(
+                incident=incident,
+                title=request.POST.get("situationupdate_title") or "",
+                description=request.POST.get("situationupdate_description") or "",
+                update_time=parsed_update_time,
+                reported_by=request.POST.get("reported_by") or "",
+                department=request.POST.get("department") or "",
+                severity_change=request.POST.get("severity_change") or "",
+                status_change=request.POST.get("status_change") or "",
+                casualties_injured=(
+                    int(request.POST.get("casualties_injured"))
+                    if request.POST.get("casualties_injured")
+                    else None
+                ),
+                casualties_dead=(
+                    int(request.POST.get("casualties_dead"))
+                    if request.POST.get("casualties_dead")
+                    else None
+                ),
+                affected_area=request.POST.get("affected_area") or "",
+                actions_taken=request.POST.get("actions_taken") or "",
+                resources_deployed=request.POST.get("resources_deployed") or "",
+                next_steps=request.POST.get("next_steps") or "",
+                confidence_level=request.POST.get("confidence_level") or "",
+                attachments=request.POST.get("attachments") or "",
+                created_at=parsed_update_time,
+                tenant_id=getattr(organization, "tenant_id", None),
+            )
+
+            from .models import log_system_action
+
+            actionby_id = getattr(request.user, "id", None)
+            log_system_action(
+                tenant_id=getattr(organization, "tenant_id", None),
+                entity="SituationUpdate",
+                actionby=actionby_id,
+                actionon=f"{incident.id}:{request.POST.get('situationupdate_title') or ''}",
+                action="Create",
+            )
+
+            from django.contrib import messages
+            from django.shortcuts import redirect
+
+            messages.success(request, "Situation update added successfully.")
+            return redirect("situation_updates")
+
     incidents = IncidentCapture.objects.all().order_by("-reported_time")[:50]
 
     context = {

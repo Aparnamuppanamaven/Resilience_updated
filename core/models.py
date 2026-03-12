@@ -726,6 +726,38 @@ class TxLog(models.Model):
         return f"{self.action} {self.entity} by {self.actionby} on {self.actionon}"
 
 
+class SituationUpdate(models.Model):
+    """Situation updates linked to incidents - maps to core_situation_updates table"""
+    id = models.AutoField(primary_key=True, db_column='id')
+    incident = models.ForeignKey(
+        IncidentCapture,
+        on_delete=models.CASCADE,
+        db_column='incident_id',
+        related_name='situation_updates',
+    )
+    title = models.CharField(max_length=255, db_column='title')
+    description = models.TextField(blank=True, db_column='description')
+    update_time = models.DateTimeField(db_column='update_time')
+    reported_by = models.CharField(max_length=255, blank=True, null=True, db_column='reported_by')
+    department = models.CharField(max_length=255, blank=True, null=True, db_column='department')
+    severity_change = models.CharField(max_length=50, blank=True, null=True, db_column='severity_change')
+    status_change = models.CharField(max_length=50, blank=True, null=True, db_column='status_change')
+    casualties_injured = models.IntegerField(blank=True, null=True, db_column='casualties_injured')
+    casualties_dead = models.IntegerField(blank=True, null=True, db_column='casualties_dead')
+    affected_area = models.CharField(max_length=255, blank=True, null=True, db_column='affected_area')
+    actions_taken = models.TextField(blank=True, null=True, db_column='actions_taken')
+    resources_deployed = models.TextField(blank=True, null=True, db_column='resources_deployed')
+    next_steps = models.TextField(blank=True, null=True, db_column='next_steps')
+    confidence_level = models.CharField(max_length=50, blank=True, null=True, db_column='confidence_level')
+    attachments = models.CharField(max_length=100, blank=True, null=True, db_column='attachments')
+    created_at = models.DateTimeField(db_column='created_at')
+    tenant_id = models.BigIntegerField(blank=True, null=True, db_column='tenant_id')
+
+    class Meta:
+        db_table = 'core_situation_updates'
+        managed = False
+        ordering = ['-update_time']
+
 def log_system_action(tenant_id=None, entity=None, actionby=None, actionon=None, action='Create'):
     """
     Create a system log entry for audit trail.
