@@ -11,9 +11,6 @@
             <span class="logo-text">Resilience</span>
         </a>
         <ul class="nav-links">
-            <li class="nav-item active">
-                <a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a>
-            </li>
             <li class="nav-item">
                 <a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
             </li>
@@ -31,6 +28,9 @@
             </li>
             <li class="nav-item">
                 <a href="{% url 'system_logs' %}"><i class="fa-solid fa-list-check"></i> System Logs</a>
+            </li>
+            <li class="nav-item active">
+                <a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a>
             </li>
             <li class="nav-item nav-item-hidden">
                 <a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a>
