@@ -11,13 +11,13 @@
             <span class="logo-text">Resilience</span>
         </a>
         <ul class="nav-links">
-            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a></li>
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
             <li class="nav-item"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incident Management</a></li>
             <li class="nav-item"><a href="{% url 'situation_updates' %}"><i class="fa-solid fa-clipboard-list"></i> Situation Updates</a></li>
             <li class="nav-item active"><a href="{% url 'shift_packets' %}"><i class="fa-solid fa-file-lines"></i> Shift Packets</a></li>
             <li class="nav-item"><a href="{% url 'reports' %}"><i class="fa-solid fa-chart-bar"></i> Reports</a></li>
             <li class="nav-item"><a href="{% url 'system_logs' %}"><i class="fa-solid fa-list-check"></i> System Logs</a></li>
+            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
@@ -71,18 +71,70 @@
                     <h3 class="card-title">Select Incident &amp; Shift Cadence</h3>
                 </div>
                 <div class="card-body" style="padding: 1rem;">
-                    <form method="get" action="{% url 'shift_packets' %}" style="margin-bottom: 1rem;">
-                        <div class="dashboard-grid" style="grid-template-columns: 2fr 1fr; gap: 1rem;">
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label class="form-label">Incident</label>
-                                <select class="form-control" id="incidentSelect" name="incident_id" onchange="this.form.submit()">
-                                    <option value="">Select Incident</option>
+                    <form method="get" action="{% url 'shift_packets' %}" id="shift_incident_form" style="margin-bottom: 1rem;">
+                        <input type="hidden" name="incident_id" id="shift_incident_id_hidden" value="{% if selected_incident %}{{ selected_incident.id }}{% endif %}">
+                        <div class="form-group" style="margin-bottom: 0; position: relative; max-width: 75%;">
+                            <label class="form-label" for="shift_incident_search_input">Incident</label>
+                            <div id="shift_incident_dropdown_wrapper" style="position: relative;">
+                                <input
+                                    type="text"
+                                    id="shift_incident_search_input"
+                                    class="form-control"
+                                    placeholder="Search or select incident by ID or title"
+                                    autocomplete="off"
+                                    value="{% if selected_incident %}[INC-{{ selected_incident.id }}] {{ selected_incident.title }}{% endif %}"
+                                >
+                                <button
+                                    type="button"
+                                    id="shift_incident_dropdown_toggle"
+                                    style="
+                                        position: absolute;
+                                        top: 50%;
+                                        right: 0.75rem;
+                                        transform: translateY(-50%);
+                                        border: none;
+                                        background: transparent;
+                                        padding: 0;
+                                        cursor: pointer;
+                                        color: #9ca3af;
+                                    "
+                                    aria-label="Toggle incident list"
+                                >
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </button>
+                                <div id="shift_incident_dropdown_list" style="
+                                    position: absolute;
+                                    top: 100%;
+                                    left: 0;
+                                    right: 0;
+                                    max-height: 260px;
+                                    overflow-y: auto;
+                                    background: #ffffff;
+                                    border: 1px solid #e5e7eb;
+                                    border-top: none;
+                                    border-radius: 0 0 0.5rem 0.5rem;
+                                    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
+                                    z-index: 50;
+                                    display: none;
+                                ">
                                     {% for inc in incidents %}
-                                        <option value="{{ inc.id }}" {% if selected_incident and selected_incident.id == inc.id %}selected{% endif %}>[INC-{{ inc.id }}] {{ inc.title }}</option>
+                                        <div class="shift-incident-option"
+                                             data-incident-id="{{ inc.id }}"
+                                             data-incident-label="[INC-{{ inc.id }}] {{ inc.title }}"
+                                             style="
+                                                padding: 0.5rem 0.75rem;
+                                                cursor: pointer;
+                                                font-size: 0.875rem;
+                                                border-bottom: 1px solid #f3f4f6;
+                                             ">
+                                            [INC-{{ inc.id }}] {{ inc.title }}
+                                        </div>
                                     {% empty %}
-                                        <option value="">No incidents available</option>
+                                        <div style="padding: 0.5rem 0.75rem; font-size: 0.875rem; color: #6b7280;">
+                                            No incidents available
+                                        </div>
                                     {% endfor %}
-                                </select>
+                                </div>
                             </div>
                         </div>
                     </form>
@@ -165,3 +217,81 @@
 </div>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var searchInput = document.getElementById('shift_incident_search_input');
+    var dropdownList = document.getElementById('shift_incident_dropdown_list');
+
+    if (searchInput && dropdownList) {
+        var options = dropdownList.getElementsByClassName('shift-incident-option');
+        var toggleBtn = document.getElementById('shift_incident_dropdown_toggle');
+
+        function openDropdown() {
+            dropdownList.style.display = 'block';
+        }
+
+        function closeDropdown() {
+            dropdownList.style.display = 'none';
+        }
+
+        // Show all incidents when the field gains focus
+        searchInput.addEventListener('focus', function () {
+            searchInput.select();
+            for (var i = 0; i < options.length; i++) {
+                options[i].style.display = '';
+            }
+            openDropdown();
+        });
+
+        // Filter as user types
+        searchInput.addEventListener('input', function () {
+            var term = this.value.toLowerCase();
+            for (var i = 0; i < options.length; i++) {
+                var opt = options[i];
+                var label = opt.getAttribute('data-incident-label').toLowerCase();
+                opt.style.display = label.indexOf(term) !== -1 ? '' : 'none';
+            }
+            openDropdown();
+        });
+
+        // Click selection: set hidden input and submit GET form to load incident
+        var incidentForm = document.getElementById('shift_incident_form');
+        var incidentIdHidden = document.getElementById('shift_incident_id_hidden');
+        for (var j = 0; j < options.length; j++) {
+            options[j].addEventListener('click', function () {
+                var id = this.getAttribute('data-incident-id');
+                var label = this.getAttribute('data-incident-label');
+                searchInput.value = label;
+                if (incidentIdHidden) incidentIdHidden.value = id;
+                closeDropdown();
+                if (incidentForm) incidentForm.submit();
+            });
+        }
+
+        // Toggle button on the right of the same field
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (dropdownList.style.display === 'block') {
+                    closeDropdown();
+                } else {
+                    searchInput.focus();
+                    for (var i = 0; i < options.length; i++) {
+                        options[i].style.display = '';
+                    }
+                    openDropdown();
+                }
+            });
+        }
+
+        // Close when clicking outside
+        document.addEventListener('click', function (e) {
+            if (!document.getElementById('shift_incident_dropdown_wrapper').contains(e.target)) {
+                closeDropdown();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
