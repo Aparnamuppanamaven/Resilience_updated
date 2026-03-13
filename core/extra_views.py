@@ -14,6 +14,7 @@ from django.shortcuts import render, redirect
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.urls import reverse
+from django.contrib.auth.models import User
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -32,6 +33,8 @@ from .models import (
     ShiftPacketHistory,
     SystemSettings,
     Organization,
+    TxLog,
+    UserCredentials,
 )
 
 
@@ -156,6 +159,9 @@ def situation_updates_page(request):
             from .models import log_system_action
 
             actionby_id = getattr(request.user, "id", None)
+            # If no Django auth user is attached, fall back to legacy UserCredentials id
+            if actionby_id is None:
+                actionby_id = request.session.get("user_credentials_id")
             log_system_action(
                 tenant_id=getattr(organization, "tenant_id", None),
                 entity="SituationUpdate",
@@ -435,8 +441,7 @@ def reports_pdf(request):
 
 def system_logs_page(request):
     """
-    UI-only System Logs page.
-    Currently uses sample data; can later be wired to TxLog model.
+    System Logs page backed by TxLog table.
     """
     auth_redirect = _require_auth(request)
     if auth_redirect:
@@ -444,46 +449,55 @@ def system_logs_page(request):
 
     organization, current_status, last_sync_display = _get_org_and_status(request)
 
-    sample_logs = [
-        {
-            "id": 10432,
-            "tenant_id": 2001,
-            "entity": "User",
-            "action_by": "admin@county.gov",
-            "action": "User Login",
-            "created_date": "Mar 09, 2026 06:00",
-        },
-        {
-            "id": 10433,
-            "tenant_id": 2001,
-            "entity": "Incident",
-            "action_by": "admin@county.gov",
-            "action": "Incident Created",
-            "created_date": "Mar 09, 2026 06:05",
-        },
-        {
-            "id": 10434,
-            "tenant_id": 2001,
-            "entity": "SituationUpdate",
-            "action_by": "duty.officer@county.gov",
-            "action": "Situation Update Added",
-            "created_date": "Mar 09, 2026 06:20",
-        },
-        {
-            "id": 10435,
-            "tenant_id": 2001,
-            "entity": "ShiftPacket",
-            "action_by": "duty.officer@county.gov",
-            "action": "Shift Packet Generated",
-            "created_date": "Mar 09, 2026 06:25",
-        },
-    ]
+    # Fetch latest system logs from TxLog.
+    # If organization/tenant context exists, filter by that tenant_id; otherwise, show recent global logs.
+    logs_qs = TxLog.objects.all()
+    if organization is not None:
+        tenant_id = getattr(organization, "tenant_id", None) or getattr(organization, "pk", None)
+        if tenant_id is not None:
+            logs_qs = logs_qs.filter(tenant_id=tenant_id)
+
+    logs = list(logs_qs.order_by("-created_date")[:200])
+
+    # Build maps of user_id -> username from both auth User and legacy UserCredentials
+    actionby_ids = {log.actionby for log in logs if log.actionby is not None}
+    usercred_map = {
+        u["user_id"]: u["username"]
+        for u in UserCredentials.objects.filter(user_id__in=actionby_ids).values("user_id", "username")
+    }
+    authuser_map = {
+        u["id"]: u["username"]
+        for u in User.objects.filter(id__in=actionby_ids).values("id", "username")
+    }
+
+    # Adapt to template shape: expose action_by as username (fallback to id string)
+    enriched_logs = []
+    for log in logs:
+        action_by_display = ""
+        if log.actionby is not None:
+            # Prefer username from legacy UserCredentials (for historical rows),
+            # otherwise fall back to Django auth user, then raw id.
+            action_by_display = usercred_map.get(
+                log.actionby,
+                authuser_map.get(log.actionby, str(log.actionby)),
+            )
+
+        enriched_logs.append(
+            {
+                "id": log.id,
+                "tenant_id": log.tenant_id,
+                "entity": log.entity,
+                "action_by": action_by_display,
+                "action": log.action,
+                "created_date": log.created_date,
+            }
+        )
 
     context = {
         "organization": organization,
         "current_status": current_status,
         "last_sync_display": last_sync_display,
-        "logs": sample_logs,
+        "logs": enriched_logs,
     }
     return render(request, "core/system_logs.html", context)
 
