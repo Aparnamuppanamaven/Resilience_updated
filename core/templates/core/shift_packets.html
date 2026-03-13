@@ -68,10 +68,10 @@
         <div class="view-container">
             <div class="card" style="margin-bottom: 1rem;">
                 <div class="card-header">
-                    <h3 class="card-title">Select Incident &amp; Shift Cadence</h3>
+                    <h3 class="card-title">Select Incident</h3>
                 </div>
                 <div class="card-body" style="padding: 1rem;">
-                    <form method="get" action="{% url 'shift_packets' %}" id="shift_incident_form" style="margin-bottom: 1rem;">
+                    <form method="get" action="{% url 'shift_packets' %}" id="shift_incident_form" style="margin-bottom: 0;">
                         <input type="hidden" name="incident_id" id="shift_incident_id_hidden" value="{% if selected_incident %}{{ selected_incident.id }}{% endif %}">
                         <div class="form-group" style="margin-bottom: 0; position: relative; max-width: 75%;">
                             <label class="form-label" for="shift_incident_search_input">Incident</label>
@@ -134,25 +134,6 @@
                                             No incidents available
                                         </div>
                                     {% endfor %}
-                                </div>
-                            </div>
-                        </div>
-                    </form>
-                    <form method="post" action="{% url 'shift_packets' %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="incident_id" value="{% if selected_incident %}{{ selected_incident.id }}{% endif %}">
-                        <div class="dashboard-grid" style="grid-template-columns: 1fr; gap: 1rem;">
-                            <div class="form-group" style="margin-bottom: 0; display: flex; gap: 0.75rem; align-items: flex-end;">
-                                <div style="flex: 1;">
-                                    <label class="form-label">Shift Cadence (hours)</label>
-                                    <select class="form-control" name="shift_hours" {% if not selected_incident %}disabled{% endif %} required>
-                                        {% for h in allowed_shift_hours %}
-                                            <option value="{{ h }}" {% if current_schedule and current_schedule.shift_hours == h %}selected{% endif %}>{{ h }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div>
-                                    <button type="submit" class="btn btn-primary" {% if not selected_incident %}disabled{% endif %}>Save Cadence</button>
                                 </div>
                             </div>
                         </div>
