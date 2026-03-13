@@ -87,6 +87,13 @@ class Incident(models.Model):
     ]
     
     id = models.BigAutoField(primary_key=True)
+    incident_uid = models.IntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Shared incident identifier mapped from capture incidents.",
+        db_column="incident_uid",
+    )
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='incidents', db_column='organization_id')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -127,6 +134,13 @@ class IncidentCapture(models.Model):
     ]
     
     id = models.BigAutoField(primary_key=True)
+    incident_uid = models.IntegerField(
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Shared incident identifier used across normalized tables.",
+        db_column="incident_uid",
+    )
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='captured_incidents', db_column='organization_id')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -307,6 +321,13 @@ class ShiftPacket(models.Model):
 class IncidentShiftSchedule(models.Model):
     """Scheduler configuration for incident shift generation"""
     id = models.BigAutoField(primary_key=True)
+    incident_uid = models.IntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Shared incident identifier mapped from capture incidents.",
+        db_column="incident_uid",
+    )
     incident = models.ForeignKey(
         Incident,
         on_delete=models.CASCADE,
@@ -326,6 +347,13 @@ class IncidentShiftSchedule(models.Model):
 class ShiftPacketHistory(models.Model):
     """History of edits to shift packets"""
     id = models.BigAutoField(primary_key=True)
+    incident_uid = models.IntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Shared incident identifier mapped from capture incidents.",
+        db_column="incident_uid",
+    )
     shiftpacket = models.ForeignKey(
         ShiftPacket,
         on_delete=models.CASCADE,
@@ -350,6 +378,34 @@ class ShiftPacketHistory(models.Model):
     what_happened = models.TextField(blank=True)
     next_steps = models.TextField(blank=True)
     tx_type = models.CharField(max_length=20)
+    # AI-focused structured fields for shift packet reasoning
+    # These are populated when an AI-generated shift packet is created.
+    input_summary = models.TextField(
+        blank=True,
+        help_text="AI-generated summary of all inputs (incident + new situation updates + last packet).",
+    )
+    what_changed = models.TextField(
+        blank=True,
+        help_text="AI-generated description of what changed since the last shift packet.",
+    )
+    why_it_matters = models.TextField(
+        blank=True,
+        help_text="AI-generated explanation of why the changes matter operationally.",
+    )
+    decision_summary = models.TextField(
+        blank=True,
+        help_text="AI-identified decision(s) taken in this shift window.",
+    )
+    decision_maker = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Who took the decision, if known (name/role).",
+    )
+    decision_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the decision was taken, if known.",
+    )
     created_by = models.BigIntegerField(null=True, blank=True)
     updated_by = models.BigIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

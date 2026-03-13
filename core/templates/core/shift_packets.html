@@ -68,94 +68,93 @@
         <div class="view-container">
             <div class="card" style="margin-bottom: 1rem;">
                 <div class="card-header">
-                    <h3 class="card-title">Select Incident</h3>
+                    <h3 class="card-title">Select Incident &amp; Shift Cadence</h3>
                 </div>
                 <div class="card-body" style="padding: 1rem;">
-                    <div class="dashboard-grid" style="grid-template-columns: 2fr 1.5fr; gap: 1rem;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label class="form-label">Incident</label>
-                            <select class="form-control">
-                                <option value="" selected disabled>Select Incident</option>
-                                {% for inc in incidents %}
-                                    <option value="{{ inc.id }}">[INC-{{ inc.id }}] {{ inc.title }}</option>
-                                {% empty %}
-                                    <option>No incidents available</option>
-                                {% endfor %}
-                            </select>
+                    <form method="get" action="{% url 'shift_packets' %}" style="margin-bottom: 1rem;">
+                        <div class="dashboard-grid" style="grid-template-columns: 2fr 1fr; gap: 1rem;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Incident</label>
+                                <select class="form-control" id="incidentSelect" name="incident_id" onchange="this.form.submit()">
+                                    <option value="">Select Incident</option>
+                                    {% for inc in incidents %}
+                                        <option value="{{ inc.id }}" {% if selected_incident and selected_incident.id == inc.id %}selected{% endif %}>[INC-{{ inc.id }}] {{ inc.title }}</option>
+                                    {% empty %}
+                                        <option value="">No incidents available</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                         </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label class="form-label">Search</label>
-                            <input type="text" class="form-control" placeholder="Search incidents (UI only)">
+                    </form>
+                    <form method="post" action="{% url 'shift_packets' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="incident_id" value="{% if selected_incident %}{{ selected_incident.id }}{% endif %}">
+                        <div class="dashboard-grid" style="grid-template-columns: 1fr; gap: 1rem;">
+                            <div class="form-group" style="margin-bottom: 0; display: flex; gap: 0.75rem; align-items: flex-end;">
+                                <div style="flex: 1;">
+                                    <label class="form-label">Shift Cadence (hours)</label>
+                                    <select class="form-control" name="shift_hours" {% if not selected_incident %}disabled{% endif %} required>
+                                        {% for h in allowed_shift_hours %}
+                                            <option value="{{ h }}" {% if current_schedule and current_schedule.shift_hours == h %}selected{% endif %}>{{ h }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <button type="submit" class="btn btn-primary" {% if not selected_incident %}disabled{% endif %}>Save Cadence</button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
 
             <div class="card" style="margin-bottom: 0.5rem;">
                 <div class="card-header">
-                    <h3 class="card-title">Shift Packet Entries</h3>
-                    <span style="font-size: 0.85rem; color: #6b7280;">Example shift handoff rows</span>
+                    <h3 class="card-title">Shift Packet History</h3>
+                    <span style="font-size: 0.85rem; color: #6b7280;">AI and manual shift packets for the selected incident</span>
                 </div>
                 <div class="card-body" style="padding: 0;">
                     <div class="table-responsive" style="max-height: 340px; overflow-y: auto; overflow-x: auto;">
                         <table class="incidents-table" style="min-width: 1800px; border-collapse: separate; border-spacing: 0;">
                             <thead>
                                 <tr style="background: #f9fafb;">
-                                    <th style="padding: 0.6rem 1rem;">Shift Time</th>
-                                    <th style="padding: 0.6rem 1rem;">Previous Shift Info</th>
-                                    <th style="padding: 0.6rem 1rem;">What Happened</th>
-                                    <th style="padding: 0.6rem 1rem;">Next Steps Recommended</th>
-                                    <th style="padding: 0.6rem 1rem;">Generated Type</th>
-                                    <th style="padding: 0.6rem 1rem;">Created By</th>
-                                    <th style="padding: 0.6rem 1rem; text-align: center;">Actions</th>
+                                    <th style="padding: 0.6rem 1rem;">Created At</th>
+                                    <th style="padding: 0.6rem 1rem;">Input Summary</th>
+                                    <th style="padding: 0.6rem 1rem;">What Changed</th>
+                                    <th style="padding: 0.6rem 1rem;">Why It Matters</th>
+                                    <th style="padding: 0.6rem 1rem;">Decision</th>
+                                    <th style="padding: 0.6rem 1rem;">Decision Maker</th>
+                                    <th style="padding: 0.6rem 1rem;">Type</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td style="padding: 0.75rem 1rem;">03/09/2026 06:20</td>
-                                    <td style="padding: 0.75rem 1rem;">Power restoration ongoing in Zones A and B; crew Alpha on-site.</td>
-                                    <td style="padding: 0.75rem 1rem;">Zone C reported new outages; backup crews dispatched.</td>
-                                    <td style="padding: 0.75rem 1rem;">Monitor restoration progress; update status by 08:30; coordinate with utilities.</td>
-                                    <td style="padding: 0.75rem 1rem;"><span class="status-badge status-normal">AI</span></td>
-                                    <td style="padding: 0.75rem 1rem;">Paul</td>
-                                    <td style="padding: 0.75rem 1rem; text-align: center;">
-                                        <div class="open-incidents-actions">
-                                            <a href="#" class="btn-action-icon btn-action-update" title="Edit"><i class="fa-solid fa-pencil"></i></a>
-                                            <a href="#" class="btn-action-icon btn-action-pdf" title="ShiftPDF"><i class="fa-solid fa-file-pdf"></i></a>
-                                            <a href="#" class="btn-action-icon btn-action-excel" title="SituationLog"><i class="fa-solid fa-list"></i></a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 0.75rem 1rem;">03/09/2026 14:00</td>
-                                    <td style="padding: 0.75rem 1rem;">Containment measures in place for county network; external access limited.</td>
-                                    <td style="padding: 0.75rem 1rem;">Forensics identified phishing emails as primary vector; user list compiled.</td>
-                                    <td style="padding: 0.75rem 1rem;">Roll out password resets; schedule user training; finalize incident communications.</td>
-                                    <td style="padding: 0.75rem 1rem;"><span class="status-badge status-normal">AI</span></td>
-                                    <td style="padding: 0.75rem 1rem;">Alex</td>
-                                    <td style="padding: 0.75rem 1rem; text-align: center;">
-                                        <div class="open-incidents-actions">
-                                            <a href="#" class="btn-action-icon btn-action-update" title="Edit"><i class="fa-solid fa-pencil"></i></a>
-                                            <a href="#" class="btn-action-icon btn-action-pdf" title="ShiftPDF"><i class="fa-solid fa-file-pdf"></i></a>
-                                            <a href="#" class="btn-action-icon btn-action-excel" title="SituationLog"><i class="fa-solid fa-list"></i></a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 0.75rem 1rem;">03/08/2026 22:15</td>
-                                    <td style="padding: 0.75rem 1rem;">Sandbagging operations completed for Riverfront Sector 3; shelters activated.</td>
-                                    <td style="padding: 0.75rem 1rem;">Water levels plateaued; no new evacuations; dewatering started.</td>
-                                    <td style="padding: 0.75rem 1rem;">Plan demobilization of non-critical resources; maintain monitoring overnight.</td>
-                                    <td style="padding: 0.75rem 1rem;"><span class="status-badge status-watch">Manual</span></td>
-                                    <td style="padding: 0.75rem 1rem;">Jordan</td>
-                                    <td style="padding: 0.75rem 1rem; text-align: center;">
-                                        <div class="open-incidents-actions">
-                                            <a href="#" class="btn-action-icon btn-action-update" title="Edit"><i class="fa-solid fa-pencil"></i></a>
-                                            <a href="#" class="btn-action-icon btn-action-pdf" title="ShiftPDF"><i class="fa-solid fa-file-pdf"></i></a>
-                                            <a href="#" class="btn-action-icon btn-action-excel" title="SituationLog"><i class="fa-solid fa-list"></i></a>
-                                        </div>
-                                    </td>
-                                </tr>
+                                {% if history_entries %}
+                                    {% for entry in history_entries %}
+                                        <tr>
+                                            <td style="padding: 0.75rem 1rem;">{{ entry.created_at|date:"m/d/Y H:i" }}</td>
+                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.input_summary }}</td>
+                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.what_changed }}</td>
+                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.why_it_matters }}</td>
+                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.decision_summary }}</td>
+                                            <td style="padding: 0.75rem 1rem;">{{ entry.decision_maker|default:"—" }}</td>
+                                            <td style="padding: 0.75rem 1rem;">
+                                                <span class="status-badge {% if entry.tx_type == 'AI' %}status-normal{% else %}status-watch{% endif %}">
+                                                    {{ entry.tx_type|default:"N/A" }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" style="padding: 0.75rem 1rem; text-align: center; color: #6b7280;">
+                                            {% if selected_incident %}
+                                                No shift packet history found for this incident yet.
+                                            {% else %}
+                                                Select an incident to view shift packet history.
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
