@@ -702,6 +702,9 @@
             
             
             <!-- Agency & Contact Information Section -->
+            <style>
+                .admin-field-readonly { background-color: #f8f9fa; color: #6c757d; }
+            </style>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem;">
                 <h4 style="margin: 0; color: #495057; font-size: 1.1rem; font-weight: 600;">Agency & Contact Information</h4>
             </div>
@@ -714,14 +717,10 @@
                         </label>
                         <input type="text" name="agency_name" id="agency_name" required 
                                value="{% if logged_in_user_data %}{{ logged_in_user_data.agency_name }}{% endif %}"
-                               {% if logged_in_user_data %}readonly{% endif %} style="
-                            width: 100%;
-                            padding: 0.75rem;
-                            border: 1px solid #dee2e6;
-                            border-radius: 6px;
-                            font-size: 0.95rem;
-                            {% if logged_in_user_data %}background-color: #f8f9fa; color: #6c757d;{% else %}background-color: white; color: #212529;{% endif %}
-                        " placeholder="Enter agency name">
+                               {% if logged_in_user_data %}readonly{% endif %}
+                               class="{% if logged_in_user_data %}admin-field-readonly{% endif %}"
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 6px; font-size: 0.95rem; background-color: #fff; color: #212529;"
+                               placeholder="Enter agency name">
                     </div>
                     
                     <div class="form-group">
@@ -730,14 +729,10 @@
                         </label>
                         <input type="text" name="primary_liaison_name" id="primary_liaison_name" required 
                                value="{% if logged_in_user_data %}{{ logged_in_user_data.primary_liaison_name }}{% endif %}"
-                               {% if logged_in_user_data %}readonly{% endif %} style="
-                            width: 100%;
-                            padding: 0.75rem;
-                            border: 1px solid #dee2e6;
-                            border-radius: 6px;
-                            font-size: 0.95rem;
-                            {% if logged_in_user_data %}background-color: #f8f9fa; color: #6c757d;{% else %}background-color: white; color: #212529;{% endif %}
-                        " placeholder="Enter liaison name">
+                               {% if logged_in_user_data %}readonly{% endif %}
+                               class="{% if logged_in_user_data %}admin-field-readonly{% endif %}"
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 6px; font-size: 0.95rem; background-color: #fff; color: #212529;"
+                               placeholder="Enter liaison name">
                     </div>
                 </div>
                 
@@ -748,14 +743,10 @@
                         </label>
                         <input type="email" name="liaison_email" id="liaison_email" required 
                                value="{% if logged_in_user_data %}{{ logged_in_user_data.liaison_email }}{% endif %}"
-                               {% if logged_in_user_data %}readonly{% endif %} style="
-                            width: 100%;
-                            padding: 0.75rem;
-                            border: 1px solid #dee2e6;
-                            border-radius: 6px;
-                            font-size: 0.95rem;
-                            {% if logged_in_user_data %}background-color: #f8f9fa; color: #6c757d;{% else %}background-color: white; color: #212529;{% endif %}
-                        " placeholder="Enter email address">
+                               {% if logged_in_user_data %}readonly{% endif %}
+                               class="{% if logged_in_user_data %}admin-field-readonly{% endif %}"
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 6px; font-size: 0.95rem; background-color: #fff; color: #212529;"
+                               placeholder="Enter email address">
                     </div>
                 </div>
                 
