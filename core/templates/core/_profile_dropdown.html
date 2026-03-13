@@ -7,12 +7,12 @@
                 <img src="{{ sidebar_profile_image_url }}" alt="" class="avatar-img" style="width:44px;height:44px;border-radius:50%;object-fit:cover;display:block;">
             </div>
             {% else %}
-            <div class="avatar">{% if user.get_full_name %}{{ user.get_full_name|slice:":1"|upper }}{% elif user.username %}{{ user.username|slice:":1"|upper }}{% else %}?{% endif %}</div>
+            <div class="avatar">{% if sidebar_display_name %}{{ sidebar_display_name|slice:":1"|upper }}{% elif user.get_full_name %}{{ user.get_full_name|slice:":1"|upper }}{% elif user.username %}{{ user.username|slice:":1"|upper }}{% else %}?{% endif %}</div>
             {% endif %}
         </button>
         <div class="user-info">
-            <span class="user-name">{{ user.get_full_name|default:user.username|default:"User" }}</span>
-            <span class="user-role">{% if profile_footer_role %}{{ profile_footer_role }}{% elif user.liaison_profile %}{{ user.liaison_profile.organization.name }}{% else %}Account{% endif %}</span>
+            <span class="user-name">{% if sidebar_display_name %}{{ sidebar_display_name }}{% else %}{{ user.get_full_name|default:user.username|default:"User" }}{% endif %}</span>
+            <span class="user-role">{% if profile_footer_role %}{{ profile_footer_role }}{% elif sidebar_organization_name %}{{ sidebar_organization_name }}{% elif user.liaison_profile %}{{ user.liaison_profile.organization.name }}{% else %}Account{% endif %}</span>
         </div>
     </div>
     <div class="profile-dropdown-panel" id="profileDropdownPanel" aria-hidden="true" style="display: none;">

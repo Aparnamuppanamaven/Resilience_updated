@@ -17,16 +17,59 @@ def _user_table_image_q(email, username, full_name):
 
 
 def auth_context(request):
-    """Add is_admin and sidebar profile image URL so sidebar can show Admin link and user photo."""
+    """Add is_admin, sidebar profile image URL, and sidebar display name/org so sidebar is consistent on all pages."""
     data = {
         'is_admin': (
             request.user.is_authenticated
             and getattr(request.user, 'is_staff', False)
         ),
         'sidebar_profile_image_url': None,
+        'sidebar_display_name': None,
+        'sidebar_organization_name': None,
         'MEDIA_URL': getattr(settings, 'MEDIA_URL', '/media/'),
     }
-    # Legacy user first: when session has user_credentials_id, resolve image from core_users by username
+    # Legacy user: session has user_credentials_id — set display name and org for sidebar on every page
+    if request.session.get('user_credentials_id'):
+        try:
+            from .models import UserCredentials, UsersTable, Organization
+            cred = UserCredentials.objects.filter(
+                user_id=request.session['user_credentials_id']
+            ).first()
+            if cred:
+                data['sidebar_display_name'] = request.session.get(
+                    'user_credentials_username', cred.username
+                ) or cred.username
+                # Prefer org from first Organization; optionally from UsersTable (agency_name) if matched
+                org = Organization.objects.first()
+                if org:
+                    data['sidebar_organization_name'] = org.name
+                q = (
+                    Q(liaison_email__iexact=cred.username)
+                    | Q(email_id__iexact=cred.username)
+                    | Q(primary_liaison_name__iexact=cred.username)
+                )
+                user_table = UsersTable.objects.filter(q).first()
+                if user_table and user_table.agency_name:
+                    data['sidebar_organization_name'] = user_table.agency_name
+                elif user_table and user_table.primary_liaison_name and not data['sidebar_display_name']:
+                    data['sidebar_display_name'] = user_table.primary_liaison_name
+        except Exception:
+            pass
+    # Django auth: set display name and org from user / liaison so every page has same sidebar
+    elif getattr(request.user, 'is_authenticated', False) and request.user.is_authenticated:
+        try:
+            liaison = getattr(request.user, 'liaison_profile', None)
+            if liaison and getattr(liaison, 'organization', None):
+                data['sidebar_organization_name'] = liaison.organization.name
+            name = (getattr(request.user, 'get_full_name', lambda: '')() or '').strip()
+            if not name:
+                name = (getattr(request.user, 'username', None) or '').strip()
+            if name:
+                data['sidebar_display_name'] = name
+        except Exception:
+            pass
+
+    # Legacy user: resolve profile image from core_users by username
     if request.session.get('user_credentials_id'):
         try:
             from .models import UserCredentials, UsersTable

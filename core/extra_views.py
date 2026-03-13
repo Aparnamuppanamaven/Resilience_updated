@@ -23,10 +23,13 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 from reportlab.lib.enums import TA_LEFT
 
 from .models import (
+    Incident,
     IncidentCapture,
     IncidentEvent,
+    IncidentShiftSchedule,
     OperationalUpdate,
     ShiftPacket,
+    ShiftPacketHistory,
     SystemSettings,
     Organization,
 )
@@ -197,23 +200,107 @@ def situation_updates_page(request):
     return render(request, "core/situation_updates.html", context)
 
 
+def _ensure_incident_for_capture(capture: IncidentCapture, organization: Organization) -> Incident:
+    """
+    Ensure there is an Incident (core_operationalupdate) representing this
+    captured incident. If none exists, create a simple one from the capture.
+    """
+    uid = capture.incident_uid or capture.id
+    if capture.incident_uid is None:
+        capture.incident_uid = uid
+        capture.save(update_fields=["incident_uid"])
+
+    incident, _created = Incident.objects.get_or_create(
+        organization=organization,
+        incident_uid=uid,
+        defaults={
+            "title": capture.title,
+            "description": capture.description or "",
+            "severity": capture.severity or "LOW",
+            "impact": capture.impact or "",
+            "next_action": "",
+            "status": "Open",
+            "owner": None,
+            "is_synthesized": False,
+            "tenant_id": capture.tenant_id,
+        },
+    )
+    return incident
+
+
 def shift_packets_page(request):
     """
     UI-only Shift Packets page.
-    Shows incident selector and a table of example shift packet entries.
+    Shows incident selector, shift cadence configuration, and
+    a table of actual shift packet history entries (AI/manual).
     """
     auth_redirect = _require_auth(request)
     if auth_redirect:
         return auth_redirect
 
     organization, current_status, last_sync_display = _get_org_and_status(request)
+    # Use capture incidents for the dropdown, but map them to Incident for scheduling/history
     incidents = IncidentCapture.objects.all().order_by("-reported_time")[:50]
+    selected_incident_capture = None
+    selected_incident = None
+    incident_id_param = request.GET.get("incident_id")
+    history_entries = []
+    current_schedule = None
+
+    if incident_id_param:
+        try:
+            selected_incident_capture = IncidentCapture.objects.get(id=incident_id_param)
+            selected_incident = _ensure_incident_for_capture(selected_incident_capture, organization)
+        except (IncidentCapture.DoesNotExist, ValueError, TypeError):
+            selected_incident_capture = None
+            selected_incident = None
+
+    # Handle cadence selection POST
+    if request.method == "POST":
+        incident_id = request.POST.get("incident_id")
+        shift_hours = request.POST.get("shift_hours")
+
+        if incident_id and shift_hours:
+            try:
+                capture_obj = IncidentCapture.objects.get(id=incident_id)
+                incident_obj = _ensure_incident_for_capture(capture_obj, organization)
+                shift_hours_int = int(shift_hours)
+            except (IncidentCapture.DoesNotExist, ValueError, TypeError):
+                incident_obj = None
+                shift_hours_int = None
+
+            if incident_obj is not None and shift_hours_int is not None:
+                IncidentShiftSchedule.objects.update_or_create(
+                    incident=incident_obj,
+                    defaults={
+                        "shift_hours": shift_hours_int,
+                        "created_by": request.user.id if request.user.is_authenticated else 0,
+                        "incident_uid": incident_obj.incident_uid,
+                    },
+                )
+                # Redirect with the same capture incident selected so history reloads
+                return redirect(f"{reverse('shift_packets')}?incident_id={capture_obj.id}")
+
+    # Load existing schedule and history for the selected capture incident
+    if selected_incident_capture:
+        selected_incident = _ensure_incident_for_capture(selected_incident_capture, organization)
+        current_schedule = IncidentShiftSchedule.objects.filter(
+            incident_uid=selected_incident.incident_uid
+        ).first()
+        history_entries = list(
+            ShiftPacketHistory.objects.filter(incident_uid=selected_incident.incident_uid)
+            .order_by("-created_at")[:50]
+        )
 
     context = {
         "organization": organization,
         "current_status": current_status,
         "last_sync_display": last_sync_display,
         "incidents": incidents,
+        "selected_incident": selected_incident_capture,
+        "history_entries": history_entries,
+        "current_schedule": current_schedule,
+        "allowed_shift_hours": [1, 2, 3, 4, 6, 8, 10, 12, 18, 24, 48, 72],
     }
     return render(request, "core/shift_packets.html", context)
 

@@ -4,7 +4,7 @@
 {% block title %}Incident Management - Resilience System{% endblock %}
 
 {% block content %}
-<div class="app-container">
+<div class="app-container" data-open-incident-modal="{% if create_incident_form and create_incident_form.errors %}1{% else %}0{% endif %}">
     <nav class="sidebar">
         <a href="{% url 'dashboard' %}" class="sidebar-header" style="text-decoration: none; color: var(--primary-color); display: flex; align-items: center; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
             <i class="fa-solid fa-shield-halved logo-icon"></i>
@@ -177,8 +177,10 @@
                                     text-transform: uppercase;
                                     letter-spacing: 0.025em;
                                     border-bottom: 1px solid #e5e7eb;
-                                    width: 60px;
-                                "></th>
+                                    white-space: nowrap;
+                                ">
+                                    Actions
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -299,7 +301,43 @@
                                     {% endif %}
                                 </td>
                                 <td style="padding: 0.75rem 1rem; text-align: center;">
-                                    <i class="fa-solid fa-chevron-right" style="color: #9ca3af; font-size: 0.75rem;"></i>
+                                    <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                                        <a href="{% url 'incident_detail' incident.id %}" title="View details" style="
+                                            display: inline-flex;
+                                            align-items: center;
+                                            justify-content: center;
+                                            width: 28px;
+                                            height: 28px;
+                                            border-radius: 999px;
+                                            border: 1px solid #e5e7eb;
+                                            color: #9ca3af;
+                                            background: #ffffff;
+                                            font-size: 0.75rem;
+                                        ">
+                                            <i class="fa-solid fa-chevron-right"></i>
+                                        </a>
+                                        <button type="button"
+                                                title="Edit shift cadence"
+                                                data-incident-id="{{ incident.id }}"
+                                                data-shift-cadence="{{ incident.shift_cadence_hours|default_if_none:'' }}"
+                                                onclick="openCadenceModalFromButton(this, event)"
+                                                style="
+                                                    display: inline-flex;
+                                                    align-items: center;
+                                                    justify-content: center;
+                                                    padding: 0.25rem 0.6rem;
+                                                    border-radius: 999px;
+                                                    border: 1px solid #6366f1;
+                                                    background: #eef2ff;
+                                                    color: #4f46e5;
+                                                    font-size: 0.75rem;
+                                                    font-weight: 500;
+                                                    text-decoration: none;
+                                                    cursor: pointer;
+                                                ">
+                                            Edit Cadence
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -457,6 +495,23 @@
                             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.impact.errors }}</div>
                         {% endif %}
                     </div>
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">
+                            {{ create_incident_form.shift_cadence_hours.label }}
+                        </label>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; max-width: 260px;">
+                            {{ create_incident_form.shift_cadence_hours }}
+                            <span style="font-size: 0.875rem; color: #6b7280;">hours</span>
+                        </div>
+                        {% if create_incident_form.shift_cadence_hours.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">
+                                {{ create_incident_form.shift_cadence_hours.errors }}
+                            </div>
+                        {% endif %}
+                        <p style="margin-top: 0.25rem; font-size: 0.8rem; color: #9ca3af;">
+                            Used for AI shift packet generation on the Shift Packets page. You can change it later.
+                        </p>
+                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
                         <div class="form-group">
                             <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.casualties.label }}</label>
@@ -475,6 +530,74 @@
                     </div>
                     <button type="submit" class="btn btn-submit" style="width: 100%; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">
                         Submit Incident to Timeline
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Cadence modal -->
+    <div id="editCadenceModal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    ">
+        <div style="
+            background: white;
+            border-radius: 12px;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        ">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb;">
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 600; color: #111827;">Edit Shift Cadence</h3>
+                <button type="button" onclick="closeCadenceModal()" style="
+                    background: none;
+                    border: none;
+                    font-size: 1.5rem;
+                    color: #6b7280;
+                    cursor: pointer;
+                    padding: 0.25rem;
+                    line-height: 1;
+                " aria-label="Close">&times;</button>
+            </div>
+            <div style="padding: 1.25rem;">
+                <form method="post" action="{% url 'incidents_list' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_cadence">
+                    <input type="hidden" name="incident_id" id="cadenceIncidentIdInput">
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">
+                            Shift Packet (hours)
+                        </label>
+                        <select id="cadenceHoursSelect" name="shift_hours" class="form-control" required style="max-width: 260px;">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="6">6</option>
+                            <option value="8">8</option>
+                            <option value="10">10</option>
+                            <option value="12">12</option>
+                            <option value="18">18</option>
+                            <option value="24">24</option>
+                            <option value="48">48</option>
+                            <option value="72">72</option>
+                        </select>
+                        <p style="margin-top: 0.25rem; font-size: 0.8rem; color: #9ca3af;">
+                            Controls how often AI shift packets are generated for this incident.
+                        </p>
+                    </div>
+                    <button type="submit" class="btn btn-submit" style="width: 100%; padding: 0.6rem 1.25rem; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95rem;">
+                        Save Cadence
                     </button>
                 </form>
             </div>
@@ -551,6 +674,43 @@
     </style>
 
     <script>
+    function openCadenceModal(incidentId, currentCadence, evt) {
+        if (evt) {
+            evt.stopPropagation();
+        }
+        var modal = document.getElementById('editCadenceModal');
+        var idInput = document.getElementById('cadenceIncidentIdInput');
+        var selectEl = document.getElementById('cadenceHoursSelect');
+        if (idInput) {
+            idInput.value = incidentId;
+        }
+        if (selectEl) {
+            if (currentCadence) {
+                selectEl.value = currentCadence;
+            } else {
+                selectEl.value = '24';
+            }
+        }
+        modal.style.display = 'flex';
+    }
+
+    function openCadenceModalFromButton(buttonEl, evt) {
+        var id = buttonEl.getAttribute('data-incident-id');
+        var cadence = buttonEl.getAttribute('data-shift-cadence') || '';
+        openCadenceModal(id, cadence, evt);
+    }
+
+    function closeCadenceModal() {
+        var modal = document.getElementById('editCadenceModal');
+        modal.style.display = 'none';
+    }
+
+    document.getElementById('editCadenceModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeCadenceModal();
+        }
+    });
+
     function openCreateIncidentModal() {
         document.getElementById('createIncidentModal').style.display = 'flex';
     }
@@ -561,11 +721,13 @@
     document.getElementById('createIncidentModal').addEventListener('click', function(e) {
         if (e.target === this) closeCreateIncidentModal();
     });
-    // Make modal visible as flex when open (for centering)
+    // Make modal visible as flex when open (for centering) if form has errors
     document.addEventListener('DOMContentLoaded', function() {
-        {% if create_incident_form.errors %}
-        openCreateIncidentModal();
-        {% endif %}
+        var root = document.querySelector('.app-container');
+        var flag = root ? root.getAttribute('data-open-incident-modal') : '0';
+        if (flag === '1') {
+            openCreateIncidentModal();
+        }
     });
     // Make incident rows clickable
     document.addEventListener('DOMContentLoaded', function() {

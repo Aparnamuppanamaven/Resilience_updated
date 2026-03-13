@@ -679,6 +679,13 @@ class CreateIncidentForm(forms.Form):
         }),
     )
 
+    shift_cadence_hours = forms.ChoiceField(
+        required=False,
+        label='Shift Packet (hours)',
+        choices=[(h, f"{h}") for h in [1, 2, 3, 4, 6, 8, 10, 12, 18, 24, 48, 72]],
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
 
 class UserSignupForm(forms.ModelForm):
     """Form for user registration: username, password, confirm password only."""

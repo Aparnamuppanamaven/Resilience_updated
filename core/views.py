@@ -39,16 +39,31 @@ from django.db import transaction
 from django.core.files.storage import default_storage
 from django.utils.text import slugify
 from .models import (
-    Organization, Liaison, OperationalUpdate, Incident, IncidentEvent, IncidentCapture,
-    Decision, SystemSettings, ShiftPacket,
-    ExternalUser, ExternalPayment, ExternalSubscription, UserCredentials, UsersTable, Shift, Department,
-    Payment, Invoice,
-    StripePayment, UserProfile,
-
+    Organization,
+    Liaison,
+    OperationalUpdate,
+    Incident,
+    IncidentEvent,
+    IncidentCapture,
+    Decision,
+    SystemSettings,
+    ShiftPacket,
+    ExternalUser,
+    ExternalPayment,
+    ExternalSubscription,
+    UserCredentials,
+    UsersTable,
+    Shift,
+    Department,
+    Payment,
+    Invoice,
+    StripePayment,
+    UserProfile,
     TenantDomain,
     log_system_action,
-
+    IncidentShiftSchedule,
 )
+from .extra_views import _ensure_incident_for_capture
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, CreateIncidentForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm, ProfileEditForm, LegacyProfileEditForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
 from .payment_utils import generate_invoice_id, calculate_due_date, ensure_unique_invoice_id
@@ -2539,9 +2554,41 @@ def incidents_list(request):
     
     create_incident_form = None  # set below for GET or when POST create_incident fails
     
-    # Handle New Incident Creation POST from the form on this page
-    if request.method == 'POST' and request.POST.get('action') == 'create_incident':
-        form = CreateIncidentForm(request.POST)
+    # Handle POST actions on this page
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        # Inline update of shift cadence for an incident
+        if action == "update_cadence":
+            incident_id = request.POST.get("incident_id")
+            shift_hours = request.POST.get("shift_hours")
+            if incident_id and shift_hours and organization:
+                try:
+                    capture_obj = IncidentCapture.objects.get(id=incident_id)
+                    normalized_incident = _ensure_incident_for_capture(capture_obj, organization)
+                    shift_hours_int = int(shift_hours)
+                    IncidentShiftSchedule.objects.update_or_create(
+                        incident=normalized_incident,
+                        defaults={
+                            "shift_hours": shift_hours_int,
+                            "created_by": getattr(request.user, "id", 0) or 0,
+                            "incident_uid": normalized_incident.incident_uid,
+                        },
+                    )
+                    messages.success(request, "Shift cadence updated.")
+                except Exception as e:
+                    messages.error(request, f"Could not update shift cadence: {e}")
+            return redirect("incidents_list")
+
+        # New Incident Creation POST from the form on this page
+        if action == "create_incident":
+            form = CreateIncidentForm(request.POST)
+        else:
+            form = None
+    else:
+        form = None
+
+    if form is not None and request.method == "POST" and request.POST.get("action") == "create_incident":
         if form.is_valid() and organization:
             reported_time = form.cleaned_data.get('reported_time') or timezone.now()
             tenant_id = getattr(organization, 'tenant_id', None)
@@ -2560,6 +2607,24 @@ def incidents_list(request):
                 source=form.cleaned_data.get('source') or '',
                 tenant_id=tenant_id,
             )
+            # Optional: if a shift cadence was provided, create/update the normalized
+            # incident and its IncidentShiftSchedule so Shift Packets scheduling is ready.
+            shift_cadence = form.cleaned_data.get('shift_cadence_hours')
+            if shift_cadence:
+                try:
+                    shift_hours_int = int(shift_cadence)
+                    normalized_incident = _ensure_incident_for_capture(incident, organization)
+                    IncidentShiftSchedule.objects.update_or_create(
+                        incident=normalized_incident,
+                        defaults={
+                            "shift_hours": shift_hours_int,
+                            "created_by": getattr(request.user, "id", 0) or 0,
+                            "incident_uid": normalized_incident.incident_uid,
+                        },
+                    )
+                except Exception:
+                    # Do not block incident creation if schedule setup fails.
+                    pass
             actionby_id = None
             if liaison:
                 actionby_id = getattr(liaison.user, 'id', None)
@@ -2587,13 +2652,24 @@ def incidents_list(request):
     if liaison is not None and organization is not None:
         # Standard Django auth users (with Liaison) only see incidents
         # that belong to their organization.
-        incidents = IncidentCapture.objects.filter(
+        incidents_qs = IncidentCapture.objects.filter(
             organization=organization
         ).order_by('-reported_time')
+        incidents = list(incidents_qs)
     else:
         # Legacy UserCredentials users and any fallback case:
         # show all incidents (no org filter) so previously captured data is visible.
-        incidents = IncidentCapture.objects.all().order_by('-reported_time')
+        incidents = list(IncidentCapture.objects.all().order_by('-reported_time'))
+    
+    # Attach any existing shift cadence configuration to each incident for display
+    uids = [inc.incident_uid for inc in incidents if getattr(inc, "incident_uid", None) is not None]
+    if uids:
+        schedules = IncidentShiftSchedule.objects.filter(incident_uid__in=uids)
+        cadence_by_uid = {s.incident_uid: s.shift_hours for s in schedules}
+    else:
+        cadence_by_uid = {}
+    for inc in incidents:
+        inc.shift_cadence_hours = cadence_by_uid.get(getattr(inc, "incident_uid", None))
     
     # Get or create system settings for status display
     settings_obj, created = SystemSettings.objects.get_or_create(
@@ -2623,7 +2699,12 @@ def incidents_list(request):
     # Form for New Incident Creation: use bound form with errors if POST failed, else fresh with initial
     if create_incident_form is None:
         now = timezone.now()
-        create_incident_form = CreateIncidentForm(initial={'reported_time': now.strftime('%Y-%m-%dT%H:%M')})
+        create_incident_form = CreateIncidentForm(
+            initial={
+                "reported_time": now.strftime('%Y-%m-%dT%H:%M'),
+                "shift_cadence_hours": "24",
+            }
+        )
     
     return render(request, 'core/incidents_list.html', {
         'incidents': incidents,
