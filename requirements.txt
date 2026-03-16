@@ -26,6 +26,9 @@ requests>=2.31.0
 # django-environ>=0.11.0  # For environment variable management
 # python-decouple>=3.8    # Alternative for environment variables
 
+# Scheduler dependency
+APScheduler>=3.10.0
+
 # Development dependencies (optional)
 # Uncomment these for development
 # django-debug-toolbar>=4.2.0

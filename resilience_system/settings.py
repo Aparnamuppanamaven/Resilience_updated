@@ -204,6 +204,11 @@ if not DEBUG:
     X_FRAME_OPTIONS = "ALLOWALL"  # Allow iframe embedding as required
 
 # --------------------------------------------------
+# SCHEDULER
+# --------------------------------------------------
+RUN_APSCHEDULER = os.getenv("RUN_APSCHEDULER", "True").lower() in ("true", "1", "yes")
+
+# --------------------------------------------------
 # DEFAULT PK FIELD
 # --------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

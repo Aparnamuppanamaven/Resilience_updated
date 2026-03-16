@@ -418,6 +418,40 @@ class ShiftPacketHistory(models.Model):
         ordering = ['-created_at']
 
 
+class ShiftPacketSchedulerLog(models.Model):
+    """Scheduler logs for shift packet generation runs."""
+    run_id = models.BigAutoField(primary_key=True)
+    incident = models.ForeignKey(
+        Incident,
+        on_delete=models.CASCADE,
+        related_name='scheduler_logs',
+        db_column='incident_id',
+    )
+    triggered_at = models.DateTimeField()
+    next_scheduled = models.DateTimeField()
+    schedule_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('generated', 'Generated'),
+            ('failed', 'Failed'),
+        ],
+    )
+    message = models.TextField(blank=True, null=True)
+    capture_incident = models.ForeignKey(
+        IncidentCapture,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='scheduler_logs',
+        db_column='capture_incident_id',
+        help_text='core_incidents ID associated with this scheduler log',
+    )
+
+    class Meta:
+        db_table = 'core_shiftpacket_scheduler_log'
+        ordering = ['-triggered_at']
+
+
 class AgencyUserCounter(models.Model):
     """License/seat usage per agency/organization"""
     id = models.BigAutoField(primary_key=True)

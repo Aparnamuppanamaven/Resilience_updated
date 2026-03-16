@@ -22,7 +22,7 @@ from typing import List, Optional, Dict, Any
 
 from django.utils import timezone
 
-from .models import Incident, ShiftPacket, SituationUpdate
+from .models import Incident, IncidentEvent, ShiftPacket, SituationUpdate
 
 try:
     # OpenAI Python SDK v1.x
@@ -38,6 +38,7 @@ class IncidentContext:
     incident: Incident
     last_packet: Optional[ShiftPacket]
     situation_updates: List[SituationUpdate]
+    incident_events: List[IncidentEvent]
 
 
 def _build_prompt_payload(ctx: IncidentContext) -> Dict[str, Any]:
@@ -65,6 +66,25 @@ def _build_prompt_payload(ctx: IncidentContext) -> Dict[str, Any]:
             }
         )
 
+    incident_event_payload = []
+    for ev in ctx.incident_events:
+        event_user = "unknown"
+        if ev.user_log_id is not None:
+            try:
+                event_user = ev.user_log.username
+            except Exception:
+                # If user no longer exists, keep incident event user unknown
+                event_user = "unknown"
+
+        incident_event_payload.append(
+            {
+                "id": ev.id,
+                "time": ev.created_time.isoformat(),
+                "event_desc": ev.event_desc,
+                "user": event_user,
+            }
+        )
+
     payload: Dict[str, Any] = {
         "incident": {
             "id": incident.id,
@@ -78,6 +98,7 @@ def _build_prompt_payload(ctx: IncidentContext) -> Dict[str, Any]:
         },
         "last_shift_packet": None,
         "situation_updates_since_last_packet": situation_payload,
+        "incident_events": incident_event_payload,
     }
 
     if last_packet is not None:

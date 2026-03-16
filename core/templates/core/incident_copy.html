@@ -269,12 +269,12 @@
                                 </div>
                             </div>
 
-                            <div style="font-size: 0.9rem; color: #111827; white-space: pre-wrap;">
+                            <div style="font-size: 0.9rem; color: #111827;">
                                 {{ incident.description|default:"Not specified" }}
                             </div>
                             {% if incident.impact %}
                                 <hr style="margin: 1rem 0; border-color: rgba(15, 23, 42, 0.2);">
-                                <div style="font-size: 0.9rem; color: #111827; white-space: pre-wrap;">
+                                <div style="font-size: 0.9rem; color: #111827;">
                                     <strong>Impact:</strong> {{ incident.impact }}
                                 </div>
                             {% endif %}
