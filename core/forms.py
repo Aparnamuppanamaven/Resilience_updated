@@ -621,13 +621,16 @@ class CreateIncidentForm(forms.Form):
         ],
         widget=forms.Select(attrs={'class': 'form-control'}),
     )
-    status = forms.CharField(
-        required=False,
+    status = forms.ChoiceField(
+        required=True,
         label='Status',
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'e.g., Open, Investigating',
-        }),
+        choices=[
+            ('Open', 'Open'),
+            ('Investigating', 'Investigating'),
+            ('Resolved', 'Resolved'),
+        ],
+        initial='Open',
+        widget=forms.Select(attrs={'class': 'form-control'}),
     )
     reported_time = forms.DateTimeField(
         required=False,
