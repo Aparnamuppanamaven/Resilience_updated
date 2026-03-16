@@ -482,6 +482,13 @@
                         {% endif %}
                     </div>
                     <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.sub_category.label }}</label>
+                        {{ create_incident_form.sub_category }}
+                        {% if create_incident_form.sub_category.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.sub_category.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="form-group" style="margin-bottom: 1rem;">
                         <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.location.label }}</label>
                         {{ create_incident_form.location }}
                         {% if create_incident_form.location.errors %}
@@ -774,6 +781,46 @@
             });
         }
     }
+
+    // Incident creation: Category -> Sub Category dependent dropdown
+    document.addEventListener('DOMContentLoaded', function() {
+        const categorySelect = document.getElementById('incidentCategorySelect');
+        const subCategorySelect = document.getElementById('incidentSubCategorySelect');
+        if (!categorySelect || !subCategorySelect) return;
+
+        const resetSubCategory = (placeholderText) => {
+            subCategorySelect.innerHTML = '';
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = placeholderText || 'Select sub category';
+            subCategorySelect.appendChild(opt);
+        };
+
+        const loadServices = async (category) => {
+            resetSubCategory('Loading...');
+            if (!category) {
+                resetSubCategory('Select sub category');
+                return;
+            }
+            try {
+                const resp = await fetch(`{% url 'department_services_api' %}?category=${encodeURIComponent(category)}`);
+                const data = await resp.json();
+                resetSubCategory('Select sub category');
+                (data.services || []).forEach((name) => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    subCategorySelect.appendChild(opt);
+                });
+            } catch (e) {
+                resetSubCategory('Select sub category');
+            }
+        };
+
+        categorySelect.addEventListener('change', () => {
+            loadServices(categorySelect.value);
+        });
+    });
     </script>
 </div>
 {% endblock %}

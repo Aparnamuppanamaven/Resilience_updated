@@ -2602,6 +2602,7 @@ def incidents_list(request):
                 created_by=liaison,
                 reported_by=form.cleaned_data.get('reported_by') or '',
                 category=form.cleaned_data.get('category') or '',
+                sub_category=form.cleaned_data.get('sub_category') or '',
                 location=form.cleaned_data.get('location') or '',
                 casualties=form.cleaned_data.get('casualties') or None,
                 source=form.cleaned_data.get('source') or '',
@@ -2714,6 +2715,24 @@ def incidents_list(request):
         'last_sync_display': sync_time_display,
         'create_incident_form': create_incident_form,
     })
+
+
+def department_services_api(request):
+    """
+    Return service_name options from core_department for a given category.
+    Used by the Incident Creation modal to populate the Sub Category dropdown.
+    """
+    category = (request.GET.get("category") or "").strip()
+    if not category:
+        return JsonResponse({"services": []})
+
+    services = list(
+        Department.objects.filter(category=category)
+        .values_list("service_name", flat=True)
+        .distinct()
+        .order_by("service_name")
+    )
+    return JsonResponse({"services": services})
 
 
 def incident_copy_view(request):

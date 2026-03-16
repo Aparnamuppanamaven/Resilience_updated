@@ -35,6 +35,7 @@ from .models import (
     Organization,
     TxLog,
     UserCredentials,
+    Department,
 )
 
 
@@ -104,6 +105,12 @@ def situation_updates_page(request):
 
     organization, current_status, last_sync_display = _get_org_and_status(request)
 
+    department_categories = list(
+        Department.objects.values_list("category", flat=True)
+        .distinct()
+        .order_by("category")
+    )
+
     if request.method == "POST":
         incident_id = request.POST.get("incident_id")
         try:
@@ -133,7 +140,10 @@ def situation_updates_page(request):
                 description=request.POST.get("situationupdate_description") or "",
                 update_time=parsed_update_time,
                 reported_by=request.POST.get("reported_by") or "",
+                # Store selected department category (core_department.category)
                 department=request.POST.get("department") or "",
+                # Store selected sub-department (core_department.service_name) into sub_department column
+                sub_department=request.POST.get("sub_category") or "",
                 severity_change=request.POST.get("severity_change") or "",
                 status_change=request.POST.get("status_change") or "",
                 casualties_injured=(
@@ -202,6 +212,7 @@ def situation_updates_page(request):
         "incidents": incidents,
         "selected_incident": selected_incident,
         "situation_updates": situation_updates,
+        "department_categories": department_categories,
     }
     return render(request, "core/situation_updates.html", context)
 

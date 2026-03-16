@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import datetime, timedelta
 import re
-from .models import OperationalUpdate, SystemSettings, UserCredentials, Payment, Invoice, UserProfile
+from .models import OperationalUpdate, SystemSettings, UserCredentials, Payment, Invoice, UserProfile, Department
 
 
 PASSWORD_REGEX = re.compile(
@@ -602,13 +602,27 @@ class CreateIncidentForm(forms.Form):
             'placeholder': 'Describe the incident...',
         }),
     )
-    category = forms.CharField(
+    category = forms.ChoiceField(
         required=False,
-        label='Category',
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'e.g., Cybersecurity',
-        }),
+        label="Category",
+        choices=[("", "Select category")],
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "incidentCategorySelect",
+            }
+        ),
+    )
+    sub_category = forms.ChoiceField(
+        required=False,
+        label="Sub Category",
+        choices=[("", "Select sub category")],
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "id": "incidentSubCategorySelect",
+            }
+        ),
     )
     severity = forms.ChoiceField(
         required=True,
@@ -681,6 +695,36 @@ class CreateIncidentForm(forms.Form):
             'placeholder': 'e.g., Hotline, Email',
         }),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        categories = (
+            Department.objects.values_list("category", flat=True)
+            .distinct()
+            .order_by("category")
+        )
+        self.fields["category"].choices = [("", "Select category")] + [
+            (c, c) for c in categories if c
+        ]
+
+        if self.is_bound:
+            selected_category = (self.data.get("category") or "").strip()
+        else:
+            selected_category = (self.initial.get("category") or "").strip()
+
+        services = []
+        if selected_category:
+            services = (
+                Department.objects.filter(category=selected_category)
+                .values_list("service_name", flat=True)
+                .distinct()
+                .order_by("service_name")
+            )
+
+        self.fields["sub_category"].choices = [("", "Select sub category")] + [
+            (s, s) for s in services if s
+        ]
 
     shift_cadence_hours = forms.ChoiceField(
         required=False,
