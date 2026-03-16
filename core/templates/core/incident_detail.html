@@ -147,16 +147,11 @@
                             <div class="form-group">
                                 <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Severity</label>
                                 <div>
-                                    <span class="badge" style="
+                                    <span class="badge severity-badge severity-{{ incident.severity|default:''|lower }}" style="
                                         padding: 6px 12px;
                                         border-radius: 4px;
                                         font-size: 0.875rem;
                                         font-weight: 500;
-                                        {% if incident.severity == 'LOW' %}background-color: #d1ecf1; color: #0c5460;
-                                        {% elif incident.severity == 'MEDIUM' %}background-color: #fff3cd; color: #856404;
-                                        {% elif incident.severity == 'HIGH' %}background-color: #f8d7da; color: #721c24;
-                                        {% elif incident.severity == 'CRITICAL' %}background-color: #f5c6cb; color: #721c24;
-                                        {% else %}background-color: #e2e3e5; color: #383d41;{% endif %}
                                     ">
                                         {{ incident.get_severity_display|default:incident.severity }}
                                     </span>
@@ -745,6 +740,8 @@
         </div>
     </div>
 
+    <span id="incidentMeta" data-incident-id="{{ incident.id }}" style="display:none"></span>
+
     <script>
     function activateAlert() {
         if (confirm('Are you sure you want to activate the alert? This will change the system status to High Alert.')) {
@@ -818,8 +815,15 @@
         firstIcon.style.transform = 'rotate(180deg)';
     });
 
+    function getIncidentId() {
+        const el = document.getElementById('incidentMeta');
+        const raw = el ? el.getAttribute('data-incident-id') : null;
+        const id = raw ? Number(raw) : NaN;
+        return Number.isFinite(id) ? id : null;
+    }
+
     // User Assignment Functions
-    const incidentId = {{ incident.id }};
+    const incidentId = getIncidentId();
 
     function toggleUserSelection() {
         const container = document.getElementById('usersTableContainer');
@@ -922,7 +926,7 @@
             return;
         }
         
-        const incidentId = {{ incident.id }};
+        const incidentId = getIncidentId();
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         
         // Disable form while submitting
@@ -1081,7 +1085,7 @@
 
     // Generate Shift Packet PDF and show preview modal
     function generateShiftPacket() {
-        const incidentId = {{ incident.id }};
+        const incidentId = getIncidentId();
         const btn = document.getElementById('generateShiftPacketBtn');
         const originalBtnText = btn.innerHTML;
         btn.disabled = true;
@@ -1109,7 +1113,7 @@
 
     // Download PDF from preview
     function downloadPdfFromPreview() {
-        const incidentId = {{ incident.id }};
+        const incidentId = getIncidentId();
         const pdfUrl = `/incidents/${incidentId}/generate-shift-packet/`;
         
         fetch(pdfUrl)
@@ -1273,6 +1277,13 @@
         background: #f1f1f1;
         border-radius: 4px;
     }
+
+    /* Severity badge colors: keep template logic out of CSS */
+    .severity-badge.severity-low { background-color: #d1ecf1; color: #0c5460; }
+    .severity-badge.severity-medium { background-color: #fff3cd; color: #856404; }
+    .severity-badge.severity-high { background-color: #f8d7da; color: #721c24; }
+    .severity-badge.severity-critical { background-color: #f5c6cb; color: #721c24; }
+    .severity-badge { background-color: #e2e3e5; color: #383d41; }
 
     .collapse-content::-webkit-scrollbar-thumb {
         background: #888;
