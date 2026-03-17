@@ -768,6 +768,7 @@ class CreateIncidentForm(forms.Form):
         required=False,
         label='Shift Packet (hours)',
         choices=[(h, f"{h}") for h in [1, 2, 3, 4, 6, 8, 10, 12, 18, 24, 48, 72]],
+        initial="8",
         widget=forms.Select(attrs={'class': 'form-control'}),
     )
 
