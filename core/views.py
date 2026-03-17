@@ -2987,7 +2987,7 @@ def incidents_list(request):
         create_incident_form = CreateIncidentForm(
             initial={
                 "reported_time": now.strftime('%Y-%m-%dT%H:%M'),
-                "shift_cadence_hours": "24",
+                "shift_cadence_hours": "8",
                 "reported_by": initial_reported_by,
             }
         )

@@ -406,7 +406,7 @@
                                 {% endif %}
                             </div>
 
-                            <!-- Add/Change Users Button -->
+                            <!-- Add/Remove Users Button -->
                             <div id="assignButtonContainer" style="margin-bottom: 1.5rem;">
                                 <button onclick="toggleUserSelection()" id="assignUsersBtn" style="
                                     width: 100%;
@@ -420,7 +420,7 @@
                                     transition: background 0.2s;
                                 " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#667eea'">
                                     <i class="fa-solid fa-user-plus" style="margin-right: 0.5rem;"></i>
-                                    <span id="assignBtnText">{% if assigned_liaisons %}Change Users{% else %}Assign Users{% endif %}</span>
+                                    <span id="assignBtnText">Add / Remove Users</span>
                                 </button>
                             </div>
 
@@ -439,7 +439,7 @@
                                             font-weight: 600;
                                             cursor: pointer;
                                             font-size: 0.875rem;
-                                        ">Add Selected</button>
+                                        ">Save</button>
                                     </div>
 
                                     <!-- Search and filter for users (by Name and Department/Agency) -->
@@ -502,7 +502,27 @@
                                                 {% for user in all_users %}
                                                 <tr class="user-select-row" data-name="{{ user.name|default:user.primary_liaison_name|lower }}" data-department="{{ user.department|default_if_none:''|lower }}" style="border-bottom: 1px solid #f1f3f5; background: white;">
                                                     <td style="padding: 0.75rem 1rem; text-align: center;">
-                                                        <input type="checkbox" class="user-checkbox" value="{{ user.id }}" data-user-name="{{ user.name|default:user.primary_liaison_name }}" data-user-email="{{ user.email_id|default:user.liaison_email }}" {% for liaison in assigned_liaisons %}{% if liaison.user.email|lower == user.liaison_email|lower %}checked{% endif %}{% endfor %}>
+                                                        <!-- Hidden checkbox keeps existing JS (saveSelectedUsers) working -->
+                                                        <input type="checkbox" class="user-checkbox" value="{{ user.id }}" data-user-name="{{ user.name|default:user.primary_liaison_name }}" data-user-email="{{ user.email_id|default:user.liaison_email }}" style="display:none;">
+                                                        <button type="button"
+                                                                class="btn btn-sm"
+                                                                onclick="toggleUserRowSelection(this)"
+                                                                style="
+                                                                    display: inline-flex;
+                                                                    align-items: center;
+                                                                    justify-content: center;
+                                                                    width: 26px;
+                                                                    height: 26px;
+                                                                    border-radius: 999px;
+                                                                    border: 1px solid #10b981;
+                                                                    background: #ecfdf3;
+                                                                    color: #10b981;
+                                                                    cursor: pointer;
+                                                                    font-size: 0.8rem;
+                                                                "
+                                                                title="Add / remove user">
+                                                            <span>+</span>
+                                                        </button>
                                                     </td>
                                                     <td style="padding: 0.75rem 1rem;">
                                                         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -913,7 +933,7 @@
             btn.style.background = '#6c757d';
         } else {
             container.style.display = 'none';
-            btnText.textContent = '{% if assigned_liaisons %}Change Users{% else %}Assign Users{% endif %}';
+            btnText.textContent = 'Add / Remove Users';
             btn.style.background = '#667eea';
         }
     }
@@ -921,6 +941,30 @@
     function toggleAllUsers(checkbox) {
         const checkboxes = document.querySelectorAll('.user-checkbox');
         checkboxes.forEach(cb => cb.checked = checkbox.checked);
+    }
+
+    // Toggle a single user row selection via + button
+    function toggleUserRowSelection(button) {
+        const row = button.closest('tr');
+        if (!row) return;
+        const checkbox = row.querySelector('.user-checkbox');
+        if (!checkbox) return;
+
+        checkbox.checked = !checkbox.checked;
+
+        if (checkbox.checked) {
+            // Selected state styling
+            row.style.background = '#ecfdf3';
+            button.style.background = '#10b981';
+            button.style.color = '#ffffff';
+            button.querySelector('span').textContent = '−';
+        } else {
+            // Default state styling
+            row.style.background = 'white';
+            button.style.background = '#ecfdf3';
+            button.style.color = '#10b981';
+            button.querySelector('span').textContent = '+';
+        }
     }
 
     // Filter users in "Select Users" table by name and department/agency
