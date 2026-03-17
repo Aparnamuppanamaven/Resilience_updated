@@ -80,9 +80,9 @@ class IncidentAssignedUser(models.Model):
 class Incident(models.Model):
     """Incidents - maps to existing core_operationalupdate table"""
     SEVERITY_CHOICES = [
-        ('LOW', 'Low - Informational'),
-        ('MEDIUM', 'Medium - Potential Impact'),
-        ('HIGH', 'High - Critical Incident'),
+        ('LOW', 'Low '),
+        ('MEDIUM', 'Medium '),
+        ('HIGH', 'High '),
         ('CRITICAL', 'Critical'),
     ]
     
@@ -127,9 +127,9 @@ class Incident(models.Model):
 class IncidentCapture(models.Model):
     """Incidents captured from Capture form - maps to core_incidents table"""
     SEVERITY_CHOICES = [
-        ('LOW', 'Low - Informational'),
-        ('MEDIUM', 'Medium - Potential Impact'),
-        ('HIGH', 'High - Critical Incident'),
+        ('LOW', 'Low '),
+        ('MEDIUM', 'Medium '),
+        ('HIGH', 'High '),
         ('CRITICAL', 'Critical'),
     ]
     
@@ -161,6 +161,7 @@ class IncidentCapture(models.Model):
     category = models.CharField(max_length=100, null=True, blank=True, db_column='category')
     sub_category = models.CharField(max_length=255, null=True, blank=True, db_column='sub_category')
     location = models.CharField(max_length=255, null=True, blank=True, db_column='location')
+    zipcode = models.CharField(max_length=20, null=True, blank=True, db_column='Zipcode')
     casualties = models.IntegerField(null=True, blank=True, db_column='casualties')
     source = models.CharField(max_length=100, null=True, blank=True, db_column='source')
     tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')

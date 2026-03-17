@@ -638,9 +638,9 @@ class CreateIncidentForm(forms.Form):
         required=True,
         label='Severity',
         choices=[
-            ('LOW', 'Low - Informational'),
-            ('MEDIUM', 'Medium - Potential Impact'),
-            ('HIGH', 'High - Critical Incident'),
+            ('LOW', 'Low '),
+            ('MEDIUM', 'Medium '),
+            ('HIGH', 'High '),
             ('CRITICAL', 'Critical'),
         ],
         widget=forms.Select(attrs={'class': 'form-control'}),
@@ -649,11 +649,18 @@ class CreateIncidentForm(forms.Form):
         required=True,
         label='Status',
         choices=[
-            ('Open', 'Open'),
-            ('Investigating', 'Investigating'),
-            ('Resolved', 'Resolved'),
+            ('new', 'New'),
+            ('open', 'Open'),
+            ('in_progress', 'In Progress'),
+            ('investigating', 'Investigating'),
+            ('on_hold', 'On Hold'),
+            ('resolved', 'Resolved'),
+            ('closed', 'Closed'),
+            ('reopened', 'Reopened'),
+            ('escalated', 'Escalated'),
+            ('cancelled', 'Cancelled'),
         ],
-        initial='Open',
+        initial='open',
         widget=forms.Select(attrs={'class': 'form-control'}),
     )
     reported_time = forms.DateTimeField(
@@ -670,6 +677,7 @@ class CreateIncidentForm(forms.Form):
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'Name or designation',
+            'readonly': 'readonly',
         }),
     )
     location = forms.CharField(
@@ -678,6 +686,14 @@ class CreateIncidentForm(forms.Form):
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'e.g., County-wide',
+        }),
+    )
+    zipcode = forms.CharField(
+        required=False,
+        label='Zipcode',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., 12345',
         }),
     )
     impact = forms.CharField(
@@ -692,18 +708,30 @@ class CreateIncidentForm(forms.Form):
     casualties = forms.CharField(
         required=False,
         label='Casualties',
+        initial='0',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'If applicable',
         }),
     )
-    source = forms.CharField(
+    source = forms.ChoiceField(
         required=False,
         label='Source',
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'e.g., Hotline, Email',
-        }),
+        choices=[
+            ('', 'Select source'),
+            ('police', 'Police Station'),
+            ('control_room', 'Control Room'),
+            ('fire', 'Fire Department'),
+            ('ambulance', 'Ambulance Service'),
+            ('public', 'Public'),
+            ('witness', 'Witness'),
+            ('internal', 'Internal Staff'),
+            ('security', 'Security Team'),
+            ('ngo', 'NGO'),
+            ('media', 'Media'),
+            ('other', 'Other'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-control'}),
     )
 
     def __init__(self, *args, **kwargs):

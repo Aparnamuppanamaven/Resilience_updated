@@ -160,11 +160,7 @@
                             <div class="form-group">
                                 <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Status</label>
                                 <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-<<<<<<< Updated upstream
-                                    {{ incident.reported_time|date:"M d, Y g:i A" }}
-=======
                                     {{ incident.status|default:"—" }}
->>>>>>> Stashed changes
                                 </div>
                             </div>
                         </div>
@@ -199,9 +195,23 @@
                         </div>
 
                         <div class="form-group" style="margin-bottom: 1.25rem;">
+                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Sub Category</label>
+                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                {{ incident.sub_category|default:"—" }}
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.25rem;">
                             <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Location</label>
                             <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
                                 {{ incident.location|default:"—" }}
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1.25rem;">
+                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Zipcode</label>
+                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                {{ incident.zipcode|default:"—" }}
                             </div>
                         </div>
 
@@ -1324,6 +1334,11 @@
     .collapse-content::-webkit-scrollbar-track {
         background: #f1f1f1;
         border-radius: 4px;
+    }
+
+    /* Hide Incident Logs section visually */
+    .collapse-section[data-section="3"] {
+        display: none !important;
     }
 
     /* Severity badge colors: keep template logic out of CSS */

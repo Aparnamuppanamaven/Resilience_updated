@@ -2863,6 +2863,12 @@ def incidents_list(request):
         if form.is_valid() and organization:
             reported_time = form.cleaned_data.get('reported_time') or timezone.now()
             tenant_id = getattr(organization, 'tenant_id', None)
+            # Always derive reported_by from the logged-in user/session
+            reported_by_email = ''
+            if request.user.is_authenticated:
+                reported_by_email = getattr(request.user, 'email', '') or ''
+            elif request.session.get('user_credentials_username'):
+                reported_by_email = request.session.get('user_credentials_username') or ''
             incident = IncidentCapture.objects.create(
                 organization=organization,
                 title=form.cleaned_data['title'],
@@ -2871,10 +2877,11 @@ def incidents_list(request):
                 impact=form.cleaned_data.get('impact') or '',
                 reported_time=reported_time,
                 created_by=liaison,
-                reported_by=form.cleaned_data.get('reported_by') or '',
+                reported_by=reported_by_email,
                 category=form.cleaned_data.get('category') or '',
                 sub_category=form.cleaned_data.get('sub_category') or '',
                 location=form.cleaned_data.get('location') or '',
+                zipcode=form.cleaned_data.get('zipcode') or '',
                 casualties=form.cleaned_data.get('casualties') or None,
                 source=form.cleaned_data.get('source') or '',
                 tenant_id=tenant_id,
@@ -2971,10 +2978,17 @@ def incidents_list(request):
     # Form for New Incident Creation: use bound form with errors if POST failed, else fresh with initial
     if create_incident_form is None:
         now = timezone.now()
+        # Pre-fill reported_by with the logged-in user's email/identifier
+        initial_reported_by = ''
+        if request.user.is_authenticated:
+            initial_reported_by = getattr(request.user, 'email', '') or ''
+        elif request.session.get('user_credentials_username'):
+            initial_reported_by = request.session.get('user_credentials_username') or ''
         create_incident_form = CreateIncidentForm(
             initial={
                 "reported_time": now.strftime('%Y-%m-%dT%H:%M'),
                 "shift_cadence_hours": "24",
+                "reported_by": initial_reported_by,
             }
         )
     
