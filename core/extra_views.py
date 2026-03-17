@@ -10,7 +10,7 @@ import json
 from io import BytesIO
 
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.urls import reverse
@@ -312,6 +312,59 @@ def shift_packets_page(request):
         "allowed_shift_hours": [1, 2, 3, 4, 6, 8, 10, 12, 18, 24, 48, 72],
     }
     return render(request, "core/shift_packets.html", context)
+
+
+def edit_shift_packet_history(request, history_id: int):
+    """
+    Allow manual editing of a single ShiftPacketHistory entry.
+
+    Behaviour:
+    - User can edit the narrative fields shown on the Shift Packet cards.
+    - When edited, tx_type is set to 'MANUAL' so the UI badge shows MANUAL
+      instead of AI.
+    - All edits are stored in core_shiftpacket_history only.
+    """
+    auth_redirect = _require_auth(request)
+    if auth_redirect:
+        return auth_redirect
+
+    organization, current_status, last_sync_display = _get_org_and_status(request)
+
+    history = get_object_or_404(ShiftPacketHistory, id=history_id)
+
+    # Resolve capture incident so we can link back to the Shift Packets page
+    capture_incident = (
+        IncidentCapture.objects.filter(incident_uid=history.incident_uid).first()
+        if history.incident_uid
+        else None
+    )
+
+    if request.method == "POST":
+        history.input_summary = request.POST.get("input_summary", history.input_summary or "")
+        history.what_changed = request.POST.get("what_changed", history.what_changed or "")
+        history.why_it_matters = request.POST.get("why_it_matters", history.why_it_matters or "")
+        history.decision_summary = request.POST.get("decision_summary", history.decision_summary or "")
+        history.decision_maker = request.POST.get("decision_maker", history.decision_maker or "")
+
+        # Mark as MANUAL once a human has edited the entry
+        history.tx_type = "MANUAL"
+        if request.user.is_authenticated:
+            history.updated_by = request.user.id
+
+        history.save()
+
+        if capture_incident:
+            return redirect(f"{reverse('shift_packets')}?incident_id={capture_incident.id}")
+        return redirect("shift_packets")
+
+    context = {
+        "organization": organization,
+        "current_status": current_status,
+        "last_sync_display": last_sync_display,
+        "history": history,
+        "capture_incident": capture_incident,
+    }
+    return render(request, "core/shift_packet_edit.html", context)
 
 
 def _build_report_context(request):

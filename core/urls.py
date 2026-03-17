@@ -38,6 +38,11 @@ urlpatterns = [
     # UI-only pages for prototype workflows (no backend persistence yet)
     path('situation-updates/', extra_views.situation_updates_page, name='situation_updates'),
     path('shift-packets/', extra_views.shift_packets_page, name='shift_packets'),
+    path(
+        'shift-packets/history/<int:history_id>/edit/',
+        extra_views.edit_shift_packet_history,
+        name='edit_shift_packet_history',
+    ),
     path('reports/', extra_views.reports_page, name='reports'),
     path('reports/pdf/', extra_views.reports_pdf, name='reports_pdf'),
     path('api/situation-logs/', extra_views.api_situation_logs, name='api_situation_logs'),
