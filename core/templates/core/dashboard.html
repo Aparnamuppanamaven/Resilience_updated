@@ -118,12 +118,13 @@
                     <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
                         <thead>
                             <tr style="background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
-                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151; width: 3rem; min-width: 1rem;">SNO</th>
-                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151;">Incident</th>
-                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151;">Location</th>
-                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151;">Severity</th>
-                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151;">Status</th>
-                                <th style="padding: 0.6rem 1rem; text-align: center; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: #374151; background: #f9fafb;">Shift Packet,Logs</th>
+                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151; width: 3rem; min-width: 1rem;"><i class="fa-solid fa-hashtag"></i> SNO</th>
+                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151;"><i class="fa-solid fa-exclamation-triangle"></i> Incident</th>
+                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151;"><i class="fa-solid fa-location-dot"></i> Location</th>
+                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151;"><i class="fa-solid fa-bolt"></i> Severity</th>
+                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151;"><i class="fa-solid fa-circle-check"></i> Status</th>
+                                <th style="padding: 0.6rem 1rem; text-align: center; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: #374151; background: #f9fafb;"><i class="fa-solid fa-clipboard-list"></i> Shift Packet</th>
+                                <th style="padding: 0.6rem 1rem; text-align: center; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: #374151; background: #f9fafb;"><i class="fa-solid fa-clipboard-list"></i> Logs</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -142,17 +143,22 @@
                                 <td style="padding: 0.9rem 1rem;">Open</td>
                                 <td style="padding: 0.6rem 1rem; text-align: center; vertical-align: middle;">
                                     <div class="open-incidents-actions">
-                                        <button type="button" class="btn-action-update" data-incident-id="{{ incident.id }}" data-incident-title="{{ incident.title }}" title="Update Incident">
-                                            <i class="fa-solid fa-pen-to-square"></i>
-                                        </button>
-                                        <a href="/incidents/{{ incident.id }}/generate-shift-packet/" target="_blank" class="btn-action-icon btn-action-pdf" title="Generate Shift Packet (PDF)"><i class="fa-solid fa-file-pdf"></i></a>
-                                        <a href="/incidents/{{ incident.id }}/case-history.csv" class="btn-action-icon btn-action-excel" title="Generate Case History (CSV)" download><i class="fa-solid fa-file-excel"></i></a>
+                                        <a href="{% url 'generate_shift_packet_pdf' incident.id %}" target="_blank" class="btn-action-icon btn-action-pdf" title="Download Shift Packet PDF">
+                                            <i class="fa-solid fa-file-pdf"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                                <td style="padding: 0.6rem 1rem; text-align: center; vertical-align: middle;">
+                                    <div class="open-incidents-actions">
+                                        <a href="{% url 'incident_log_history_pdf' incident.id %}" target="_blank" class="btn-action-icon btn-action-pdf" title="Download Logs PDF">
+                                            <i class="fa-solid fa-file-pdf"></i>
+                                        </a>
                                     </div>
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="6" style="padding: 0.9rem 1rem; color: #6b7280;">
+                                <td colspan="7" style="padding: 0.9rem 1rem; color: #6b7280;">
                                     No incidents captured yet.
                                 </td>
                             </tr>

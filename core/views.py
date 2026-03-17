@@ -48,6 +48,7 @@ from .models import (
     Decision,
     SystemSettings,
     ShiftPacket,
+    ShiftPacketHistory,
     ExternalUser,
     ExternalPayment,
     ExternalSubscription,
@@ -3840,7 +3841,7 @@ def add_incident_event_log(request, incident_id):
 
 
 
-def generate_incident_shift_packet_pdf(request, incident_id):
+def incident_log_history_pdf(request, incident_id):
     """Generate a comprehensive incident log history PDF similar to the example format"""
     # Check authentication
     if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
@@ -4557,6 +4558,287 @@ def generate_incident_shift_packet_pdf(request, incident_id):
         return HttpResponse('Incident not found', status=404)
     except Exception as e:
         return HttpResponse(f'Error generating PDF: {str(e)}', status=500)
+
+
+def generate_incident_shift_packet_pdf(request, incident_id):
+    """
+    Generate a Shift Packet summary PDF for a single incident.
+    This focuses on the Shift Packet History (AI/manual packets)
+    instead of the full incident log timeline.
+    """
+    # Reuse the same auth + incident lookup as the log history PDF
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return HttpResponse('Unauthorized', status=401)
+
+    try:
+        organization = None
+        if request.user.is_authenticated:
+            try:
+                liaison = request.user.liaison_profile
+                organization = liaison.organization
+            except (Liaison.DoesNotExist, AttributeError):
+                return HttpResponse('Organization not found', status=400)
+        elif 'user_credentials_id' in request.session:
+            organization = Organization.objects.first()
+
+        if 'user_credentials_id' in request.session:
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id)
+                organization = incident.organization
+            except IncidentCapture.DoesNotExist:
+                return HttpResponse('Incident not found', status=404)
+        else:
+            if not organization:
+                return HttpResponse('Organization not found', status=400)
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+            except IncidentCapture.DoesNotExist:
+                return HttpResponse('Incident not found', status=404)
+
+        # Load Shift Packet history entries for this incident (via shared incident_uid)
+        history_entries = []
+        if getattr(incident, "incident_uid", None) is not None:
+            history_entries = list(
+                ShiftPacketHistory.objects.filter(incident_uid=incident.incident_uid)
+                .select_related("shiftpacket")
+                .order_by("created_at")
+            )
+
+        # Build a simple, clean Shift Packet PDF using ReportLab
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.enums import TA_LEFT, TA_CENTER
+        from reportlab.lib.colors import HexColor
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=0.7 * inch,
+            rightMargin=0.7 * inch,
+            topMargin=1.6 * inch,   # leave space for header banner
+            bottomMargin=0.9 * inch,
+        )
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "ShiftPacketTitle",
+            parent=styles["Heading1"],
+            fontName="Helvetica-Bold",
+            fontSize=16,
+            textColor=HexColor("#0f172a"),
+            alignment=TA_LEFT,
+            spaceAfter=6,
+        )
+        subtitle_style = ParagraphStyle(
+            "ShiftPacketSubtitle",
+            parent=styles["Normal"],
+            fontSize=10,
+            textColor=HexColor("#64748b"),
+            alignment=TA_LEFT,
+            spaceAfter=4,
+        )
+        section_title = ParagraphStyle(
+            "SectionTitle",
+            parent=styles["Heading2"],
+            fontName="Helvetica-Bold",
+            fontSize=11,
+            textColor=HexColor("#111827"),
+            spaceBefore=12,
+            spaceAfter=6,
+        )
+        body_style = ParagraphStyle(
+            "Body",
+            parent=styles["Normal"],
+            fontSize=9.5,
+            leading=13,
+            textColor=HexColor("#111827"),
+        )
+
+        elements = []
+
+        # Header block: Incident + organization
+        elements.append(Paragraph("Shift Packet Summary", title_style))
+        elements.append(
+            Paragraph(
+                f"[INC-{incident.id}] {incident.title}", subtitle_style
+            )
+        )
+        org_name = organization.name if organization else ""
+        if org_name:
+            elements.append(
+                Paragraph(f"Organization: {org_name}", body_style)
+            )
+        if incident.reported_time:
+            elements.append(
+                Paragraph(
+                    f"Reported: {incident.reported_time.strftime('%d %b %Y, %H:%M hrs')}",
+                    body_style,
+                )
+            )
+        elements.append(Spacer(1, 12))
+
+        # Meta row: Total packets
+        total_packets = len(history_entries)
+        meta_data = [
+            [
+                Paragraph("<b>Total Shift Packets</b>", body_style),
+                Paragraph(str(total_packets), body_style),
+            ]
+        ]
+        meta_table = Table(
+            meta_data,
+            colWidths=[2.3 * inch, 4.5 * inch],
+        )
+        meta_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), HexColor("#f8fafc")),
+                    ("BOX", (0, 0), (-1, -1), 0.8, HexColor("#e5e7eb")),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+        elements.append(meta_table)
+        elements.append(Spacer(1, 16))
+
+        # Section: Shift Packet History
+        elements.append(Paragraph("Shift Packet History", section_title))
+
+        if not history_entries:
+            elements.append(
+                Paragraph(
+                    "No shift packets have been generated for this incident yet.",
+                    body_style,
+                )
+            )
+        else:
+            header = [
+                Paragraph("<b>Created At</b>", body_style),
+                Paragraph("<b>Input Summary</b>", body_style),
+                Paragraph("<b>What Changed</b>", body_style),
+                Paragraph("<b>Why It Matters</b>", body_style),
+                Paragraph("<b>Decision</b>", body_style),
+                Paragraph("<b>Type</b>", body_style),
+            ]
+            table_rows = [header]
+
+            for entry in history_entries:
+                created = (
+                    entry.created_at.strftime("%d %b %Y, %H:%M")
+                    if entry.created_at
+                    else ""
+                )
+                table_rows.append(
+                    [
+                        Paragraph(created, body_style),
+                        Paragraph(entry.input_summary or "", body_style),
+                        Paragraph(entry.what_changed or "", body_style),
+                        Paragraph(entry.why_it_matters or "", body_style),
+                        Paragraph(entry.decision_summary or "", body_style),
+                        Paragraph(entry.tx_type or "", body_style),
+                    ]
+                )
+
+            # Slightly rebalance column widths to avoid clipping of long text
+            # while keeping within the printable width (~7.3 in like the log report).
+            history_table = Table(
+                table_rows,
+                colWidths=[1.2 * inch, 1.8 * inch, 1.8 * inch, 2.0 * inch, 2.0 * inch, 0.7 * inch],
+                repeatRows=1,
+            )
+            history_table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#0a1f44")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#e5e7eb")),
+                        ("ALIGN", (0, 0), (-1, 0), "LEFT"),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, 0), 9),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("BACKGROUND", (0, 1), (-1, -1), HexColor("#ffffff")),
+                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor("#ffffff"), HexColor("#f9fafb")]),
+                        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#e5e7eb")),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                        ("TOPPADDING", (0, 0), (-1, -1), 5),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ]
+                )
+            )
+            elements.append(history_table)
+
+        # Use same styled header/footer as Incident Log History,
+        # but with "Shift Packet Summary" as the report title.
+        def _draw_footer(canvas, doc_obj):
+            """Simple footer: page number centered at bottom, matching log report colors."""
+            width, _ = doc_obj.pagesize
+            canvas.setFont("Helvetica", 8)
+            canvas.setFillColor(HexColor("#94a3b8"))
+            page_text = f"Page {doc_obj.page}"
+            canvas.drawCentredString(width / 2.0, 0.5 * inch, page_text)
+
+        def on_first_page(canvas, doc_obj):
+            width, height = doc_obj.pagesize
+            x = 0.6 * inch
+            y = height - 1.55 * inch
+            w = width - 1.2 * inch
+            h = 0.95 * inch
+            canvas.setFillColor(HexColor("#ffffff"))
+            canvas.setStrokeColor(HexColor("#6366f1"))
+            canvas.setLineWidth(2)
+            try:
+                canvas.roundRect(x, y, w, h, 14, stroke=1, fill=1)
+            except Exception:
+                canvas.rect(x, y, w, h, stroke=1, fill=1)
+
+            # Left brand
+            canvas.setFillColor(HexColor("#2563eb"))
+            canvas.setFont("Helvetica-Bold", 14)
+            canvas.drawString(x + 16, y + h - 26, "Resilience")
+
+            # Right report header
+            canvas.setFillColor(HexColor("#94a3b8"))
+            canvas.setFont("Helvetica-Bold", 8)
+            canvas.drawRightString(
+                x + w - 16,
+                y + h - 20,
+                "EMERGENCY & INCIDENT MANAGEMENT PLATFORM",
+            )
+            canvas.setFillColor(HexColor("#0a1f44"))
+            canvas.setFont("Helvetica-Bold", 16)
+            canvas.drawRightString(
+                x + w - 16,
+                y + h - 42,
+                "Shift Packet Summary",
+            )
+            canvas.setFillColor(HexColor("#94a3b8"))
+            canvas.setFont("Helvetica", 8.5)
+            canvas.drawRightString(
+                x + w - 16,
+                y + 16,
+                f"Report Generated: {timezone.now().strftime('%d %b %Y, %H:%M hrs')}",
+            )
+
+            _draw_footer(canvas, doc_obj)
+
+        def on_later_pages(canvas, doc_obj):
+            _draw_footer(canvas, doc_obj)
+
+        doc.build(elements, onFirstPage=on_first_page, onLaterPages=on_later_pages)
+        buffer.seek(0)
+        response = HttpResponse(buffer, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="Shift_Packet_INC-{incident.id}.pdf"'
+        return response
+
+    except IncidentCapture.DoesNotExist:
+        return HttpResponse("Incident not found", status=404)
+    except Exception as e:
+        return HttpResponse(f"Error generating Shift Packet PDF: {str(e)}", status=500)
 
 
 def incident_case_history_csv(request, incident_id):

@@ -27,6 +27,7 @@ urlpatterns = [
     path('incidents/', views.incidents_list, name='incidents_list'),
     path('incidents/<int:incident_id>/', views.incident_detail, name='incident_detail'),
     path('incidents/<int:incident_id>/generate-shift-packet/', views.generate_incident_shift_packet_pdf, name='generate_shift_packet_pdf'),
+    path('incidents/<int:incident_id>/logs.pdf', views.incident_log_history_pdf, name='incident_log_history_pdf'),
     path('incidents/<int:incident_id>/case-history.csv', views.incident_case_history_csv, name='incident_case_history_csv'),
     path('api/search-users/', views.search_users_for_assignment, name='search_users_for_assignment'),
     path('api/incidents/<int:incident_id>/assign-users/', views.assign_users_to_incident, name='assign_users_to_incident'),
