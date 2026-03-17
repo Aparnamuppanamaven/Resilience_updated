@@ -143,45 +143,37 @@
                             </div>
                         </div>
 
-                        <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+                        <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
                             <div class="form-group">
                                 <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Severity</label>
                                 <div>
-                                    <span class="badge severity-badge severity-{{ incident.severity|default:''|lower }}" style="
+                                    <span class="badge" style="
                                         padding: 6px 12px;
                                         border-radius: 4px;
                                         font-size: 0.875rem;
                                         font-weight: 500;
+                                        {% if incident.severity == 'LOW' %}background-color: #d1ecf1; color: #0c5460;
+                                        {% elif incident.severity == 'MEDIUM' %}background-color: #fff3cd; color: #856404;
+                                        {% elif incident.severity == 'HIGH' %}background-color: #f8d7da; color: #721c24;
+                                        {% elif incident.severity == 'CRITICAL' %}background-color: #f5c6cb; color: #721c24;
+                                        {% else %}background-color: #e2e3e5; color: #383d41;{% endif %}
                                     ">
                                         {{ incident.get_severity_display|default:incident.severity }}
                                     </span>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Status</label>
+                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Created At</label>
                                 <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-                                    {{ incident.status|default:"—" }}
+
+                                   
+
                                 </div>
                             </div>
                         </div>
 
-                        <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
-                            <div class="form-group">
-                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Reported Time</label>
-                                <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-                                    {{ incident.reported_time|date:"d-m-Y H:i" }}
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Reported By</label>
-                                <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-                                    {{ incident.reported_by|default:"—" }}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group" style="margin-bottom: 1.25rem;">
-                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Description</label>
+                        <div class="form-group" style="margin-bottom: 1.5rem;">
+                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">What Changed?</label>
                             <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; white-space: pre-wrap; min-height: 60px; border-left: 3px solid #667eea;">
                                 {{ incident.description|default:"Not specified" }}
                             </div>
@@ -195,13 +187,6 @@
                         </div>
 
                         <div class="form-group" style="margin-bottom: 1.25rem;">
-                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Sub Category</label>
-                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-                                {{ incident.sub_category|default:"—" }}
-                            </div>
-                        </div>
-
-                        <div class="form-group" style="margin-bottom: 1.25rem;">
                             <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Location</label>
                             <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
                                 {{ incident.location|default:"—" }}
@@ -209,31 +194,9 @@
                         </div>
 
                         <div class="form-group" style="margin-bottom: 1.25rem;">
-                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Zipcode</label>
-                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-                                {{ incident.zipcode|default:"—" }}
-                            </div>
-                        </div>
-
-                        <div class="form-group" style="margin-bottom: 1.25rem;">
                             <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Impact</label>
                             <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; white-space: pre-wrap; min-height: 60px; border-left: 3px solid #667eea;">
                                 {{ incident.impact|default:"Not specified" }}
-                            </div>
-                        </div>
-
-                        <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0;">
-                            <div class="form-group">
-                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Casualties</label>
-                                <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-                                    {{ incident.casualties|default:"—" }}
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Source</label>
-                                <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-                                    {{ incident.source|default:"—" }}
-                                </div>
                             </div>
                         </div>
 
@@ -492,7 +455,7 @@
                                                 {% for user in all_users %}
                                                 <tr class="user-select-row" data-name="{{ user.name|default:user.primary_liaison_name|lower }}" data-department="{{ user.department|default_if_none:''|lower }}" style="border-bottom: 1px solid #f1f3f5; background: white;">
                                                     <td style="padding: 0.75rem 1rem; text-align: center;">
-                                                        <input type="checkbox" class="user-checkbox" value="{{ user.id }}" data-user-name="{{ user.name|default:user.primary_liaison_name }}" data-user-email="{{ user.email_id|default:user.liaison_email }}">
+                                                        <input type="checkbox" class="user-checkbox" value="{{ user.id }}" data-user-name="{{ user.name|default:user.primary_liaison_name }}" data-user-email="{{ user.email_id|default:user.liaison_email }}" {% for liaison in assigned_liaisons %}{% if liaison.user.email|lower == user.liaison_email|lower %}checked{% endif %}{% endfor %}>
                                                     </td>
                                                     <td style="padding: 0.75rem 1rem;">
                                                         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -638,7 +601,7 @@
                                 <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; border-left: 3px solid #4facfe;">
                                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
                                         <span style="font-weight: 600; color: #212529;">Incident Created</span>
-                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ incident.reported_time|date:"M d, Y g:i A" }}</span>
+                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ incident.created_at|date:"M d, Y g:i A" }}</span>
                                     </div>
                                     <p style="margin: 0; color: #6c757d; font-size: 0.9rem;">
                                         Incident "{{ incident.title }}" was created with severity level {{ incident.get_severity_display|default:incident.severity }}.
@@ -663,7 +626,7 @@
                                 <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; border-left: 3px solid #00f2fe;">
                                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
                                         <span style="font-weight: 600; color: #212529;">Created By</span>
-                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ incident.reported_time|date:"M d, Y" }}</span>
+                                        <span style="font-size: 0.875rem; color: #6c757d;">{{ incident.created_at|date:"M d, Y" }}</span>
                                     </div>
                                     <p style="margin: 0; color: #6c757d; font-size: 0.9rem;">
                                         {{ incident.created_by.user.get_full_name|default:incident.created_by.user.username }} created this incident.
@@ -798,8 +761,6 @@
         </div>
     </div>
 
-    <span id="incidentMeta" data-incident-id="{{ incident.id }}" style="display:none"></span>
-
     <script>
     function activateAlert() {
         if (confirm('Are you sure you want to activate the alert? This will change the system status to High Alert.')) {
@@ -873,15 +834,8 @@
         firstIcon.style.transform = 'rotate(180deg)';
     });
 
-    function getIncidentId() {
-        const el = document.getElementById('incidentMeta');
-        const raw = el ? el.getAttribute('data-incident-id') : null;
-        const id = raw ? Number(raw) : NaN;
-        return Number.isFinite(id) ? id : null;
-    }
-
     // User Assignment Functions
-    const incidentId = getIncidentId();
+    const incidentId = {{ incident.id }};
 
     function toggleUserSelection() {
         const container = document.getElementById('usersTableContainer');
@@ -984,7 +938,7 @@
             return;
         }
         
-        const incidentId = getIncidentId();
+        const incidentId = {{ incident.id }};
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         
         // Disable form while submitting
@@ -1143,7 +1097,7 @@
 
     // Generate Shift Packet PDF and show preview modal
     function generateShiftPacket() {
-        const incidentId = getIncidentId();
+        const incidentId = {{ incident.id }};
         const btn = document.getElementById('generateShiftPacketBtn');
         const originalBtnText = btn.innerHTML;
         btn.disabled = true;
@@ -1171,7 +1125,7 @@
 
     // Download PDF from preview
     function downloadPdfFromPreview() {
-        const incidentId = getIncidentId();
+        const incidentId = {{ incident.id }};
         const pdfUrl = `/incidents/${incidentId}/generate-shift-packet/`;
         
         fetch(pdfUrl)
@@ -1334,11 +1288,6 @@
     .collapse-content::-webkit-scrollbar-track {
         background: #f1f1f1;
         border-radius: 4px;
-    }
-
-    /* Hide Incident Logs section visually */
-    .collapse-section[data-section="3"] {
-        display: none !important;
     }
 
     /* Severity badge colors: keep template logic out of CSS */

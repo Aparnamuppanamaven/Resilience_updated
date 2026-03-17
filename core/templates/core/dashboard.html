@@ -120,9 +120,9 @@
                             <tr style="background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
                                 <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #6b7280; width: 3rem; min-width: 1rem;">SNO</th>
                                 <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #6b7280;">Incident</th>
-                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #6b7280;">Status</th>
                                 <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #6b7280;">Location</th>
                                 <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #6b7280;">Severity</th>
+                                <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #6b7280;">Status</th>
                                 <th style="padding: 0.6rem 1rem; text-align: center; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: #6b7280; background: #f9fafb;">Shift Packet,Logs</th>
                             </tr>
                         </thead>
@@ -135,14 +135,16 @@
                                         {{ incident.title }}
                                     </a>
                                 </td>
-                                <td style="padding: 0.9rem 1rem;">Open</td>
                                 <td style="padding: 0.9rem 1rem;">—</td>
                                 <td style="padding: 0.9rem 1rem;">
                                     {{ incident.get_severity_display|default:incident.severity }}
                                 </td>
+                                <td style="padding: 0.9rem 1rem;">Open</td>
                                 <td style="padding: 0.6rem 1rem; text-align: center; vertical-align: middle;">
                                     <div class="open-incidents-actions">
-                                        <button type="button" class="btn-action-update" data-incident-id="{{ incident.id }}" data-incident-title="{{ incident.title }}" title="Update Incident">Update Incident</button>
+                                        <button type="button" class="btn-action-update" data-incident-id="{{ incident.id }}" data-incident-title="{{ incident.title }}" title="Update Incident">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </button>
                                         <a href="/incidents/{{ incident.id }}/generate-shift-packet/" target="_blank" class="btn-action-icon btn-action-pdf" title="Generate Shift Packet (PDF)"><i class="fa-solid fa-file-pdf"></i></a>
                                         <a href="/incidents/{{ incident.id }}/case-history.csv" class="btn-action-icon btn-action-excel" title="Generate Case History (CSV)" download><i class="fa-solid fa-file-excel"></i></a>
                                     </div>

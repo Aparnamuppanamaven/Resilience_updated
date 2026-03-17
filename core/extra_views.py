@@ -8,15 +8,12 @@ These do NOT persist data yet – they are meant for front-end review only.
 from datetime import timedelta
 import json
 from io import BytesIO
-import os
 
-from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.urls import reverse
-from django.contrib.auth.models import User
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -35,9 +32,6 @@ from .models import (
     ShiftPacketHistory,
     SystemSettings,
     Organization,
-    TxLog,
-    UserCredentials,
-    Department,
 )
 
 
@@ -107,12 +101,6 @@ def situation_updates_page(request):
 
     organization, current_status, last_sync_display = _get_org_and_status(request)
 
-    department_categories = list(
-        Department.objects.values_list("category", flat=True)
-        .distinct()
-        .order_by("category")
-    )
-
     if request.method == "POST":
         incident_id = request.POST.get("incident_id")
         try:
@@ -135,24 +123,6 @@ def situation_updates_page(request):
 
         from .models import SituationUpdate
 
-        attachments_path = ""
-        files = request.FILES.getlist("attachments_file")
-        if files:
-            upload_root = getattr(settings, "MEDIA_ROOT", None)
-            if upload_root:
-                upload_dir = os.path.join(upload_root, "situation_attachments")
-                os.makedirs(upload_dir, exist_ok=True)
-                # For now, store only the first uploaded file path in the attachments column
-                f = files[0]
-                base, ext = os.path.splitext(f.name)
-                safe_ext = ext if ext.lower() in [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".txt"] else ".bin"
-                filename = f"sit_{incident_id}_{timezone.now().strftime('%Y%m%d%H%M%S%f')}_{base[:20]}{safe_ext}"
-                full_path = os.path.join(upload_dir, filename)
-                with open(full_path, "wb") as out:
-                    for chunk in f.chunks():
-                        out.write(chunk)
-                attachments_path = f"situation_attachments/{filename}"
-
         if incident:
             SituationUpdate.objects.create(
                 incident=incident,
@@ -160,10 +130,7 @@ def situation_updates_page(request):
                 description=request.POST.get("situationupdate_description") or "",
                 update_time=parsed_update_time,
                 reported_by=request.POST.get("reported_by") or "",
-                # Store selected department category (core_department.category)
                 department=request.POST.get("department") or "",
-                # Store selected sub-department (core_department.service_name) into sub_department column
-                sub_department=request.POST.get("sub_category") or "",
                 severity_change=request.POST.get("severity_change") or "",
                 status_change=request.POST.get("status_change") or "",
                 casualties_injured=(
@@ -181,7 +148,7 @@ def situation_updates_page(request):
                 resources_deployed=request.POST.get("resources_deployed") or "",
                 next_steps=request.POST.get("next_steps") or "",
                 confidence_level=request.POST.get("confidence_level") or "",
-                attachments=attachments_path,
+                attachments=request.POST.get("attachments") or "",
                 created_at=parsed_update_time,
                 tenant_id=getattr(organization, "tenant_id", None),
             )
@@ -189,9 +156,6 @@ def situation_updates_page(request):
             from .models import log_system_action
 
             actionby_id = getattr(request.user, "id", None)
-            # If no Django auth user is attached, fall back to legacy UserCredentials id
-            if actionby_id is None:
-                actionby_id = request.session.get("user_credentials_id")
             log_system_action(
                 tenant_id=getattr(organization, "tenant_id", None),
                 entity="SituationUpdate",
@@ -232,7 +196,6 @@ def situation_updates_page(request):
         "incidents": incidents,
         "selected_incident": selected_incident,
         "situation_updates": situation_updates,
-        "department_categories": department_categories,
     }
     return render(request, "core/situation_updates.html", context)
 
@@ -472,7 +435,8 @@ def reports_pdf(request):
 
 def system_logs_page(request):
     """
-    System Logs page backed by TxLog table.
+    UI-only System Logs page.
+    Currently uses sample data; can later be wired to TxLog model.
     """
     auth_redirect = _require_auth(request)
     if auth_redirect:
@@ -480,55 +444,46 @@ def system_logs_page(request):
 
     organization, current_status, last_sync_display = _get_org_and_status(request)
 
-    # Fetch latest system logs from TxLog.
-    # If organization/tenant context exists, filter by that tenant_id; otherwise, show recent global logs.
-    logs_qs = TxLog.objects.all()
-    if organization is not None:
-        tenant_id = getattr(organization, "tenant_id", None) or getattr(organization, "pk", None)
-        if tenant_id is not None:
-            logs_qs = logs_qs.filter(tenant_id=tenant_id)
-
-    logs = list(logs_qs.order_by("-created_date")[:200])
-
-    # Build maps of user_id -> username from both auth User and legacy UserCredentials
-    actionby_ids = {log.actionby for log in logs if log.actionby is not None}
-    usercred_map = {
-        u["user_id"]: u["username"]
-        for u in UserCredentials.objects.filter(user_id__in=actionby_ids).values("user_id", "username")
-    }
-    authuser_map = {
-        u["id"]: u["username"]
-        for u in User.objects.filter(id__in=actionby_ids).values("id", "username")
-    }
-
-    # Adapt to template shape: expose action_by as username (fallback to id string)
-    enriched_logs = []
-    for log in logs:
-        action_by_display = ""
-        if log.actionby is not None:
-            # Prefer username from legacy UserCredentials (for historical rows),
-            # otherwise fall back to Django auth user, then raw id.
-            action_by_display = usercred_map.get(
-                log.actionby,
-                authuser_map.get(log.actionby, str(log.actionby)),
-            )
-
-        enriched_logs.append(
-            {
-                "id": log.id,
-                "tenant_id": log.tenant_id,
-                "entity": log.entity,
-                "action_by": action_by_display,
-                "action": log.action,
-                "created_date": log.created_date,
-            }
-        )
+    sample_logs = [
+        {
+            "id": 10432,
+            "tenant_id": 2001,
+            "entity": "User",
+            "action_by": "admin@county.gov",
+            "action": "User Login",
+            "created_date": "Mar 09, 2026 06:00",
+        },
+        {
+            "id": 10433,
+            "tenant_id": 2001,
+            "entity": "Incident",
+            "action_by": "admin@county.gov",
+            "action": "Incident Created",
+            "created_date": "Mar 09, 2026 06:05",
+        },
+        {
+            "id": 10434,
+            "tenant_id": 2001,
+            "entity": "SituationUpdate",
+            "action_by": "duty.officer@county.gov",
+            "action": "Situation Update Added",
+            "created_date": "Mar 09, 2026 06:20",
+        },
+        {
+            "id": 10435,
+            "tenant_id": 2001,
+            "entity": "ShiftPacket",
+            "action_by": "duty.officer@county.gov",
+            "action": "Shift Packet Generated",
+            "created_date": "Mar 09, 2026 06:25",
+        },
+    ]
 
     context = {
         "organization": organization,
         "current_status": current_status,
         "last_sync_display": last_sync_display,
-        "logs": enriched_logs,
+        "logs": sample_logs,
     }
     return render(request, "core/system_logs.html", context)
 

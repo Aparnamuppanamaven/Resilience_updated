@@ -77,6 +77,7 @@
                             <thead>
                                 <tr style="background: #f9fafb;">
                                     <th style="padding: 0.6rem 1rem; text-align: left;">ID</th>
+                                    <th style="padding: 0.6rem 1rem; text-align: left;">Tenant ID</th>
                                     <th style="padding: 0.6rem 1rem; text-align: left;">Entity</th>
                                     <th style="padding: 0.6rem 1rem; text-align: left;">Action By</th>
                                     <th style="padding: 0.6rem 1rem; text-align: left;">Action</th>
@@ -87,14 +88,15 @@
                                 {% for log in logs %}
                                 <tr>
                                     <td style="padding: 0.75rem 1rem;">{{ log.id }}</td>
+                                    <td style="padding: 0.75rem 1rem;">{{ log.tenant_id }}</td>
                                     <td style="padding: 0.75rem 1rem;">{{ log.entity }}</td>
                                     <td style="padding: 0.75rem 1rem;">{{ log.action_by }}</td>
                                     <td style="padding: 0.75rem 1rem;">{{ log.action }}</td>
-                                    <td style="padding: 0.75rem 1rem;">{{ log.created_date|date:"M d, Y h:i A" }}</td>
+                                    <td style="padding: 0.75rem 1rem;">{{ log.created_date }}</td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="5" style="padding: 0.75rem 1rem; color: #6b7280; text-align: center;">
+                                    <td colspan="6" style="padding: 0.75rem 1rem; color: #6b7280; text-align: center;">
                                         No log entries available.
                                     </td>
                                 </tr>
