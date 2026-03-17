@@ -173,6 +173,14 @@ def situation_updates_page(request):
 
     incidents = IncidentCapture.objects.all().order_by("-reported_time")[:50]
 
+    # Load distinct department categories for the Department/Sub Department dropdowns
+    from .models import Department
+    department_categories = (
+        Department.objects.values_list("category", flat=True)
+        .distinct()
+        .order_by("category")
+    )
+
     # If an incident is selected (via query param), load its situation updates
     selected_incident = None
     situation_updates = []
@@ -196,6 +204,7 @@ def situation_updates_page(request):
         "incidents": incidents,
         "selected_incident": selected_incident,
         "situation_updates": situation_updates,
+        "department_categories": department_categories,
     }
     return render(request, "core/situation_updates.html", context)
 
