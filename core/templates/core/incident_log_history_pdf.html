@@ -292,7 +292,7 @@
         <tr>
           <td class="log-num">{{ forloop.counter|stringformat:"03d" }}</td>
           <td class="log-ts">{{ log.timestamp|safe }}</td>
-          <td><span class="dept-badge" style="background:{{ log.dept_bg }};color:{{ log.dept_color }};">{{ log.department }}</span></td>
+          <td><span class="dept-badge">{{ log.department|default:"—" }}</span></td>
           <td>
             <div class="log-desc">{{ log.description }}</div>
             {% if log.author %}<div class="log-author">&mdash; {{ log.author }}</div>{% endif %}

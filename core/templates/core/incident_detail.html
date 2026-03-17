@@ -136,69 +136,116 @@
                         max-height: 2000px;
                     ">
                         <div style="padding: 1.75rem 1.5rem 1.5rem;">
-                        <div class="form-group" style="margin-bottom: 1.5rem;">
-                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Title</label>
-                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; border-left: 3px solid #667eea;">
-                                {{ incident.title }}
-                            </div>
-                        </div>
-
-                        <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                            <div class="form-group">
-                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Severity</label>
-                                <div>
-                                    <span class="badge" style="
-                                        padding: 6px 12px;
-                                        border-radius: 4px;
-                                        font-size: 0.875rem;
-                                        font-weight: 500;
-                                        {% if incident.severity == 'LOW' %}background-color: #d1ecf1; color: #0c5460;
-                                        {% elif incident.severity == 'MEDIUM' %}background-color: #fff3cd; color: #856404;
-                                        {% elif incident.severity == 'HIGH' %}background-color: #f8d7da; color: #721c24;
-                                        {% elif incident.severity == 'CRITICAL' %}background-color: #f5c6cb; color: #721c24;
-                                        {% else %}background-color: #e2e3e5; color: #383d41;{% endif %}
-                                    ">
-                                        {{ incident.get_severity_display|default:incident.severity }}
-                                    </span>
+                            <!-- Title -->
+                            <div class="form-group" style="margin-bottom: 1.5rem;">
+                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Title</label>
+                                <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; border-left: 3px solid #667eea;">
+                                    {{ incident.title }}
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Created At</label>
+
+                            <!-- Severity + Status -->
+                            <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Severity</label>
+                                    <div>
+                                        <span class="badge severity-badge severity-{{ incident.severity|default:''|lower }}" style="
+                                            padding: 6px 12px;
+                                            border-radius: 4px;
+                                            font-size: 0.875rem;
+                                            font-weight: 500;
+                                        ">
+                                            {{ incident.get_severity_display|default:incident.severity }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Status</label>
+                                    <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                        {{ incident.status|default:"—" }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Reported Time + Reported By -->
+                            <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Reported Time</label>
+                                    <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                        {{ incident.reported_time|date:"d-m-Y H:i" }}
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Reported By</label>
+                                    <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                        {{ incident.reported_by|default:"—" }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Source -->
+                            <div class="form-group" style="margin-bottom: 1.25rem;">
+                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Source</label>
                                 <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-
-                                   
-
+                                    {{ incident.source|default:"—" }}
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="form-group" style="margin-bottom: 1.5rem;">
-                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">What Changed?</label>
-                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; white-space: pre-wrap; min-height: 60px; border-left: 3px solid #667eea;">
-                                {{ incident.description|default:"Not specified" }}
+                            <!-- Description -->
+                            <div class="form-group" style="margin-bottom: 1.5rem;">
+                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Description</label>
+                                <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; white-space: pre-wrap; min-height: 60px; border-left: 3px solid #667eea;">
+                                    {{ incident.description|default:"Not specified" }}
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="form-group" style="margin-bottom: 1.25rem;">
-                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Category</label>
-                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-                                {{ incident.category|default:"—" }}
+                            <!-- Category + Sub Category -->
+                            <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Category</label>
+                                    <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                        {{ incident.category|default:"—" }}
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Sub Category</label>
+                                    <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                        {{ incident.sub_category|default:"—" }}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="form-group" style="margin-bottom: 1.25rem;">
-                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Location</label>
-                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-                                {{ incident.location|default:"—" }}
+                            <!-- Location + Zipcode -->
+                            <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Location</label>
+                                    <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                        {{ incident.location|default:"—" }}
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Zipcode</label>
+                                    <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                        {{ incident.zipcode|default:"—" }}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
 
-                        <div class="form-group" style="margin-bottom: 1.25rem;">
-                            <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Impact</label>
-                            <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; white-space: pre-wrap; min-height: 60px; border-left: 3px solid #667eea;">
-                                {{ incident.impact|default:"Not specified" }}
+                            <!-- Impact -->
+                            <div class="form-group" style="margin-bottom: 1.25rem;">
+                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Impact</label>
+                                <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #212529; white-space: pre-wrap; min-height: 60px; border-left: 3px solid #667eea;">
+                                    {{ incident.impact|default:"Not specified" }}
+                                </div>
                             </div>
-                        </div>
+
+                            <!-- Casualties -->
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Casualties</label>
+                                <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                    {{ incident.casualties|default:"—" }}
+                                </div>
+                            </div>
 
                         </div>
                     </div>
@@ -495,8 +542,8 @@
                     </div>
                 </div>
 
-                <!-- Section 3: Incident Logs -->
-                <div class="collapse-section" data-section="3">
+                <!-- Section 3: Incident Logs (hidden) -->
+                <div class="collapse-section" data-section="3" style="display: none;">
                     <div class="collapse-header" onclick="toggleSection(3)" style="
                         background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
                         color: white;
@@ -834,8 +881,26 @@
         firstIcon.style.transform = 'rotate(180deg)';
     });
 
+    // Hidden meta element for incident id
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!document.getElementById('incidentIdMeta')) {
+            const span = document.createElement('span');
+            span.id = 'incidentIdMeta';
+            span.setAttribute('data-incident-id', '{{ incident.id }}');
+            span.style.display = 'none';
+            document.body.appendChild(span);
+        }
+    });
+
+    function getIncidentId() {
+        const el = document.getElementById('incidentIdMeta');
+        const raw = el ? el.getAttribute('data-incident-id') : null;
+        const id = raw ? Number(raw) : NaN;
+        return Number.isFinite(id) ? id : null;
+    }
+
     // User Assignment Functions
-    const incidentId = {{ incident.id }};
+    const incidentId = getIncidentId();
 
     function toggleUserSelection() {
         const container = document.getElementById('usersTableContainer');
@@ -938,7 +1003,7 @@
             return;
         }
         
-        const incidentId = {{ incident.id }};
+        const incidentId = getIncidentId();
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         
         // Disable form while submitting
@@ -1097,7 +1162,7 @@
 
     // Generate Shift Packet PDF and show preview modal
     function generateShiftPacket() {
-        const incidentId = {{ incident.id }};
+        const incidentId = getIncidentId();
         const btn = document.getElementById('generateShiftPacketBtn');
         const originalBtnText = btn.innerHTML;
         btn.disabled = true;
@@ -1125,7 +1190,7 @@
 
     // Download PDF from preview
     function downloadPdfFromPreview() {
-        const incidentId = {{ incident.id }};
+        const incidentId = getIncidentId();
         const pdfUrl = `/incidents/${incidentId}/generate-shift-packet/`;
         
         fetch(pdfUrl)
