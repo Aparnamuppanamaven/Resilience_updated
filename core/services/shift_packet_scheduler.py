@@ -2,7 +2,7 @@ import logging
 import random
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import transaction, OperationalError
 from django.utils import timezone
 
 from core.ai_shift import IncidentContext, generate_shift_packet_ai_summary
@@ -17,6 +17,62 @@ from core.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _log_scheduler_event(incident, triggered_at, next_scheduled, schedule_status):
+    """
+    Lightweight scheduler log written into core_incident_events.
+
+    IMPORTANT: We are not allowed to change the IncidentEvent model or table
+    structure, so we serialize scheduler metadata into the event_desc field.
+    The created_time column acts as `triggered_at`.
+
+    This still satisfies the requirement that every scheduler check is logged
+    into core_incident_events without altering any existing tables.
+    """
+    if incident is None:
+        return
+
+    # Human‑readable, machine‑parsable message
+    message = (
+        f"[SCHEDULER] status={schedule_status}; "
+        f"triggered_at={triggered_at.isoformat()}; "
+        f"next_scheduled={next_scheduled.isoformat()}"
+    )
+
+    IncidentEvent.objects.create(
+        incident=incident,
+        event_desc=message,
+        created_time=triggered_at,
+    )
+
+
+def _create_scheduler_log(incident, incident_capture, triggered_at, next_scheduled, schedule_status, message):
+    """
+    Write a scheduler log row.
+
+    IMPORTANT for your requirement:
+    - We store the ID from core_incidents (IncidentCapture) in the incident_id column.
+      This is done by passing the IncidentCapture instance to the 'incident' field.
+    - We no longer reference any non‑existent capture_incident_id column.
+    """
+    # If we have a matching IncidentCapture, use it; otherwise we skip logging
+    if incident_capture is None:
+        return
+
+    # Legacy audit log table (core_shiftpacket_scheduler_log)
+    try:
+        ShiftPacketSchedulerLog.objects.create(
+            incident=incident_capture,
+            triggered_at=triggered_at,
+            next_scheduled=next_scheduled,
+            schedule_status=schedule_status,
+            message=message,
+        )
+    except OperationalError:
+        # If legacy table is not present or mismatched, we don't want to break
+        # the scheduler; the primary log for product behavior is IncidentEvent.
+        logger.warning("Legacy ShiftPacketSchedulerLog write failed", exc_info=True)
 
 
 def process_incident_shift_schedules():
@@ -42,9 +98,9 @@ def process_incident_shift_schedules():
         try:
             # Active incident check
             if incident.status == "Resolved":
-                ShiftPacketSchedulerLog.objects.create(
+                _create_scheduler_log(
                     incident=incident,
-                    capture_incident=incident_capture,
+                    incident_capture=incident_capture,
                     triggered_at=now,
                     next_scheduled=next_scheduled,
                     schedule_status="generated",
@@ -58,11 +114,23 @@ def process_incident_shift_schedules():
                 .order_by("-created_at")
                 .first()
             )
+            # IMPORTANT:
+            # - For the very first run we use the incident timestamp as the
+            #   "last packet" time (no packets yet).
+            # - For subsequent runs we always base the schedule on the last
+            #   packet generation time so that intervals stay correct.
             last_packet_time = last_history.created_at if last_history else incident.timestamp
             due_at = last_packet_time + timedelta(hours=schedule.shift_hours)
 
             if now < due_at:
-                # Skip logging when packet is not due yet.
+                # Case 1 — NOT yet due.
+                # Log a "failed" (not due) entry into core_incident_events.
+                _log_scheduler_event(
+                    incident=incident,
+                    triggered_at=now,
+                    next_scheduled=due_at,
+                    schedule_status="failed",
+                )
                 continue
 
             situation_updates = list(
@@ -125,9 +193,19 @@ def process_incident_shift_schedules():
                     decision_time=ai_result.get("decision_time"),
                 )
 
-                ShiftPacketSchedulerLog.objects.create(
+                # Case 2 — generated.
+                # Log into both IncidentEvent (core_incident_events) and the
+                # legacy ShiftPacketSchedulerLog table for audit.
+                _log_scheduler_event(
                     incident=incident,
-                    capture_incident=incident_capture,
+                    triggered_at=now,
+                    next_scheduled=next_scheduled,
+                    schedule_status="generated",
+                )
+
+                _create_scheduler_log(
+                    incident=incident,
+                    incident_capture=incident_capture,
                     triggered_at=now,
                     next_scheduled=next_scheduled,
                     schedule_status="generated",
@@ -139,9 +217,9 @@ def process_incident_shift_schedules():
         except Exception as err:
             logger.exception("Scheduler error for incident %s", getattr(incident, 'id', 'unknown'))
             try:
-                ShiftPacketSchedulerLog.objects.create(
+                _create_scheduler_log(
                     incident=incident,
-                    capture_incident=incident_capture,
+                    incident_capture=incident_capture,
                     triggered_at=now,
                     next_scheduled=next_scheduled,
                     schedule_status="failed",

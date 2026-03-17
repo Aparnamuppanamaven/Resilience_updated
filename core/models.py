@@ -419,13 +419,28 @@ class ShiftPacketHistory(models.Model):
 
 
 class ShiftPacketSchedulerLog(models.Model):
-    """Scheduler logs for shift packet generation runs."""
+    """
+    Scheduler logs for shift packet generation runs.
+
+    IMPORTANT: This model is mapped to an existing legacy table.
+    - The database table has a column called `incident_id` only.
+    - In this project, you want that column to store IDs from `core_incidents`
+      (the `IncidentCapture` table), NOT from `core_operationalupdate`.
+    - There is NO `capture_incident_id` column in the database.
+
+    To respect that requirement without changing the DB, we:
+    - Map `incident` directly to `IncidentCapture` using db_column='incident_id'.
+    - Do NOT define any `capture_incident` field here, so Django never tries
+      to write to a non‑existent `capture_incident_id` column.
+    """
+
     run_id = models.BigAutoField(primary_key=True)
     incident = models.ForeignKey(
-        Incident,
+        IncidentCapture,           # uses core_incidents.id
         on_delete=models.CASCADE,
         related_name='scheduler_logs',
         db_column='incident_id',
+        help_text='core_incidents.id stored in incident_id column',
     )
     triggered_at = models.DateTimeField()
     next_scheduled = models.DateTimeField()
@@ -437,19 +452,11 @@ class ShiftPacketSchedulerLog(models.Model):
         ],
     )
     message = models.TextField(blank=True, null=True)
-    capture_incident = models.ForeignKey(
-        IncidentCapture,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='scheduler_logs',
-        db_column='capture_incident_id',
-        help_text='core_incidents ID associated with this scheduler log',
-    )
 
     class Meta:
         db_table = 'core_shiftpacket_scheduler_log'
         ordering = ['-triggered_at']
+        managed = False  # Do not let Django try to migrate/alter this legacy table
 
 
 class AgencyUserCounter(models.Model):
