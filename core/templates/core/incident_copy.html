@@ -230,22 +230,14 @@
                                 </div>
                             </div>
 
-<<<<<<< HEAD
-                            <div style="font-size: 0.9rem; color: #111827;">
-                                {{ incident.description|default:"Not specified" }}
-                            </div>
-                            {% if incident.impact %}
-                                <hr style="margin: 1rem 0; border-color: rgba(15, 23, 42, 0.2);">
-                                <div style="font-size: 0.9rem; color: #111827;">
-                                    <strong>Impact:</strong> {{ incident.impact }}
-=======
+
                             <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem;">
                                 <div>
                                     <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Reported Time</div>
                                     <div style="font-size: 0.9rem; color: #111827;">
                                         {{ incident.reported_time|date:"d-m-Y H:i" }}
                                     </div>
->>>>>>> dbca9f9 (ui changes)
+
                                 </div>
                                 <div>
                                     <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Reported By</div>
@@ -812,4 +804,3 @@ function submitCopyIncidentEvent(event) {
 </script>
 {% endif %}
 {% endblock %}
-
