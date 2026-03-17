@@ -8,7 +8,9 @@ These do NOT persist data yet – they are meant for front-end review only.
 from datetime import timedelta
 import json
 from io import BytesIO
+import os
 
+from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.template.loader import render_to_string
@@ -133,6 +135,24 @@ def situation_updates_page(request):
 
         from .models import SituationUpdate
 
+        attachments_path = ""
+        files = request.FILES.getlist("attachments_file")
+        if files:
+            upload_root = getattr(settings, "MEDIA_ROOT", None)
+            if upload_root:
+                upload_dir = os.path.join(upload_root, "situation_attachments")
+                os.makedirs(upload_dir, exist_ok=True)
+                # For now, store only the first uploaded file path in the attachments column
+                f = files[0]
+                base, ext = os.path.splitext(f.name)
+                safe_ext = ext if ext.lower() in [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".txt"] else ".bin"
+                filename = f"sit_{incident_id}_{timezone.now().strftime('%Y%m%d%H%M%S%f')}_{base[:20]}{safe_ext}"
+                full_path = os.path.join(upload_dir, filename)
+                with open(full_path, "wb") as out:
+                    for chunk in f.chunks():
+                        out.write(chunk)
+                attachments_path = f"situation_attachments/{filename}"
+
         if incident:
             SituationUpdate.objects.create(
                 incident=incident,
@@ -161,7 +181,7 @@ def situation_updates_page(request):
                 resources_deployed=request.POST.get("resources_deployed") or "",
                 next_steps=request.POST.get("next_steps") or "",
                 confidence_level=request.POST.get("confidence_level") or "",
-                attachments=request.POST.get("attachments") or "",
+                attachments=attachments_path,
                 created_at=parsed_update_time,
                 tenant_id=getattr(organization, "tenant_id", None),
             )

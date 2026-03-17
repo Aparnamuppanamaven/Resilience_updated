@@ -600,6 +600,28 @@ class TenantDomain(models.Model):
         return f"{self.org_name} (Tenant ID: {self.tenant_id})"
 
 
+class Agency(models.Model):
+    """
+    Persisted Agency Management record backing Admin Module → Agency Information.
+
+    Note: This is separate from Organization because the UI needs fields like
+    admin_user_id and allowed_users.
+    """
+
+    agency_id = models.CharField(max_length=50, primary_key=True, db_column="agency_id")
+    agency_name = models.CharField(max_length=255, db_column="agency_name")
+    admin_user_id = models.CharField(max_length=255, blank=True, default="", db_column="admin_user_id")
+    allowed_users = models.PositiveIntegerField(default=25, db_column="allowed_users")
+    created_at = models.DateTimeField(auto_now_add=True, db_column="created_at")
+
+    class Meta:
+        db_table = "core_agency"
+        ordering = ["agency_name"]
+
+    def __str__(self):
+        return f"{self.agency_name} ({self.agency_id})"
+
+
 class UsersTable(models.Model):
     """Users table from database - maps to existing users table"""
     id = models.AutoField(primary_key=True)

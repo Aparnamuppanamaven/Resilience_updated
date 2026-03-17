@@ -196,26 +196,11 @@
                             INC-{{ incident.id }}
                         </div>
 
-                        <!-- Incident title row with icons (no inner box) -->
+                        <!-- Incident title row (read-only) -->
                         <div style="margin-bottom: 1.25rem;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <div style="font-size: 0.9rem; font-weight: 600; color: #111827;">
                                     Incident title
-                                </div>
-                                <div style="display: flex; gap: 0.25rem;">
-                                    <!-- Icon buttons similar to reference image -->
-                                    <button type="button" style="border: 1px solid #e5e7eb; background: white; border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: default;">
-                                        <i class="fa-solid fa-align-left" style="font-size: 0.8rem; color: #4b5563;"></i>
-                                    </button>
-                                    <button type="button" style="border: 1px solid #e5e7eb; background: white; border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: default;">
-                                        <i class="fa-solid fa-link" style="font-size: 0.8rem; color: #4b5563;"></i>
-                                    </button>
-                                    <button type="button" style="border: 1px solid #e5e7eb; background: white; border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: default;">
-                                        <i class="fa-solid fa-paperclip" style="font-size: 0.8rem; color: #4b5563;"></i>
-                                    </button>
-                                    <button type="button" style="border: 1px solid #e5e7eb; background: white; border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: default;">
-                                        <i class="fa-solid fa-ellipsis-h" style="font-size: 0.8rem; color: #4b5563;"></i>
-                                    </button>
                                 </div>
                             </div>
                             <div style="font-size: 1.05rem; font-weight: 600; color: #111827; word-break: break-word; border: 2px solid #ef4444; padding: 0.5rem 0.75rem; background: white;">
@@ -229,46 +214,23 @@
                                 Incident full information (non editable)
                             </div>
 
-                            <!-- Meta info row: Severity, Created By, Start / End Time (like Capture form) -->
-                            <div style="margin-bottom: 0.75rem;">
-                                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 0.5rem;">
-                                    <div>
-                                        <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Severity</div>
-                                        <div style="font-size: 0.9rem;">
-                                            {{ incident.get_severity_display|default:incident.severity }}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Created By</div>
-                                        <div style="font-size: 0.9rem;">
-                                            Designated Liaison
-                                        </div>
+                            <!-- Same fields as Incident Details (read-only) -->
+                            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem;">
+                                <div>
+                                    <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Severity</div>
+                                    <div style="font-size: 0.9rem; color: #111827;">
+                                        {{ incident.get_severity_display|default:incident.severity }}
                                     </div>
                                 </div>
-                                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem;">
-                                    <div>
-                                        <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Start Time</div>
-                                        <div style="font-size: 0.9rem; color: #111827;">
-                                            {% if incident.start_time %}
-                                                {{ incident.start_time|date:"M d, Y g:i A" }}
-                                            {% else %}
-                                                —
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">End Time</div>
-                                        <div style="font-size: 0.9rem; color: #111827;">
-                                            {% if incident.end_time %}
-                                                {{ incident.end_time|date:"M d, Y g:i A" }}
-                                            {% else %}
-                                                —
-                                            {% endif %}
-                                        </div>
+                                <div>
+                                    <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Status</div>
+                                    <div style="font-size: 0.9rem; color: #111827;">
+                                        {{ incident.status|default:"—" }}
                                     </div>
                                 </div>
                             </div>
 
+<<<<<<< HEAD
                             <div style="font-size: 0.9rem; color: #111827;">
                                 {{ incident.description|default:"Not specified" }}
                             </div>
@@ -276,8 +238,66 @@
                                 <hr style="margin: 1rem 0; border-color: rgba(15, 23, 42, 0.2);">
                                 <div style="font-size: 0.9rem; color: #111827;">
                                     <strong>Impact:</strong> {{ incident.impact }}
+=======
+                            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem;">
+                                <div>
+                                    <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Reported Time</div>
+                                    <div style="font-size: 0.9rem; color: #111827;">
+                                        {{ incident.reported_time|date:"d-m-Y H:i" }}
+                                    </div>
+>>>>>>> dbca9f9 (ui changes)
                                 </div>
-                            {% endif %}
+                                <div>
+                                    <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Reported By</div>
+                                    <div style="font-size: 0.9rem; color: #111827;">
+                                        {{ incident.reported_by|default:"—" }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom: 0.75rem;">
+                                <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Description</div>
+                                <div style="font-size: 0.9rem; color: #111827; white-space: pre-wrap;">
+                                    {{ incident.description|default:"Not specified" }}
+                                </div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem;">
+                                <div>
+                                    <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Category</div>
+                                    <div style="font-size: 0.9rem; color: #111827;">
+                                        {{ incident.category|default:"—" }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Location</div>
+                                    <div style="font-size: 0.9rem; color: #111827;">
+                                        {{ incident.location|default:"—" }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom: 0.75rem;">
+                                <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Impact</div>
+                                <div style="font-size: 0.9rem; color: #111827; white-space: pre-wrap;">
+                                    {{ incident.impact|default:"Not specified" }}
+                                </div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem;">
+                                <div>
+                                    <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Casualties</div>
+                                    <div style="font-size: 0.9rem; color: #111827;">
+                                        {{ incident.casualties|default:"—" }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Source</div>
+                                    <div style="font-size: 0.9rem; color: #111827;">
+                                        {{ incident.source|default:"—" }}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -361,24 +381,8 @@
                             <div style="font-size: 1rem; font-weight: 600; color: #111827;">
                                 Incident events
                             </div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <label for="commentFilter" style="font-size: 0.8rem; color: #6b7280;">Show:</label>
-                                <select id="commentFilter" onchange="filterComments(this.value)" style="
-                                    padding: 0.25rem 0.5rem;
-                                    border: 1px solid #e5e7eb;
-                                    border-radius: 4px;
-                                    font-size: 0.8rem;
-                                    background: white;
-                                    color: #374151;
-                                ">
-                                    <option value="all">All</option>
-                                    <option value="comments">Comments</option>
-                                    <option value="activity">Activity</option>
-                                    <option value="history">History</option>
-                                </select>
-                                <div style="font-size: 0.8rem; color: #6b7280;">
-                                    Newest first
-                                </div>
+                            <div style="font-size: 0.8rem; color: #6b7280;">
+                                Newest first
                             </div>
                         </div>
 
@@ -660,12 +664,6 @@ function changeStatus(status) {
     btn.querySelector('span').textContent = status;
     document.getElementById('statusDropdown').style.display = 'none';
     // You can add API call here to save status if needed
-}
-
-function filterComments(filterValue) {
-    // Filter logic for comments - can be enhanced based on log types
-    console.log('Filtering comments by:', filterValue);
-    // For now, just reload or filter client-side if needed
 }
 
 function openAssignUsersModal() {

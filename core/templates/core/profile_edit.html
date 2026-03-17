@@ -23,16 +23,25 @@
         </a>
         <ul class="nav-links">
             <li class="nav-item">
-                <a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a>
-            </li>
-            <li class="nav-item">
                 <a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
             </li>
             <li class="nav-item">
-                <a href="{% url 'capture' %}"><i class="fa-solid fa-pen-to-square"></i> Incidents</a>
+                <a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incident Management</a>
             </li>
             <li class="nav-item">
-                <a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incident Management</a>
+                <a href="{% url 'situation_updates' %}"><i class="fa-solid fa-clipboard-list"></i> Situation Updates</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'shift_packets' %}"><i class="fa-solid fa-file-lines"></i> Shift Packets</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'reports' %}"><i class="fa-solid fa-chart-bar"></i> Reports</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'system_logs' %}"><i class="fa-solid fa-list-check"></i> System Logs</a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a>
             </li>
             <li class="nav-item nav-item-hidden">
                 <a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a>

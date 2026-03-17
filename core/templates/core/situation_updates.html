@@ -191,6 +191,7 @@
                                     <th style="width: 250px; padding: 0.6rem 1rem;">Next Steps Recommended</th>
                                     <th style="width: 150px; padding: 0.6rem 1rem;">Reported By</th>
                                     <th style="width: 120px; padding: 0.6rem 1rem;">Status</th>
+                                    <th style="width: 120px; padding: 0.6rem 1rem;">Attachments</th>
                                     <th style="width: 120px; padding: 0.6rem 1rem; text-align: center;">Actions</th>
                                 </tr>
                             </thead>
@@ -248,6 +249,15 @@
                                                     </span>
                                                 {% else %}
                                                     <span class="status-badge status-normal">LOGGED</span>
+                                                {% endif %}
+                                            </td>
+                                            <td style="width: 120px; padding: 0.75rem 1rem; vertical-align: top;">
+                                                {% if update.attachments %}
+                                                    <a href="{{ MEDIA_URL }}{{ update.attachments }}" target="_blank" style="margin-right: 0.4rem;" title="View attachment">
+                                                        <i class="fa-solid fa-paperclip"></i>
+                                                    </a>
+                                                {% else %}
+                                                    <span style="color:#9ca3af; font-size:0.8rem;">—</span>
                                                 {% endif %}
                                             </td>
                                             <td style="width: 120px; padding: 0.75rem 1rem; text-align: center; vertical-align: top;">
@@ -322,7 +332,7 @@
                 " aria-label="Close">&times;</button>
             </div>
             <div style="padding: 1.25rem;">
-                <form method="post" action="{% url 'situation_updates' %}" id="addSituationUpdateForm">
+                <form method="post" action="{% url 'situation_updates' %}" id="addSituationUpdateForm" enctype="multipart/form-data">
                     {% csrf_token %}
                     <input type="hidden" name="incident_id" id="modal_incident_id" value="">
 
@@ -425,8 +435,9 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label" for="attachments">Attachments (reference)</label>
-                            <input type="text" id="attachments" name="attachments" class="form-control" placeholder="File names, links, or IDs">
+                            <label class="form-label" for="attachments_file">Attachments</label>
+                            <input type="file" id="attachments_file" name="attachments_file" class="form-control" multiple>
+                            <small style="font-size: 0.8rem; color: #6b7280;">You can upload one or more reference files (PDF, images, docs).</small>
                         </div>
                     </div>
 

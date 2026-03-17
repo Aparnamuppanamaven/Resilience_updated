@@ -50,6 +50,16 @@ class CheckoutForm(forms.Form):
             'required': 'required',
         })
     )
+    mobile_number = forms.CharField(
+        max_length=20,
+        required=False,
+        label="Mobile Number",
+        strip=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Mobile number',
+        })
+    )
     password = forms.CharField(
         label="Password",
         required=True,

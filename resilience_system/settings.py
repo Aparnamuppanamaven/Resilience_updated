@@ -77,6 +77,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.DailySessionExpiryMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     # ❌ REMOVED: XFrameOptionsMiddleware (this was blocking iframe)
 ]
@@ -157,6 +158,12 @@ MEDIA_ROOT = BASE_DIR / "media"
 LOGIN_URL = os.getenv("LOGIN_URL", "/login/")
 LOGIN_REDIRECT_URL = os.getenv("LOGIN_REDIRECT_URL", "/dashboard/")
 LOGOUT_REDIRECT_URL = os.getenv("LOGOUT_REDIRECT_URL", "/")
+
+# --------------------------------------------------
+# SESSION: hard 24-hour login window
+# --------------------------------------------------
+# Cookie expiry default (24 hours). We also enforce login_time in middleware.
+SESSION_COOKIE_AGE = int(os.getenv("SESSION_COOKIE_AGE", "86400"))
 
 # --------------------------------------------------
 # EMAIL CONFIGURATION
