@@ -4612,6 +4612,7 @@ def generate_incident_shift_packet_pdf(request, incident_id):
         from reportlab.lib.colors import HexColor
 
         buffer = BytesIO()
+        # Page layout: keep generous side margins and leave space for header banner
         doc = SimpleDocTemplate(
             buffer,
             pagesize=A4,
@@ -4744,29 +4745,43 @@ def generate_incident_shift_packet_pdf(request, incident_id):
                     ]
                 )
 
-            # Slightly rebalance column widths to avoid clipping of long text
-            # while keeping within the printable width (~7.3 in like the log report).
+            # Proportional column widths based on available page width so nothing is cut off.
+            # Use doc.width (page width minus left/right margins) to keep table inside bounds.
+            available_width = doc.width
+            col_widths = [
+                0.12 * available_width,  # Created At (small)
+                0.20 * available_width,  # Input Summary (medium)
+                0.20 * available_width,  # What Changed (medium)
+                0.22 * available_width,  # Why It Matters (large)
+                0.22 * available_width,  # Decision (large)
+                0.04 * available_width,  # Type (tiny badge)
+            ]
+
             history_table = Table(
                 table_rows,
-                colWidths=[1.2 * inch, 1.8 * inch, 1.8 * inch, 2.0 * inch, 2.0 * inch, 0.7 * inch],
+                colWidths=col_widths,
                 repeatRows=1,
             )
             history_table.setStyle(
                 TableStyle(
                     [
+                        # Header styling: dark navy with pure white text and extra padding
                         ("BACKGROUND", (0, 0), (-1, 0), HexColor("#0a1f44")),
-                        ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#e5e7eb")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#ffffff")),
                         ("ALIGN", (0, 0), (-1, 0), "LEFT"),
                         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                        ("FONTSIZE", (0, 0), (-1, 0), 9),
+                        ("FONTSIZE", (0, 0), (-1, 0), 9.5),
                         ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        # Body row backgrounds for readability
                         ("BACKGROUND", (0, 1), (-1, -1), HexColor("#ffffff")),
                         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor("#ffffff"), HexColor("#f9fafb")]),
-                        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#e5e7eb")),
-                        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                        ("TOPPADDING", (0, 0), (-1, -1), 5),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                        # Grid lines
+                        ("GRID", (0, 0), (-1, -1), 0.4, HexColor("#e5e7eb")),
+                        # Cell padding: more generous horizontally and vertically
+                        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                        ("TOPPADDING", (0, 0), (-1, -1), 6),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                     ]
                 )
             )

@@ -30,7 +30,7 @@
             <li class="nav-item">
                 <a href="{% url 'system_logs' %}"><i class="fa-solid fa-list-check"></i> System Logs</a>
             </li>
-            <li class="nav-item">
+            <li class="nav-item nav-item-user-management">
                 <a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a>
             </li>
             <li class="nav-item nav-item-hidden">
@@ -123,6 +123,7 @@
                                 <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151;"><i class="fa-solid fa-location-dot"></i> Location</th>
                                 <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151;"><i class="fa-solid fa-bolt"></i> Severity</th>
                                 <th style="padding: 0.6rem 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #374151;"><i class="fa-solid fa-circle-check"></i> Status</th>
+                                <th style="padding: 0.6rem 1rem; text-align: center; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: #374151; background: #f9fafb;"><i class="fa-solid fa-clock"></i> Cadence (hrs)</th>
                                 <th style="padding: 0.6rem 1rem; text-align: center; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: #374151; background: #f9fafb;"><i class="fa-solid fa-clipboard-list"></i> Shift Packet</th>
                                 <th style="padding: 0.6rem 1rem; text-align: center; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: #374151; background: #f9fafb;"><i class="fa-solid fa-clipboard-list"></i> Logs</th>
                             </tr>
@@ -142,6 +143,16 @@
                                 </td>
                                 <td style="padding: 0.9rem 1rem;">Open</td>
                                 <td style="padding: 0.6rem 1rem; text-align: center; vertical-align: middle;">
+                                    <button type="button"
+                                            class="btn-action-update"
+                                            data-incident-id="{{ incident.id }}"
+                                            data-shift-cadence="{{ incident.shift_cadence_hours|default_if_none:'' }}"
+                                            title="Edit shift cadence (hours)"
+                                            onclick="openCadenceModalFromDashboard(this, event)">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                    </button>
+                                </td>
+                                <td style="padding: 0.6rem 1rem; text-align: center; vertical-align: middle;">
                                     <div class="open-incidents-actions">
                                         <a href="{% url 'generate_shift_packet_pdf' incident.id %}" target="_blank" class="btn-action-icon btn-action-pdf" title="Download Shift Packet PDF">
                                             <i class="fa-solid fa-file-pdf"></i>
@@ -158,7 +169,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="7" style="padding: 0.9rem 1rem; color: #6b7280;">
+                                <td colspan="8" style="padding: 0.9rem 1rem; color: #6b7280;">
                                     No incidents captured yet.
                                 </td>
                             </tr>
@@ -172,6 +183,74 @@
         </div>
         <!-- end dashboard-scroll-area -->
     </main>
+</div>
+
+<!-- Edit Shift Cadence modal (reused from Incident Management page) -->
+<div id="editCadenceModal" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+">
+    <div style="
+        background: white;
+        border-radius: 12px;
+        max-width: 420px;
+        width: 100%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    ">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb;">
+            <h3 style="margin: 0; font-size: 1.05rem; font-weight: 600; color: #111827;">Edit Shift Cadence</h3>
+            <button type="button" onclick="closeCadenceModalFromDashboard()" style="
+                background: none;
+                border: none;
+                font-size: 1.5rem;
+                color: #6b7280;
+                cursor: pointer;
+                padding: 0.25rem;
+                line-height: 1;
+            " aria-label="Close">&times;</button>
+        </div>
+        <div style="padding: 1.25rem;">
+            <form method="post" action="{% url 'incidents_list' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_cadence">
+                <input type="hidden" name="incident_id" id="cadenceIncidentIdInput">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">
+                        Shift Packet (hours)
+                    </label>
+                    <select id="cadenceHoursSelect" name="shift_hours" class="form-control" required style="max-width: 260px;">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="6">6</option>
+                        <option value="8">8</option>
+                        <option value="10">10</option>
+                        <option value="12">12</option>
+                        <option value="18">18</option>
+                        <option value="24">24</option>
+                        <option value="48">48</option>
+                        <option value="72">72</option>
+                    </select>
+                    <p style="margin-top: 0.25rem; font-size: 0.8rem; color: #9ca3af;">
+                        Controls how often AI shift packets are generated for this incident.
+                    </p>
+                </div>
+                <button type="submit" class="btn btn-submit" style="width: 100%; padding: 0.6rem 1.25rem; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95rem;">
+                    Save Cadence
+                </button>
+            </form>
+        </div>
+    </div>
 </div>
 
 <!-- Capture Update Modal (incident selected from dashboard table; only event form shown) -->
@@ -569,6 +648,50 @@
 
 {% block extra_js %}
 <script>
+    // Open Shift Cadence editor from dashboard row (reusing Incidents page modal pattern)
+    function openCadenceModalFromDashboard(buttonEl, evt) {
+        if (evt) {
+            evt.stopPropagation();
+        }
+        var modal = document.getElementById('editCadenceModal');
+        var idInput = document.getElementById('cadenceIncidentIdInput');
+        var selectEl = document.getElementById('cadenceHoursSelect');
+        var incidentId = buttonEl.getAttribute('data-incident-id');
+        var cadence = buttonEl.getAttribute('data-shift-cadence') || '';
+
+        if (idInput) {
+            idInput.value = incidentId;
+        }
+        if (selectEl) {
+            if (cadence) {
+                selectEl.value = cadence;
+            } else {
+                selectEl.value = '8';  // default when no cadence set
+            }
+        }
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+    }
+
+    function closeCadenceModalFromDashboard() {
+        var modal = document.getElementById('editCadenceModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var modal = document.getElementById('editCadenceModal');
+        if (modal) {
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) {
+                    closeCadenceModalFromDashboard();
+                }
+            });
+        }
+    });
+
     function openCreateUpdateModal() {
         const modal = document.getElementById('createUpdateModal');
         const selectArea = document.getElementById('captureUpdateSelectArea');

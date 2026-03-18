@@ -17,12 +17,12 @@
             <li class="nav-item active"><a href="{% url 'shift_packets' %}"><i class="fa-solid fa-file-lines"></i> Shift Packets</a></li>
             <li class="nav-item"><a href="{% url 'reports' %}"><i class="fa-solid fa-chart-bar"></i> Reports</a></li>
             <li class="nav-item"><a href="{% url 'system_logs' %}"><i class="fa-solid fa-list-check"></i> System Logs</a></li>
-            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
+            <li class="nav-item nav-item-user-management"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a></li>
         </ul>
         <div class="sidebar-footer">
             {% include 'core/_profile_dropdown.html' %}
@@ -236,11 +236,101 @@
                             {% endif %}
                         </div>
                     {% endif %}
+
+                <div class="card-body" style="padding: 0;">
+                    <div class="table-responsive" style="max-height: 340px; overflow-y: auto; overflow-x: auto;">
+                        <table class="incidents-table shift-packet-history-table">
+                            <thead>
+                                <tr style="background: #f9fafb;">
+                                    <th style="padding: 0.6rem 1rem;">Created At</th>
+                                    <th style="padding: 0.6rem 1rem;">Input Summary</th>
+                                    <th style="padding: 0.6rem 1rem;">What Changed</th>
+                                    <th style="padding: 0.6rem 1rem;">Why It Matters</th>
+                                    <th style="padding: 0.6rem 1rem;">Decision</th>
+                                    <th style="padding: 0.6rem 1rem;">Decision Maker</th>
+                                    <th style="padding: 0.6rem 1rem;">Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if history_entries %}
+                                    {% for entry in history_entries %}
+                                        <tr>
+                                            <td style="padding: 0.75rem 1rem;">{{ entry.created_at|date:"m/d/Y H:i" }}</td>
+                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.input_summary }}</td>
+                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.what_changed }}</td>
+                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.why_it_matters }}</td>
+                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.decision_summary }}</td>
+                                            <td style="padding: 0.75rem 1rem;">{{ entry.decision_maker|default:"—" }}</td>
+                                            <td style="padding: 0.75rem 1rem;">
+                                                <span class="status-badge {% if entry.tx_type == 'AI' %}status-normal{% else %}status-watch{% endif %}">
+                                                    {{ entry.tx_type|default:"N/A" }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" style="padding: 0.75rem 1rem; text-align: center; color: #6b7280;">
+                                            {% if selected_incident %}
+                                                No shift packet history found for this incident yet.
+                                            {% else %}
+                                                Select an incident to view shift packet history.
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+
                 </div>
             </div>
         </div>
     </main>
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Shift Packet History table: better wrapping, spacing, and responsiveness */
+.shift-packet-history-table.incidents-table {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 1200px;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.shift-packet-history-table.incidents-table th,
+.shift-packet-history-table.incidents-table td {
+    padding: 0.65rem 0.9rem;
+    font-size: 0.875rem;
+    line-height: 1.35rem;
+    vertical-align: top;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.shift-packet-history-table.incidents-table thead th {
+    background: #0b1f3b;
+    color: #e5edf7;
+    font-weight: 600;
+}
+
+.shift-packet-history-table.incidents-table tbody tr:nth-child(even) {
+    background: #f9fafb;
+}
+
+.shift-packet-history-table.incidents-table tbody tr:nth-child(odd) {
+    background: #ffffff;
+}
+
+@media (max-width: 1024px) {
+    .shift-packet-history-table.incidents-table {
+        min-width: 1000px;
+    }
+}
+</style>
 {% endblock %}
 
 {% block extra_js %}

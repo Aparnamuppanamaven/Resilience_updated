@@ -105,6 +105,11 @@ body {
     margin-bottom: var(--spacing-xs);
 }
 
+/* Keep the User Management nav item pinned above the sidebar footer */
+.nav-item.nav-item-user-management {
+    margin-top: auto;
+}
+
 .nav-item a {
     display: flex;
     align-items: center;

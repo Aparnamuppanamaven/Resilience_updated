@@ -17,12 +17,12 @@
             <li class="nav-item"><a href="{% url 'shift_packets' %}"><i class="fa-solid fa-file-lines"></i> Shift Packets</a></li>
             <li class="nav-item"><a href="{% url 'reports' %}"><i class="fa-solid fa-chart-bar"></i> Reports</a></li>
             <li class="nav-item"><a href="{% url 'system_logs' %}"><i class="fa-solid fa-list-check"></i> System Logs</a></li>
-            <li class="nav-item"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'incident_copy' %}"><i class="fa-solid fa-clone"></i> Incident Copy</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'normalize' %}"><i class="fa-solid fa-filter"></i> Normalize</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'distribute' %}"><i class="fa-solid fa-paper-plane"></i> Distribute</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'decision_log' %}"><i class="fa-solid fa-gavel"></i> Decision Log</a></li>
             <li class="nav-item nav-item-hidden"><a href="{% url 'coverage' %}"><i class="fa-solid fa-tower-broadcast"></i> Coverage</a></li>
+            <li class="nav-item nav-item-user-management"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a></li>
         </ul>
         <div class="sidebar-footer">
             {% include 'core/_profile_dropdown.html' %}
