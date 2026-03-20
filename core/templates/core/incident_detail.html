@@ -162,8 +162,24 @@
                                 <div class="form-group">
                                     <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">Status</label>
                                     <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
-                                        {{ incident.status|default:"—" }}
+                                        {% if incident.status == 'Resolved' %}
+                                            Closed
+                                        {% else %}
+                                            {{ incident.status|default:"—" }}
+                                        {% endif %}
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- End Date -->
+                            <div class="form-group" style="margin-bottom: 1.5rem;">
+                                <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">End Date</label>
+                                <div style="padding: 0.75rem; background-color: #f8f9fa; border-radius: 6px; color: #6c757d;">
+                                    {% if incident.resolved_at %}
+                                        {{ incident.resolved_at|date:"d-m-Y" }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
                                 </div>
                             </div>
 

@@ -147,6 +147,9 @@ class IncidentCapture(models.Model):
     severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default='LOW')
     impact = models.TextField(blank=True, help_text="Why it matters - operational impact analysis")
     reported_time = models.DateTimeField(db_column='reported_time')
+    # When an incident is closed from the UI, we persist the timestamp here.
+    # Underlying column lives in core_incidents as `resolved_at`.
+    resolved_at = models.DateTimeField(null=True, blank=True, db_column='resolved_at')
     status = models.CharField(
         max_length=20,
         default='Open',

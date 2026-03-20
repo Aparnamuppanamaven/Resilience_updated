@@ -225,7 +225,11 @@
                                 <div>
                                     <div style="font-size: 0.8rem; font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">Status</div>
                                     <div style="font-size: 0.9rem; color: #111827;">
-                                        {{ incident.status|default:"—" }}
+                                        {% if incident.status == 'Resolved' %}
+                                            Closed
+                                        {% else %}
+                                            {{ incident.status|default:"—" }}
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
