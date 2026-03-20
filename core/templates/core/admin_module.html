@@ -109,6 +109,7 @@
                         class="user-mgmt-tab"
                         data-tab-target="agency-info-section"
                         style="
+                            display: none;
                             padding: 0.5rem 1rem;
                             border: none;
                             border-bottom: 2px solid transparent;
@@ -631,7 +632,7 @@
                 </div>
             </div>
             
-            <div style="margin-bottom: 1rem;">
+            <div style="margin-bottom: 1rem; display: none;">
                 <div class="form-group">
                     <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
                         Shift <span style="color: #ef4444;">*</span>
@@ -705,11 +706,11 @@
             <style>
                 .admin-field-readonly { background-color: #f8f9fa; color: #6c757d; }
             </style>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 2px solid #e9ecef; padding-bottom: 0.5rem; display: none;">
                 <h4 style="margin: 0; color: #495057; font-size: 1.1rem; font-weight: 600;">Agency & Contact Information</h4>
             </div>
             
-            <div id="agencyInfoSection">
+            <div id="agencyInfoSection" style="display: none;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                     <div class="form-group">
                         <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
@@ -1290,7 +1291,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const tabButtons = document.querySelectorAll('.user-mgmt-tab');
     const sections = {
         'user-info-section': document.getElementById('user-info-section'),
-        'agency-info-section': document.getElementById('agency-info-section'),
+        // Intentionally removed from tab switching so the UI never activates it.
     };
 
     function activateTab(targetId) {

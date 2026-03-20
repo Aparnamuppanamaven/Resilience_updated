@@ -140,7 +140,7 @@
                                     border-bottom: 1px solid #e5e7eb;
                                     white-space: nowrap;
                                 ">
-                                    Title
+                                    Incidents
                                 </th>
                                 <th style="
                                     padding: 0.625rem 1rem;
@@ -313,7 +313,13 @@
                                     {% endif %}
                                 </td>
                                 <td style="padding: 0.75rem 1rem;">
-                                    <span style="color: #9ca3af; font-size: 0.875rem;">—</span>
+                                    {% if incident.resolved_at %}
+                                        <div style="color: #6b7280; font-size: 0.875rem; line-height: 1.25rem;">
+                                            {{ incident.resolved_at|date:"M d, Y" }}
+                                        </div>
+                                    {% else %}
+                                        <span style="color: #9ca3af; font-size: 0.875rem;">—</span>
+                                    {% endif %}
                                 </td>
                                 <td style="padding: 0.75rem 1rem; text-align: center;">
                                     <div style="display: inline-flex; align-items: center; gap: 0.5rem;">
@@ -332,9 +338,22 @@
                                             <i class="fa-solid fa-chevron-right"></i>
                                         </a>
                                         <button type="button"
-                                                title="Edit shift cadence"
+                                                title="Edit incident"
                                                 data-incident-id="{{ incident.id }}"
                                                 data-shift-cadence="{{ incident.shift_cadence_hours|default_if_none:'' }}"
+                                                data-title="{{ incident.title|default:'' }}"
+                                                data-description="{{ incident.description|default:'' }}"
+                                                data-impact="{{ incident.impact|default:'' }}"
+                                                data-category="{{ incident.category|default:'' }}"
+                                                data-sub-category="{{ incident.sub_category|default:'' }}"
+                                                data-severity="{{ incident.severity|default:'LOW' }}"
+                                                data-status="{{ incident.status|default:'Open' }}"
+                                                data-reported-time="{{ incident.reported_time|date:'Y-m-d\\TH:i' }}"
+                                                data-reported-by="{{ incident.reported_by|default:'' }}"
+                                                data-location="{{ incident.location|default:'' }}"
+                                                data-zipcode="{{ incident.zipcode|default:'' }}"
+                                                data-casualties="{{ incident.casualties|default_if_none:'' }}"
+                                                data-source="{{ incident.source|default:'' }}"
                                                 onclick="openCadenceModalFromButton(this, event)"
                                                 style="
                                                     display: inline-flex;
@@ -449,6 +468,13 @@
                             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.title.errors }}</div>
                         {% endif %}
                     </div>
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.description.label }}</label>
+                        {{ create_incident_form.description }}
+                        {% if create_incident_form.description.errors %}
+                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.description.errors }}</div>
+                        {% endif %}
+                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                         <div class="form-group">
                             <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.severity.label }}</label>
@@ -481,47 +507,31 @@
                             {% endif %}
                         </div>
                     </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.source.label }}</label>
-                        {{ create_incident_form.source }}
-                        {% if create_incident_form.source.errors %}
-                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.source.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.description.label }}</label>
-                        {{ create_incident_form.description }}
-                        {% if create_incident_form.description.errors %}
-                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.description.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.category.label }}</label>
-                        {{ create_incident_form.category }}
-                        {% if create_incident_form.category.errors %}
-                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.category.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.sub_category.label }}</label>
-                        {{ create_incident_form.sub_category }}
-                        {% if create_incident_form.sub_category.errors %}
-                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.sub_category.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.location.label }}</label>
-                        {{ create_incident_form.location }}
-                        {% if create_incident_form.location.errors %}
-                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.location.errors }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.zipcode.label }}</label>
-                        {{ create_incident_form.zipcode }}
-                        {% if create_incident_form.zipcode.errors %}
-                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.zipcode.errors }}</div>
-                        {% endif %}
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">
+                                {{ create_incident_form.shift_cadence_hours.label }}
+                            </label>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; max-width: 260px;">
+                                {{ create_incident_form.shift_cadence_hours }}
+                                <span style="font-size: 0.875rem; color: #6b7280;">hours</span>
+                            </div>
+                            {% if create_incident_form.shift_cadence_hours.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">
+                                    {{ create_incident_form.shift_cadence_hours.errors }}
+                                </div>
+                            {% endif %}
+                            <p style="margin-top: 0.25rem; font-size: 0.8rem; color: #9ca3af;">
+                                Used for AI shift packet generation on the Shift Packets page. You can change it later.
+                            </p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.source.label }}</label>
+                            {{ create_incident_form.source }}
+                            {% if create_incident_form.source.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.source.errors }}</div>
+                            {% endif %}
+                        </div>
                     </div>
                     <div class="form-group" style="margin-bottom: 1rem;">
                         <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.impact.label }}</label>
@@ -530,22 +540,37 @@
                             <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.impact.errors }}</div>
                         {% endif %}
                     </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">
-                            {{ create_incident_form.shift_cadence_hours.label }}
-                        </label>
-                        <div style="display: flex; align-items: center; gap: 0.5rem; max-width: 260px;">
-                            {{ create_incident_form.shift_cadence_hours }}
-                            <span style="font-size: 0.875rem; color: #6b7280;">hours</span>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">Department</label>
+                            {{ create_incident_form.category }}
+                            {% if create_incident_form.category.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.category.errors }}</div>
+                            {% endif %}
                         </div>
-                        {% if create_incident_form.shift_cadence_hours.errors %}
-                            <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">
-                                {{ create_incident_form.shift_cadence_hours.errors }}
-                            </div>
-                        {% endif %}
-                        <p style="margin-top: 0.25rem; font-size: 0.8rem; color: #9ca3af;">
-                            Used for AI shift packet generation on the Shift Packets page. You can change it later.
-                        </p>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">sub Department</label>
+                            {{ create_incident_form.sub_category }}
+                            {% if create_incident_form.sub_category.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.sub_category.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.location.label }}</label>
+                            {{ create_incident_form.location }}
+                            {% if create_incident_form.location.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.location.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.zipcode.label }}</label>
+                            {{ create_incident_form.zipcode }}
+                            {% if create_incident_form.zipcode.errors %}
+                                <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.zipcode.errors }}</div>
+                            {% endif %}
+                        </div>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
                         <div class="form-group">
@@ -554,6 +579,10 @@
                             {% if create_incident_form.casualties.errors %}
                                 <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.casualties.errors }}</div>
                             {% endif %}
+                        </div>
+                        <div class="form-group" aria-hidden="true" style="visibility: hidden; pointer-events: none;">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">&nbsp;</label>
+                            <div style="height: 38px;"></div>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-submit" style="width: 100%; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">
@@ -564,7 +593,7 @@
         </div>
     </div>
 
-    <!-- Edit Cadence modal -->
+    <!-- Edit Incident modal -->
     <div id="editCadenceModal" style="
         display: none;
         position: fixed;
@@ -581,12 +610,14 @@
         <div style="
             background: white;
             border-radius: 12px;
-            max-width: 420px;
+            max-width: 760px;
             width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         ">
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb;">
-                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 600; color: #111827;">Edit Shift Cadence</h3>
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 600; color: #111827;">Edit Incident</h3>
                 <button type="button" onclick="closeCadenceModal()" style="
                     background: none;
                     border: none;
@@ -597,35 +628,144 @@
                     line-height: 1;
                 " aria-label="Close">&times;</button>
             </div>
+
             <div style="padding: 1.25rem;">
                 <form method="post" action="{% url 'incidents_list' %}">
                     {% csrf_token %}
-                    <input type="hidden" name="action" value="update_cadence">
+                    <input type="hidden" name="action" value="update_incident">
                     <input type="hidden" name="incident_id" id="cadenceIncidentIdInput">
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.title.label }}</label>
+                        <input type="text" id="edit_incident_title" class="form-control" disabled />
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.description.label }}</label>
+                        <textarea id="edit_incident_description" class="form-control" rows="3" disabled></textarea>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.severity.label }}</label>
+                            <select id="edit_incident_severity" name="severity" class="form-control">
+                                <option value="LOW">LOW</option>
+                                <option value="MEDIUM">MEDIUM</option>
+                                <option value="HIGH">HIGH</option>
+                                <option value="CRITICAL">CRITICAL</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.status.label }}</label>
+                            <select id="edit_incident_status" name="status" class="form-control" required>
+                                <option value="new">New</option>
+                                <option value="open">Open</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="investigating">Investigating</option>
+                                <option value="on_hold">On Hold</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="closed">Closed</option>
+                                <option value="reopened">Reopened</option>
+                                <option value="escalated">Escalated</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.category.label }}</label>
+                            <select id="edit_incidentCategorySelect" class="form-control" disabled>
+                                <option value="">Select category</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.sub_category.label }}</label>
+                            <select id="edit_incidentSubCategorySelect" class="form-control" disabled>
+                                <option value="">Select sub category</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.reported_time.label }}</label>
+                            <input type="datetime-local" id="edit_incident_reported_time" class="form-control" disabled />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.reported_by.label }}</label>
+                            <input type="text" id="edit_incident_reported_by" class="form-control" disabled />
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.location.label }}</label>
+                            <input type="text" id="edit_incident_location" class="form-control" disabled />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.zipcode.label }}</label>
+                            <input type="text" id="edit_incident_zipcode" class="form-control" disabled />
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.impact.label }}</label>
+                        <textarea id="edit_incident_impact" class="form-control" rows="2" disabled></textarea>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.casualties.label }}</label>
+                            <input type="text" id="edit_incident_casualties" class="form-control" disabled />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.source.label }}</label>
+                            <select id="edit_incident_source" class="form-control" disabled>
+                                <option value="">Select source</option>
+                                <option value="police">Police Station</option>
+                                <option value="control_room">Control Room</option>
+                                <option value="fire">Fire Department</option>
+                                <option value="ambulance">Ambulance Service</option>
+                                <option value="public">Public</option>
+                                <option value="witness">Witness</option>
+                                <option value="internal">Internal Staff</option>
+                                <option value="security">Security Team</option>
+                                <option value="ngo">NGO</option>
+                                <option value="media">Media</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="form-group" style="margin-bottom: 1rem;">
                         <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">
-                            Shift Packet (hours)
+                            {{ create_incident_form.shift_cadence_hours.label }}
                         </label>
-                        <select id="cadenceHoursSelect" name="shift_hours" class="form-control" required style="max-width: 260px;">
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="6">6</option>
-                            <option value="8">8</option>
-                            <option value="10">10</option>
-                            <option value="12">12</option>
-                            <option value="18">18</option>
-                            <option value="24">24</option>
-                            <option value="48">48</option>
-                            <option value="72">72</option>
-                        </select>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; max-width: 260px;">
+                            <select id="editShiftHoursSelect" name="shift_hours" class="form-control" required>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="6">6</option>
+                                <option value="8">8</option>
+                                <option value="10">10</option>
+                                <option value="12">12</option>
+                                <option value="18">18</option>
+                                <option value="24">24</option>
+                                <option value="48">48</option>
+                                <option value="72">72</option>
+                            </select>
+                            <span style="font-size: 0.875rem; color: #6b7280;">hours</span>
+                        </div>
                         <p style="margin-top: 0.25rem; font-size: 0.8rem; color: #9ca3af;">
                             Controls how often AI shift packets are generated for this incident.
                         </p>
                     </div>
-                    <button type="submit" class="btn btn-submit" style="width: 100%; padding: 0.6rem 1.25rem; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95rem;">
-                        Save Cadence
+
+                    <button type="submit" class="btn btn-submit" style="width: 100%; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">
+                        Save Changes
                     </button>
                 </form>
             </div>
@@ -702,31 +842,120 @@
     </style>
 
     <script>
-    function openCadenceModal(incidentId, currentCadence, evt) {
-        if (evt) {
-            evt.stopPropagation();
-        }
+    function mapIncidentStatusToForm(statusValue) {
+        const s = (statusValue || '').toString().toLowerCase();
+        // core table uses status "Resolved"; UI expects "Closed" for end_date semantics
+        if (s === 'resolved' || s === 'closed') return 'closed';
+        if (s === 'investigating' || s === 'in_progress') return 'in_progress';
+        if (s === 'open' || s === 'new') return 'open';
+        return 'open';
+    }
+
+    function setFieldValue(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.value = value ?? '';
+    }
+
+    function openCadenceModal(incidentId, data, evt) {
+        if (evt) evt.stopPropagation();
+
         var modal = document.getElementById('editCadenceModal');
+
         var idInput = document.getElementById('cadenceIncidentIdInput');
-        var selectEl = document.getElementById('cadenceHoursSelect');
-        if (idInput) {
-            idInput.value = incidentId;
+        if (idInput) idInput.value = incidentId;
+
+        // Shift hours (editable)
+        var shiftSelect = document.getElementById('editShiftHoursSelect');
+        if (shiftSelect) {
+            shiftSelect.value = data.shiftCadence && data.shiftCadence !== '' ? data.shiftCadence : '8';
         }
-        if (selectEl) {
-            if (currentCadence) {
-                selectEl.value = currentCadence;
+
+        // Read-only fields (disabled inputs still accept .value)
+        setFieldValue('edit_incident_title', data.title);
+        setFieldValue('edit_incident_description', data.description);
+        setFieldValue('edit_incident_impact', data.impact);
+        setFieldValue('edit_incident_location', data.location);
+        setFieldValue('edit_incident_zipcode', data.zipcode);
+        setFieldValue('edit_incident_casualties', data.casualties);
+        setFieldValue('edit_incident_reported_time', data.reportedTime);
+        setFieldValue('edit_incident_reported_by', data.reportedBy);
+
+        const severitySelect = document.getElementById('edit_incident_severity');
+        if (severitySelect) severitySelect.value = data.severity || 'LOW';
+
+        const categorySelect = document.getElementById('edit_incidentCategorySelect');
+        if (categorySelect) {
+            const v = data.category || '';
+            const hasOption = Array.from(categorySelect.options).some(o => o.value === v);
+            if (!hasOption) {
+                const opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = v;
+                categorySelect.appendChild(opt);
+            }
+            categorySelect.value = v;
+        }
+
+        const sourceSelect = document.getElementById('edit_incident_source');
+        if (sourceSelect) sourceSelect.value = data.source || '';
+
+        // Editable status (mapped from IncidentCapture.status)
+        const statusSelect = document.getElementById('edit_incident_status');
+        if (statusSelect) statusSelect.value = mapIncidentStatusToForm(data.status);
+
+        // sub_category options are loaded dynamically (to ensure the current value exists)
+        const subCategorySelect = document.getElementById('edit_incidentSubCategorySelect');
+        if (subCategorySelect) {
+            const selectedSub = data.subCategory || '';
+            subCategorySelect.innerHTML = '';
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Select sub category';
+            subCategorySelect.appendChild(opt);
+
+            const category = data.category || '';
+            if (category) {
+                fetch(`{% url 'department_services_api' %}?category=${encodeURIComponent(category)}`)
+                    .then(resp => resp.json())
+                    .then(payload => {
+                        (payload.services || []).forEach((name) => {
+                            const opt2 = document.createElement('option');
+                            opt2.value = name;
+                            opt2.textContent = name;
+                            subCategorySelect.appendChild(opt2);
+                        });
+                        subCategorySelect.value = selectedSub;
+                    })
+                    .catch(() => {
+                        subCategorySelect.value = selectedSub;
+                    });
             } else {
-                // Default to 8 hours when no existing cadence is set
-                selectEl.value = '8';
+                subCategorySelect.value = selectedSub;
             }
         }
+
         modal.style.display = 'flex';
     }
 
     function openCadenceModalFromButton(buttonEl, evt) {
+        var data = {
+            shiftCadence: buttonEl.getAttribute('data-shift-cadence') || '',
+            title: buttonEl.getAttribute('data-title') || '',
+            description: buttonEl.getAttribute('data-description') || '',
+            impact: buttonEl.getAttribute('data-impact') || '',
+            category: buttonEl.getAttribute('data-category') || '',
+            subCategory: buttonEl.getAttribute('data-sub-category') || '',
+            severity: buttonEl.getAttribute('data-severity') || 'LOW',
+            status: buttonEl.getAttribute('data-status') || 'Open',
+            reportedTime: buttonEl.getAttribute('data-reported-time') || '',
+            reportedBy: buttonEl.getAttribute('data-reported-by') || '',
+            location: buttonEl.getAttribute('data-location') || '',
+            zipcode: buttonEl.getAttribute('data-zipcode') || '',
+            casualties: buttonEl.getAttribute('data-casualties') || '',
+            source: buttonEl.getAttribute('data-source') || '',
+        };
         var id = buttonEl.getAttribute('data-incident-id');
-        var cadence = buttonEl.getAttribute('data-shift-cadence') || '';
-        openCadenceModal(id, cadence, evt);
+        openCadenceModal(id, data, evt);
     }
 
     function closeCadenceModal() {
