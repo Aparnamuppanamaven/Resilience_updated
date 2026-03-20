@@ -120,13 +120,32 @@ def situation_updates_page(request):
             try:
                 parsed_update_time = datetime.fromisoformat(raw_update_time)
             except ValueError:
-                parsed_update_time = timezone.now()
+                # Accept the UI format: DD-MM-YYYY HH:MM
+                try:
+                    parsed_update_time = datetime.strptime(raw_update_time, "%d-%m-%Y %H:%M")
+                    parsed_update_time = timezone.make_aware(
+                        parsed_update_time, timezone.get_current_timezone()
+                    )
+                except ValueError:
+                    parsed_update_time = timezone.now()
         else:
             parsed_update_time = timezone.now()
 
         from .models import SituationUpdate
 
         if incident:
+            # SituationUpdate.attachments is a CharField in this project.
+            # We store uploaded filenames (not the file contents).
+            attachments_value = request.POST.get("attachments") or ""
+            try:
+                uploaded_files = request.FILES.getlist("attachments_file")
+                if uploaded_files:
+                    attachments_value = ",".join(f.name for f in uploaded_files)
+                    # keep within model max_length
+                    attachments_value = attachments_value[:100]
+            except Exception:
+                pass
+
             SituationUpdate.objects.create(
                 incident=incident,
                 title=request.POST.get("situationupdate_title") or "",
@@ -151,7 +170,7 @@ def situation_updates_page(request):
                 resources_deployed=request.POST.get("resources_deployed") or "",
                 next_steps=request.POST.get("next_steps") or "",
                 confidence_level=request.POST.get("confidence_level") or "",
-                attachments=request.POST.get("attachments") or "",
+                attachments=attachments_value,
                 created_at=parsed_update_time,
                 tenant_id=getattr(organization, "tenant_id", None),
             )
