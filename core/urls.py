@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/incidents/<int:incident_id>/assign-users/', views.assign_users_to_incident, name='assign_users_to_incident'),
     path('api/incidents/<int:incident_id>/add-event-log/', views.add_incident_event_log, name='add_incident_event_log'),
     path('api/department-services/', views.department_services_api, name='department_services_api'),
+    path('api/counties-by-state/', views.counties_by_state_api, name='counties_by_state_api'),
     path('api/toggle-alert/', views.toggle_alert, name='toggle_alert'),
     path('api/toggle-alert/', views.toggle_alert, name='toggle_alert'),
     # UI-only pages for prototype workflows (no backend persistence yet)

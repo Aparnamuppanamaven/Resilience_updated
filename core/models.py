@@ -50,6 +50,10 @@ class Liaison(models.Model):
     incident_types = models.TextField(help_text="Key incident types of concern")
     role = models.CharField(max_length=100, blank=True, help_text="User role")
     dept = models.CharField(max_length=100, blank=True, help_text="Department")
+    # core_liaison.sub_dept (legacy column name)
+    sub_dept = models.CharField(max_length=255, blank=True, db_column='sub_dept', help_text="Sub Department")
+    # core_liaison.state (legacy column name)
+    state = models.CharField(max_length=100, blank=True, db_column='state', help_text="State")
     county = models.CharField(max_length=100, blank=True, help_text="County")
     created_at = models.DateTimeField(auto_now_add=True)
     tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
@@ -586,6 +590,43 @@ class Department(models.Model):
     
     def __str__(self):
         return f"{self.category} - {self.service_name}"
+
+
+class State(models.Model):
+    """
+    State master data (maps to `states` table).
+    Used to populate the checkout State dropdown.
+    """
+    state_id = models.IntegerField(primary_key=True, db_column="state_id")
+    state_name = models.CharField(max_length=100, db_column="state_name")
+    state_code = models.CharField(max_length=2, db_column="state_code")
+
+    class Meta:
+        db_table = "states"
+        managed = False
+        ordering = ["state_name"]
+
+    def __str__(self):
+        return f"{self.state_name} ({self.state_code})"
+
+
+class Counties(models.Model):
+    """
+    County master data (maps to `counties` table).
+    Used to populate the dependent County dropdown.
+    """
+    county_id = models.IntegerField(primary_key=True, db_column="county_id")
+    county_name = models.CharField(max_length=100, db_column="county_name")
+    state_id = models.IntegerField(db_column="state_id")
+
+    class Meta:
+        # Legacy table name: `counties`
+        db_table = "counties"
+        managed = False
+        ordering = ["county_name"]
+
+    def __str__(self):
+        return self.county_name
 
 
 class TenantDomain(models.Model):

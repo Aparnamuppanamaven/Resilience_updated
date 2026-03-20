@@ -63,6 +63,8 @@ from .models import (
     TenantDomain,
     log_system_action,
     IncidentShiftSchedule,
+    State,
+    Counties,
 )
 from .extra_views import _ensure_incident_for_capture
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, CreateIncidentForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm, ProfileEditForm, LegacyProfileEditForm
@@ -269,7 +271,9 @@ def checkout(request):
             incidents = form.cleaned_data.get('incidents')
             role = form.cleaned_data.get('role', '')
             dept = form.cleaned_data.get('dept', '')
-            countee = form.cleaned_data.get('countee', '')
+            sub_dept = form.cleaned_data.get('sub_department', '')
+            state_id = form.cleaned_data.get('state', '')
+            county_id = form.cleaned_data.get('county', '')
 
             username = liaison_email.strip()
             n = 0
@@ -328,7 +332,12 @@ def checkout(request):
                             'incident_types': incidents,
                             'role': role,
                             'dept': dept,
-                            'county': countee,
+                            'sub_dept': sub_dept,
+                            'state': (State.objects.filter(state_id=state_id).values_list('state_name', flat=True).first() if state_id else ''),
+                            'county': (
+                                Counties.objects.filter(county_id=county_id, state_id=state_id)
+                                .values_list('county_name', flat=True).first() if county_id else ''
+                            ),
                         }
                     )
 
@@ -444,13 +453,15 @@ def checkout(request):
                 })
 
     else:
-        form = CheckoutForm()
         checkout_data = request.session.get('checkout_data')
+        initial = checkout_data.copy() if checkout_data else {}
+        # Backend-required fields that we keep as hidden inputs in the UI.
+        # Set defaults when the session doesn't provide them.
+        initial.setdefault('role', 'liaison')
+        initial.setdefault('incidents', 'N/A')
+        initial.setdefault('number_of_users', 1)
 
-        if checkout_data:
-            for field in form.fields:
-                if field in checkout_data:
-                    form.fields[field].initial = checkout_data[field]
+        form = CheckoutForm(initial=initial)
 
     return render(request, 'core/checkout.html', {'form': form})
 
@@ -3019,6 +3030,23 @@ def department_services_api(request):
         .order_by("service_name")
     )
     return JsonResponse({"services": services})
+
+
+def counties_by_state_api(request):
+    """
+    Return county options from `counties` for the selected `state_id`.
+    Used by the checkout page to populate the County dropdown.
+    """
+    state_id = (request.GET.get("state_id") or "").strip()
+    if not state_id:
+        return JsonResponse({"counties": []})
+
+    counties = list(
+        Counties.objects.filter(state_id=state_id)
+        .values("county_id", "county_name")
+        .order_by("county_name")
+    )
+    return JsonResponse({"counties": counties})
 
 
 def incident_copy_view(request):

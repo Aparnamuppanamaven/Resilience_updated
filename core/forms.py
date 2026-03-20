@@ -9,7 +9,17 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import datetime, timedelta
 import re
-from .models import OperationalUpdate, SystemSettings, UserCredentials, Payment, Invoice, UserProfile, Department
+from .models import (
+    OperationalUpdate,
+    SystemSettings,
+    UserCredentials,
+    Payment,
+    Invoice,
+    UserProfile,
+    Department,
+    State,
+    Counties,
+)
 
 
 PASSWORD_REGEX = re.compile(
@@ -21,7 +31,7 @@ class CheckoutForm(forms.Form):
     """Checkout form for Foundation purchase"""
     agency = forms.CharField(
         max_length=255,
-        label="Agency / Organization Name",
+        label="Organization Name",
         required=True,
         strip=True,
         widget=forms.TextInput(attrs={
@@ -91,28 +101,42 @@ class CheckoutForm(forms.Form):
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'e.g. Operations Manager',
-            'required': 'required',
+            # 'required': 'required',
         })
     )
-    dept = forms.CharField(
-        max_length=100,
+    dept = forms.ChoiceField(
         label="Department",
         required=True,
-        strip=True,
-        widget=forms.TextInput(attrs={
+        choices=[('', 'Select department')],
+        widget=forms.Select(attrs={
             'class': 'form-control',
-            'placeholder': 'e.g. Emergency Management',
             'required': 'required',
         })
     )
-    countee = forms.CharField(
-        max_length=100,
+    sub_department = forms.ChoiceField(
+        label="Sub Department",
+        required=True,
+        choices=[('', 'Select sub department')],
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+            'required': 'required',
+        })
+    )
+    state = forms.ChoiceField(
+        label="State",
+        required=True,
+        choices=[('', 'Select state')],
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+            'required': 'required',
+        })
+    )
+    county = forms.ChoiceField(
         label="County",
         required=True,
-        strip=True,
-        widget=forms.TextInput(attrs={
+        choices=[('', 'Select county')],
+        widget=forms.Select(attrs={
             'class': 'form-control',
-            'placeholder': 'County information',
             'required': 'required',
         })
     )
@@ -123,7 +147,7 @@ class CheckoutForm(forms.Form):
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'e.g. Flooding, Cyber, Power Outage',
-            'required': 'required',
+            # 'required': 'required',
         })
     )
     channels = forms.ChoiceField(
@@ -149,9 +173,66 @@ class CheckoutForm(forms.Form):
             'class': 'form-control',
             'placeholder': 'e.g. 10',
             'min': '1',
-            'required': 'required',
+            # 'required': 'required',
         })
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Department dropdown: core_department.category
+        departments = (
+            Department.objects.values_list("category", flat=True)
+            .distinct()
+            .order_by("category")
+        )
+        self.fields["dept"].choices = [("", "Select department")] + [(d, d) for d in departments if d]
+
+        # Cascading Sub Department dropdown: core_department.service_name filtered by selected category
+        if self.is_bound:
+            selected_dept = (self.data.get("dept") or "").strip()
+        else:
+            selected_dept = (self.initial.get("dept") or "").strip()
+
+        services = []
+        if selected_dept:
+            services = (
+                Department.objects.filter(category=selected_dept)
+                .values_list("service_name", flat=True)
+                .distinct()
+                .order_by("service_name")
+            )
+
+        self.fields["sub_department"].choices = [("", "Select sub department")] + [
+            (s, s) for s in services if s
+        ]
+
+        # State dropdown: core states table
+        states = (
+            State.objects.values_list("state_id", "state_name")
+            .order_by("state_name")
+        )
+        self.fields["state"].choices = [("", "Select state")] + [
+            (str(state_id), state_name) for state_id, state_name in states if state_id
+        ]
+
+        # County dropdown: core counties filtered by selected state_id
+        if self.is_bound:
+            selected_state_id = (self.data.get("state") or "").strip()
+        else:
+            selected_state_id = (self.initial.get("state") or "").strip()
+
+        county_choices = [("", "Select county")]
+        if selected_state_id:
+            counties = (
+                Counties.objects.filter(state_id=selected_state_id)
+                .values_list("county_id", "county_name")
+                .order_by("county_name")
+            )
+            county_choices += [
+                (str(county_id), county_name) for county_id, county_name in counties if county_id
+            ]
+        self.fields["county"].choices = county_choices
     
     def clean_password(self):
         """Validate password requirements"""
@@ -188,16 +269,37 @@ class CheckoutForm(forms.Form):
     def clean_dept(self):
         value = (self.cleaned_data.get('dept') or '').strip()
         if not value:
-            raise ValidationError('Please enter the department.')
+            raise ValidationError('Please select the department.')
         return value
 
-    def clean_countee(self):
-        value = (self.cleaned_data.get('countee') or '').strip()
+    def clean_sub_department(self):
+        dept = (self.cleaned_data.get("dept") or "").strip()
+        value = (self.cleaned_data.get("sub_department") or "").strip()
         if not value:
-            raise ValidationError('Please enter the county.')
-        if value.isdigit():
-            raise ValidationError('County cannot be only numbers. Please include letters.')
+            raise ValidationError("Please select the sub department.")
+        # Ensure chosen sub_department belongs to chosen department
+        if dept and not Department.objects.filter(category=dept, service_name=value).exists():
+            raise ValidationError("Selected sub department is not valid for the chosen department.")
         return value
+
+    def clean_state(self):
+        value = (self.cleaned_data.get('state') or '').strip()
+        if not value:
+            raise ValidationError('Please select the state.')
+        if not State.objects.filter(state_id=value).exists():
+            raise ValidationError('Selected state is invalid.')
+        return value
+
+    def clean_county(self):
+        county_id = (self.cleaned_data.get('county') or '').strip()
+        if not county_id:
+            raise ValidationError('Please select the county.')
+
+        state_id = (self.cleaned_data.get('state') or '').strip()
+        if state_id and not Counties.objects.filter(state_id=state_id, county_id=county_id).exists():
+            raise ValidationError('Selected county is not valid for the chosen state.')
+
+        return county_id
 
     def clean_incidents(self):
         value = (self.cleaned_data.get('incidents') or '').strip()
