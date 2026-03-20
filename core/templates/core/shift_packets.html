@@ -67,15 +67,19 @@
 
         <div class="view-container">
             <div class="card" style="margin-bottom: 1rem;">
-                <div class="card-header">
-                    <h3 class="card-title">Select Incident</h3>
-                </div>
+
                 <div class="card-body" style="padding: 1rem;">
                     <form method="get" action="{% url 'shift_packets' %}" id="shift_incident_form" style="margin-bottom: 0;">
                         <input type="hidden" name="incident_id" id="shift_incident_id_hidden" value="{% if selected_incident %}{{ selected_incident.id }}{% endif %}">
-                        <div class="form-group" style="margin-bottom: 0; position: relative; max-width: 75%;">
-                            <label class="form-label" for="shift_incident_search_input">Incident</label>
-                            <div id="shift_incident_dropdown_wrapper" style="position: relative;">
+                        <div class="form-group" style="margin-bottom: 0; position: relative; display: flex; align-items: center; gap: 1rem; width: 100%;">
+                            <label
+                                class="form-label"
+                                for="shift_incident_search_input"
+                                style="white-space: nowrap; margin-bottom: 0; font-weight: 600; color: #111827;"
+                            >
+                                Select Incident
+                            </label>
+                            <div id="shift_incident_dropdown_wrapper" style="position: relative; flex: 1 1 auto; min-width: 0;">
                                 <input
                                     type="text"
                                     id="shift_incident_search_input"
@@ -143,7 +147,7 @@
 
             <div class="card" style="margin-bottom: 0.5rem;">
                 <div class="card-header">
-                    <h3 class="card-title">Shift Packet History</h3>
+                    <h3 class="card-title">Shift Packet List</h3>
                     <span style="font-size: 0.85rem; color: #6b7280;">AI and manual shift packets for the selected incident</span>
                 </div>
                 <div class="card-body" style="padding: 1rem;">
@@ -160,7 +164,7 @@
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; gap: 0.75rem;">
                                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                                             <div style="font-weight: 700; font-size: 1rem; color: #111827;">
-                                                Shift Packet
+                                                #{{ forloop.revcounter }} Shift Packet
                                             </div>
                                             <a href="{% url 'edit_shift_packet_history' entry.id %}"
                                                style="color: #4f46e5; text-decoration: none; display: inline-flex; align-items: center;"
@@ -168,8 +172,19 @@
                                                 <i class="fa-solid fa-pen-to-square"></i>
                                             </a>
                                         </div>
-                                        <div style="font-size: 0.85rem; color: #6b7280;">
-                                            {{ entry.created_at|date:"m/d/Y H:i" }}
+                                        <div style="font-size: 0.78rem; color: #6b7280; line-height: 1.25; text-align: right;">
+                                            <div>
+                                                <strong style="font-weight: 600; color: #6b7280;">Start:</strong>
+                                                {% if entry.start_time %}
+                                                    {{ entry.start_time|date:"m/d/Y H:i" }}
+                                                {% else %}
+                                                    --
+                                                {% endif %}
+                                            </div>
+                                            <div>
+                                                <strong style="font-weight: 600; color: #6b7280;">End:</strong>
+                                                {{ entry.created_at|date:"m/d/Y H:i" }}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -219,9 +234,20 @@
                                             {{ entry.decision_maker|default:"—" }}
                                         </div>
                                         <div>
-                                            <span class="status-badge {% if entry.tx_type == 'AI' %}status-normal{% else %}status-watch{% endif %}">
-                                                {{ entry.tx_type|default:"N/A" }}
-                                            </span>
+                                            {% with tx_type_norm=entry.tx_type|default:""|cut:" "|upper %}
+                                                <span class="status-badge {% if tx_type_norm == 'AI' %}status-normal{% else %}status-watch{% endif %}">
+                                                    {% if tx_type_norm == 'AI' %}
+                                                        <span style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.2px;">AI</span>
+                                                    {% else %}
+                                                        <img
+                                                            src="/media/user_images/human_logo.jpg"
+                                                            alt="Manual"
+                                                            title="Manual"
+                                                            style="width: 14px; height: 14px; object-fit: contain; display: inline-block;"
+                                                        >
+                                                    {% endif %}
+                                                </span>
+                                            {% endwith %}
                                         </div>
                                     </div>
                                 </div>
@@ -262,9 +288,20 @@
                                             <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.decision_summary }}</td>
                                             <td style="padding: 0.75rem 1rem;">{{ entry.decision_maker|default:"—" }}</td>
                                             <td style="padding: 0.75rem 1rem;">
-                                                <span class="status-badge {% if entry.tx_type == 'AI' %}status-normal{% else %}status-watch{% endif %}">
-                                                    {{ entry.tx_type|default:"N/A" }}
-                                                </span>
+                                                {% with tx_type_norm=entry.tx_type|default:""|cut:" "|upper %}
+                                                    <span class="status-badge {% if tx_type_norm == 'AI' %}status-normal{% else %}status-watch{% endif %}">
+                                                        {% if tx_type_norm == 'AI' %}
+                                                            <span style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.2px;">AI</span>
+                                                        {% else %}
+                                                            <img
+                                                                src="/media/user_images/human_logo.jpg"
+                                                                alt="Manual"
+                                                                title="Manual"
+                                                                style="width: 14px; height: 14px; object-fit: contain; display: inline-block;"
+                                                            >
+                                                        {% endif %}
+                                                    </span>
+                                                {% endwith %}
                                             </td>
                                         </tr>
                                     {% endfor %}

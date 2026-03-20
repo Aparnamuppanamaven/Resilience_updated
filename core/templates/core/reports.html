@@ -67,15 +67,17 @@
 
         <div class="view-container">
             <div class="card" style="margin-bottom: 1.5rem;">
-                <div class="card-header">
-                    <h3 class="card-title">Select Incident</h3>
-                </div>
                 <div class="card-body">
                     <form>
-                        <div class="dashboard-grid" style="grid-template-columns: 2fr auto auto auto; gap: 1rem; align-items: flex-end;">
-                            <div class="form-group">
-                                <label class="form-label">Incident</label>
-                                <select id="incidentSelect" class="form-control">
+                        <div class="dashboard-grid" style="grid-template-columns: 2fr auto auto auto; gap: 1rem; align-items: flex-start;">
+                            <div class="form-group" style="display: flex; align-items: center; gap: 1rem; width: 100%;">
+                                <label
+                                    class="form-label"
+                                    style="white-space: nowrap; margin-bottom: 0; font-weight: 600; color: #111827; display: flex; align-items: center; height: 38px;"
+                                >
+                                    Select Incident
+                                </label>
+                                <select id="incidentSelect" class="form-control" style="flex: 1 1 auto; min-width: 0; height: 38px;">
                                     <option value="" selected disabled>Select Incident</option>
                                     {% for inc in incidents %}
                                         <option value="{{ inc.id }}" data-title="{{ inc.title }}" data-severity="{{ inc.get_severity_display }}">[INC-{{ inc.id }}] {{ inc.title }}</option>
@@ -84,10 +86,9 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <button type="button" id="generateReportBtn" class="btn btn-submit">Generate Summary Report</button>
-                            <a href="{% url 'reports_pdf' %}" class="btn btn-secondary">Download PDF</a>
-                            <div style="display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start;">
-                                <button type="button" id="viewLogsBtn" class="btn btn-secondary">View Situation Logs</button>
+                            <button type="button" id="generateReportBtn" class="btn btn-submit" style="height: 38px;">Generate Summary Report</button>
+                            <div style="display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; justify-content: flex-start;">
+                                <button type="button" id="viewLogsBtn" class="btn btn-secondary" style="height: 38px;">View Situation Logs</button>
                                 <span style="font-size: 0.8rem; color: #6b7280;">
                                     Total Logs in System: {{ total_situation_logs }}
                                 </span>
@@ -99,8 +100,21 @@
 
             <div class="card" id="reportPreviewCard">
                 <div class="card-header">
-                    <h3 class="card-title">Report Preview</h3>
-                    <span style="font-size: 0.85rem; color: #6b7280;">Generated report content</span>
+                    <h3 class="card-title">Report</h3>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span style="font-size: 0.85rem; color: #6b7280;">Generated report content</span>
+                        <a
+                            id="downloadPdfIconLink"
+                            href="{% url 'reports_pdf' %}"
+                            title="Download PDF"
+                            style="color: var(--primary-color); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onclick="event.preventDefault(); window.open(this.href, '_blank');"
+                        >
+                            <i class="fa-solid fa-file-pdf" style="font-size: 1rem;"></i>
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="dashboard-grid" style="grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
@@ -214,9 +228,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const generateReportBtn = document.getElementById('generateReportBtn');
     const viewLogsBtn = document.getElementById('viewLogsBtn');
     const reportPreviewCard = document.getElementById('reportPreviewCard');
+    const downloadPdfIconLink = document.getElementById('downloadPdfIconLink');
     const situationLogsModal = document.getElementById('situationLogsModal');
     const closeLogsModal = document.getElementById('closeLogsModal');
     const logsTableBody = document.getElementById('situationLogsTableBody');
+    const reportsPdfBaseUrl = "{% url 'reports_pdf' %}";
 
     // Generate Summary Report button handler
     generateReportBtn.addEventListener('click', function() {
@@ -228,6 +244,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const incidentTitle = selectedOption.getAttribute('data-title') || selectedOption.text.replace(/^\[INC-\d+\]\s*/, '');
         const severity = selectedOption.getAttribute('data-severity') || 'Unknown';
+
+        // Update PDF download link for the selected incident
+        if (downloadPdfIconLink) {
+            const incidentId = selectedOption.value;
+            downloadPdfIconLink.href = reportsPdfBaseUrl + "?incident_id=" + encodeURIComponent(incidentId);
+        }
 
         // Update preview
         document.getElementById('previewIncidentTitle').textContent = incidentTitle;

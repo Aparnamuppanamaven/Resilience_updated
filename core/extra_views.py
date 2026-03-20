@@ -307,6 +307,17 @@ def shift_packets_page(request):
             .order_by("-created_at")[:50]
         )
 
+        # Derive shift window:
+        # - End time  = current history row created_at
+        # - Start time = previous (older) history row created_at
+        # Since history_entries is sorted newest -> oldest (descending created_at),
+        # the previous shift packet time is the next item in the loop.
+        for i, entry in enumerate(history_entries):
+            if i + 1 < len(history_entries):
+                entry.start_time = history_entries[i + 1].created_at
+            else:
+                entry.start_time = None
+
     context = {
         "organization": organization,
         "current_status": current_status,
@@ -431,6 +442,17 @@ def reports_pdf(request):
         return auth_redirect
 
     context = _build_report_context(request)
+
+    # If user selected a specific incident on the UI, it should be sent as:
+    #   /reports/pdf/?incident_id=<IncidentCapture.id>
+    # so the PDF matches the preview.
+    incident_id = request.GET.get("incident_id")
+    if incident_id:
+        try:
+            context["preview_incident"] = IncidentCapture.objects.get(id=incident_id)
+        except (IncidentCapture.DoesNotExist, ValueError, TypeError):
+            # Fall back to whatever _build_report_context selected.
+            pass
     buffer = BytesIO()
 
     doc = SimpleDocTemplate(
@@ -451,7 +473,7 @@ def reports_pdf(request):
     story = []
 
     # Title
-    story.append(Paragraph("Incident Report Summary", title_style))
+    story.append(Paragraph("Incident Summary Report", title_style))
     story.append(Spacer(1, 0.2 * inch))
 
     # Organization / status
@@ -462,22 +484,25 @@ def reports_pdf(request):
     story.append(Paragraph(f"Current Status: {current_status}", body_style))
     story.append(Spacer(1, 0.2 * inch))
 
-    # Incident overview
+    # Incident overview (no separate "Preview Incident" section)
     preview_incident = context.get("preview_incident")
+    story.append(Spacer(1, 0.05 * inch))
     if preview_incident:
-        story.append(Paragraph("Preview Incident", subtitle_style))
-        story.append(Spacer(1, 0.1 * inch))
-        story.append(Paragraph(f"ID: INC-{preview_incident.id}", body_style))
-        story.append(Paragraph(f"Title: {preview_incident.title}", body_style))
-        desc = getattr(preview_incident, "description", "")
+        story.append(Paragraph(f"<b>ID:</b> INC-{preview_incident.id}", body_style))
+        story.append(Paragraph(f"<b>Title:</b> {preview_incident.title}", body_style))
+        desc = getattr(preview_incident, "description", "") or ""
         if desc:
-            story.append(Paragraph(f"Description: {desc}", body_style))
-        story.append(Spacer(1, 0.2 * inch))
+            story.append(Paragraph(f"<b>Description:</b> {desc}", body_style))
+    else:
+        story.append(Paragraph("<b>ID:</b> —", body_style))
+        story.append(Paragraph("<b>Title:</b> —", body_style))
+        story.append(Paragraph("<b>Description:</b> —", body_style))
+    story.append(Spacer(1, 0.2 * inch))
 
     # Situation logs and shift packets counts
     total_situation_logs = context.get("total_situation_logs", 0)
     total_shift_packets = context.get("total_shift_packets", 0)
-    story.append(Paragraph("Summary Metrics", subtitle_style))
+    story.append(Paragraph("Metrics", subtitle_style))
     story.append(Spacer(1, 0.1 * inch))
     story.append(Paragraph(f"Total Situation Logs: {total_situation_logs}", body_style))
     story.append(Paragraph(f"Total Shift Packets: {total_shift_packets}", body_style))
