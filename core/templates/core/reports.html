@@ -78,9 +78,16 @@
                                     Select Incident
                                 </label>
                                 <select id="incidentSelect" class="form-control" style="flex: 1 1 auto; min-width: 0; height: 38px;">
-                                    <option value="" selected disabled>Select Incident</option>
+                                    <option value="" disabled {% if not preview_incident %}selected{% endif %}>Select Incident</option>
                                     {% for inc in incidents %}
-                                        <option value="{{ inc.id }}" data-title="{{ inc.title }}" data-severity="{{ inc.get_severity_display }}">[INC-{{ inc.id }}] {{ inc.title }}</option>
+                                        <option
+                                            value="{{ inc.id }}"
+                                            data-title="{{ inc.title|escape }}"
+                                            data-severity="{{ inc.get_severity_display|escape }}"
+                                            data-logs="{{ inc.reports_logs_count|default:0 }}"
+                                            data-packets="{{ inc.reports_packets_count|default:0 }}"
+                                            {% if preview_incident and preview_incident.id == inc.id %}selected{% endif %}
+                                        >[INC-{{ inc.id }}] {{ inc.title }}</option>
                                     {% empty %}
                                         <option>No incidents available</option>
                                     {% endfor %}
@@ -90,7 +97,7 @@
                             <div style="display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; justify-content: flex-start;">
                                 <button type="button" id="viewLogsBtn" class="btn btn-secondary" style="height: 38px;">View Situation Logs</button>
                                 <span style="font-size: 0.8rem; color: #6b7280;">
-                                    Total Logs in System: {{ total_situation_logs }}
+                                    Total situation log entries (all incidents): {{ total_situation_logs }}
                                 </span>
                             </div>
                         </div>
@@ -148,41 +155,33 @@
                         </div>
                         <div class="card" style="box-shadow: none; border: 1px solid #e5e7eb;">
                             <div class="card-header" style="border-bottom: none; padding-bottom: 0.5rem;">
-                                <span class="card-title" style="font-size: 0.8rem; text-transform: uppercase; color: #6b7280;">Total Situation Logs</span>
+                                <span class="card-title" style="font-size: 0.8rem; text-transform: uppercase; color: #6b7280;">Situation logs (this incident)</span>
                             </div>
                             <div class="card-body" style="padding-top: 0;">
-                                <span style="font-weight: 600;">{{ total_situation_logs }}</span>
+                                <span id="previewSituationLogsCount" style="font-weight: 600;">{{ incident_situation_logs }}</span>
                             </div>
                         </div>
                         <div class="card" style="box-shadow: none; border: 1px solid #e5e7eb;">
                             <div class="card-header" style="border-bottom: none; padding-bottom: 0.5rem;">
-                                <span class="card-title" style="font-size: 0.8rem; text-transform: uppercase; color: #6b7280;">Total Shift Packets</span>
+                                <span class="card-title" style="font-size: 0.8rem; text-transform: uppercase; color: #6b7280;">Shift Packet History</span>
                             </div>
                             <div class="card-body" style="padding-top: 0;">
-                                <span style="font-weight: 600;">{{ total_shift_packets }}</span>
+                                <span id="previewShiftPacketsCount" style="font-weight: 600;">{{ incident_shift_packets }}</span>
                             </div>
                         </div>
                     </div>
 
                     <div>
-                        <h3 class="card-title" style="margin-bottom: 0.5rem;">AI Generated Summary</h3>
+                        <h3 class="card-title" style="margin-bottom: 0.5rem;">Incident summary</h3>
                         <p style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.75rem;">
-                            Example of an AI-generated narrative. In production this would be populated by backend logic.
+                            Built from the selected incident record (title, severity, description, impact, location, and timestamps). Choosing a different incident in the list reloads this section automatically.
                         </p>
-                        <div id="previewAISummary">
-                            <p style="font-size: 0.95rem; color: #374151; margin-bottom: 0.5rem;">
-                                Over the last 48 hours, the North Region experienced severe weather conditions resulting in
-                                widespread power disruptions across Zones A, B, and C. Field crews successfully restored service
-                                to Zones A and B while Zone C remains partially impacted due to continued high winds and access
-                                limitations.
-                            </p>
-                            <p style="font-size: 0.95rem; color: #374151;">
-                                Coordination between Operations, Logistics, and Planning sections ensured continuous staffing
-                                of the Emergency Operations Center with timely shift handoffs. No fatalities have been reported,
-                                and all critical facilities (hospitals, shelters) remain operational with backup power support.
-                                The next operational period will focus on full restoration in Zone C and initiation of
-                                demobilization planning.
-                            </p>
+                        <div id="previewAISummary" style="font-size: 0.95rem; color: #374151;">
+                            {% if report_summary_text %}
+                                {{ report_summary_text|linebreaks }}
+                            {% else %}
+                                <p style="color: #9ca3af;">Select an incident above to load details (or use &quot;Generate Summary Report&quot;).</p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -200,7 +199,7 @@
         </div>
         <div style="padding: 1.5rem;">
             <div style="margin-bottom: 1rem;">
-                <strong>Total Logs: {{ total_situation_logs }}</strong>
+                <strong>Logs matching filter: <span id="situationLogsModalTotal">0</span></strong>
             </div>
             <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
                 <table class="incidents-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
@@ -233,52 +232,110 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeLogsModal = document.getElementById('closeLogsModal');
     const logsTableBody = document.getElementById('situationLogsTableBody');
     const reportsPdfBaseUrl = "{% url 'reports_pdf' %}";
+    const apiSituationLogsUrl = "{% url 'api_situation_logs' %}";
+    const apiReportsIncidentUrl = "{% url 'api_reports_incident' %}";
 
-    // Generate Summary Report button handler
-    generateReportBtn.addEventListener('click', function() {
+    {% if preview_incident %}
+    if (downloadPdfIconLink) {
+        downloadPdfIconLink.href = reportsPdfBaseUrl + "?incident_id=" + encodeURIComponent("{{ preview_incident.id }}");
+    }
+    {% endif %}
+
+    function applySeverityBadge(el, severityText) {
+        const severity = (severityText || '').toLowerCase();
+        el.className = 'status-badge ';
+        if (severity.includes('critical') || severity.includes('high')) {
+            el.className += 'status-alert';
+        } else if (severity.includes('medium')) {
+            el.className += 'status-watch';
+        } else {
+            el.className += 'status-normal';
+        }
+    }
+
+    function loadReportForSelectedIncident(scrollIntoView) {
         const selectedOption = incidentSelect.options[incidentSelect.selectedIndex];
         if (!selectedOption || !selectedOption.value) {
             alert('Please select an incident first.');
             return;
         }
 
-        const incidentTitle = selectedOption.getAttribute('data-title') || selectedOption.text.replace(/^\[INC-\d+\]\s*/, '');
-        const severity = selectedOption.getAttribute('data-severity') || 'Unknown';
-
-        // Update PDF download link for the selected incident
-        if (downloadPdfIconLink) {
-            const incidentId = selectedOption.value;
-            downloadPdfIconLink.href = reportsPdfBaseUrl + "?incident_id=" + encodeURIComponent(incidentId);
+        const incidentId = selectedOption.value;
+        const summaryBox = document.getElementById('previewAISummary');
+        if (summaryBox) {
+            summaryBox.innerHTML = '<p style="color:#6b7280;"><i class="fa-solid fa-spinner fa-spin"></i> Loading incident details…</p>';
         }
 
-        // Update preview
-        document.getElementById('previewIncidentTitle').textContent = incidentTitle;
-        const severityElement = document.getElementById('previewSeverity');
-        severityElement.textContent = severity;
-        
-        // Update severity badge class based on severity
-        severityElement.className = 'status-badge ';
-        if (severity.toLowerCase().includes('critical')) {
-            severityElement.className += 'status-alert';
-        } else if (severity.toLowerCase().includes('high')) {
-            severityElement.className += 'status-alert';
-        } else if (severity.toLowerCase().includes('medium')) {
-            severityElement.className += 'status-watch';
-        } else {
-            severityElement.className += 'status-normal';
-        }
+        fetch(apiReportsIncidentUrl + '?incident_id=' + encodeURIComponent(incidentId), { credentials: 'same-origin' })
+            .then(function(response) { return response.json().then(function(data) { return { ok: response.ok, data: data }; }); })
+            .then(function(result) {
+                const data = result.data;
+                if (!result.ok || data.error) {
+                    alert(data.error || 'Could not load incident details.');
+                    if (summaryBox) summaryBox.innerHTML = '';
+                    return;
+                }
+                document.getElementById('previewIncidentTitle').textContent = data.title || '';
+                const elLogs = document.getElementById('previewSituationLogsCount');
+                const elPk = document.getElementById('previewShiftPacketsCount');
+                if (elLogs) elLogs.textContent = String(data.incident_situation_logs != null ? data.incident_situation_logs : 0);
+                if (elPk) elPk.textContent = String(data.incident_shift_packets != null ? data.incident_shift_packets : 0);
+                const severityElement = document.getElementById('previewSeverity');
+                severityElement.textContent = data.severity_display || '';
+                applySeverityBadge(severityElement, data.severity_display);
+                if (summaryBox) {
+                    summaryBox.style.whiteSpace = 'pre-wrap';
+                    summaryBox.textContent = data.report_summary_text || '';
+                }
+                if (downloadPdfIconLink) {
+                    downloadPdfIconLink.href = reportsPdfBaseUrl + '?incident_id=' + encodeURIComponent(incidentId);
+                }
+                try {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('incident_id', incidentId);
+                    window.history.replaceState({}, '', url);
+                } catch (e) { /* ignore */ }
+                reportPreviewCard.style.display = 'block';
+                try {
+                    if (scrollIntoView !== false) {
+                        reportPreviewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                } catch (e) { /* ignore */ }
+            })
+            .catch(function() {
+                alert('Failed to load incident details.');
+                if (summaryBox) summaryBox.innerHTML = '';
+            });
+    }
 
-        // Show the preview card (in case it was hidden)
-        reportPreviewCard.style.display = 'block';
-        reportPreviewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Same data load: button click (scroll to report) or dropdown change (immediate refresh)
+    generateReportBtn.addEventListener('click', function() {
+        loadReportForSelectedIncident(true);
+    });
+
+    incidentSelect.addEventListener('change', function() {
+        if (!incidentSelect.value) {
+            return;
+        }
+        loadReportForSelectedIncident(false);
     });
 
     // View Situation Logs button handler
     viewLogsBtn.addEventListener('click', function() {
-        // Fetch logs from API
-        fetch('{% url "api_situation_logs" %}')
+        const selectedOption = incidentSelect.options[incidentSelect.selectedIndex];
+        if (!selectedOption || !selectedOption.value) {
+            alert('Please select an incident first.');
+            return;
+        }
+        const incidentId = selectedOption.value;
+        let logsUrl = apiSituationLogsUrl + '?incident_id=' + encodeURIComponent(incidentId);
+        fetch(logsUrl)
             .then(response => response.json())
             .then(data => {
+                const totalEl = document.getElementById('situationLogsModalTotal');
+                if (totalEl && typeof data.total === 'number') {
+                    totalEl.textContent = data.total;
+                }
                 if (data.error) {
                     logsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #ef4444;">' + data.error + '</td></tr>';
                 } else if (data.logs && data.logs.length > 0) {
@@ -297,7 +354,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     logsTableBody.innerHTML = html;
                 } else {
-                    logsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">No logs available</td></tr>';
+                    logsTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">No logs available for this incident</td></tr>';
                 }
                 situationLogsModal.style.display = 'block';
             })

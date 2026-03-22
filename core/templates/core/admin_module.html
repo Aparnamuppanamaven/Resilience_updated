@@ -637,7 +637,7 @@
                     <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
                         Shift <span style="color: #ef4444;">*</span>
                     </label>
-                    <select name="shift_id" id="shift_id" required style="
+                    <select name="shift_id" id="shift_id" style="
                         width: 100%;
                         padding: 0.75rem;
                         border: 1px solid #dee2e6;
@@ -716,7 +716,7 @@
                         <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
                             Agency Name <span style="color: #ef4444;">*</span>
                         </label>
-                        <input type="text" name="agency_name" id="agency_name" required 
+                        <input type="text" name="agency_name" id="agency_name" 
                                value="{% if logged_in_user_data %}{{ logged_in_user_data.agency_name }}{% endif %}"
                                {% if logged_in_user_data %}readonly{% endif %}
                                class="{% if logged_in_user_data %}admin-field-readonly{% endif %}"
@@ -728,7 +728,7 @@
                         <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
                             Primary Liaison Name <span style="color: #ef4444;">*</span>
                         </label>
-                        <input type="text" name="primary_liaison_name" id="primary_liaison_name" required 
+                        <input type="text" name="primary_liaison_name" id="primary_liaison_name" 
                                value="{% if logged_in_user_data %}{{ logged_in_user_data.primary_liaison_name }}{% endif %}"
                                {% if logged_in_user_data %}readonly{% endif %}
                                class="{% if logged_in_user_data %}admin-field-readonly{% endif %}"
@@ -742,7 +742,7 @@
                         <label style="font-weight: 600; color: #495057; margin-bottom: 0.5rem; display: block;">
                             Email <span style="color: #ef4444;">*</span>
                         </label>
-                        <input type="email" name="liaison_email" id="liaison_email" required 
+                        <input type="email" name="liaison_email" id="liaison_email" 
                                value="{% if logged_in_user_data %}{{ logged_in_user_data.liaison_email }}{% endif %}"
                                {% if logged_in_user_data %}readonly{% endif %}
                                class="{% if logged_in_user_data %}admin-field-readonly{% endif %}"

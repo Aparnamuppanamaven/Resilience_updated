@@ -403,18 +403,101 @@ def edit_shift_packet_history(request, history_id: int):
     return render(request, "core/shift_packet_edit.html", context)
 
 
+def _reports_counts_for_capture(capture: IncidentCapture):
+    """Situation logs (core_incident_events) and shift packet history rows for this capture."""
+    try:
+        logs = IncidentEvent.objects.filter(incident_id=capture.id).count()
+    except Exception:
+        logs = 0
+    uid = capture.incident_uid if capture.incident_uid is not None else capture.id
+    try:
+        packets = ShiftPacketHistory.objects.filter(incident_uid=uid).count()
+    except Exception:
+        packets = 0
+    return logs, packets
+
+
+def _reports_summary_text(inc: IncidentCapture) -> str:
+    """Plain-text narrative from stored incident fields (no external AI service)."""
+    lines = []
+    if inc.title:
+        lines.append(f"Title: {inc.title}")
+    sev = inc.get_severity_display() if hasattr(inc, "get_severity_display") else (inc.severity or "")
+    if sev:
+        lines.append(f"Severity: {str(sev).strip()}")
+    if inc.status:
+        lines.append(f"Status: {inc.status}")
+    if inc.reported_time:
+        lines.append(f"Reported: {inc.reported_time.strftime('%b %d, %Y %I:%M %p')}")
+    if inc.location:
+        lines.append(f"Location: {inc.location}")
+    if inc.category or inc.sub_category:
+        cat = " / ".join(x for x in (inc.category or "", inc.sub_category or "") if x)
+        if cat.strip():
+            lines.append(f"Category: {cat.strip()}")
+    if inc.description and str(inc.description).strip():
+        lines.append("")
+        lines.append("Description:")
+        lines.append(str(inc.description).strip())
+    if inc.impact and str(inc.impact).strip():
+        lines.append("")
+        lines.append("Impact / why it matters:")
+        lines.append(str(inc.impact).strip())
+    return "\n".join(lines) if lines else "No additional detail is available for this incident."
+
+
 def _build_report_context(request):
     """
     Shared helper for the Reports page and PDF generation.
 
-    Currently uses simple global counts and the most recent incident
-    as the preview data source.
+    Incidents are scoped like Incident Management (org filter for liaison users).
+    Preview uses ?incident_id= when present (must be in the visible list), else the first incident.
+    Metrics for the tiles are per selected incident; total_situation_logs remains a global count.
     """
     organization, current_status, last_sync_display = _get_org_and_status(request)
-    incidents = IncidentCapture.objects.all().order_by("-reported_time")[:50]
-    preview_incident = incidents[0] if incidents else None
 
-    # Global counts for situation logs and shift packets
+    liaison = None
+    if request.user.is_authenticated:
+        try:
+            liaison = request.user.liaison_profile
+        except Exception:
+            liaison = None
+
+    if liaison is not None and organization is not None:
+        incidents_qs = IncidentCapture.objects.filter(organization=organization).order_by(
+            "-reported_time"
+        )[:50]
+    else:
+        incidents_qs = IncidentCapture.objects.all().order_by("-reported_time")[:50]
+
+    incidents = list(incidents_qs)
+    visible_ids = {i.id for i in incidents}
+    for inc in incidents:
+        lc, pc = _reports_counts_for_capture(inc)
+        inc.reports_logs_count = lc
+        inc.reports_packets_count = pc
+
+    incident_id_param = request.GET.get("incident_id")
+    preview_incident = None
+    if incident_id_param:
+        try:
+            cand = IncidentCapture.objects.get(id=int(incident_id_param))
+            if cand.id in visible_ids:
+                preview_incident = cand
+        except (IncidentCapture.DoesNotExist, ValueError, TypeError):
+            preview_incident = None
+
+    if preview_incident is None and incidents:
+        preview_incident = incidents[0]
+
+    if preview_incident is None:
+        incident_situation_logs = 0
+        incident_shift_packets = 0
+        report_summary_text = ""
+    else:
+        incident_situation_logs, incident_shift_packets = _reports_counts_for_capture(preview_incident)
+        report_summary_text = _reports_summary_text(preview_incident)
+
     try:
         total_situation_logs = IncidentEvent.objects.count()
     except Exception:
@@ -431,10 +514,63 @@ def _build_report_context(request):
         "last_sync_display": last_sync_display,
         "incidents": incidents,
         "preview_incident": preview_incident,
+        "incident_situation_logs": incident_situation_logs,
+        "incident_shift_packets": incident_shift_packets,
+        "report_summary_text": report_summary_text,
         "total_situation_logs": total_situation_logs,
         "total_shift_packets": total_shift_packets,
     }
     return context
+
+
+def api_reports_incident(request):
+    """
+    JSON detail for Reports page when user selects an incident (same scoping as incident list).
+    """
+    if request.method != "GET":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    auth_redirect = _require_auth(request)
+    if auth_redirect:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    organization, _, _ = _get_org_and_status(request)
+    liaison = None
+    if request.user.is_authenticated:
+        try:
+            liaison = request.user.liaison_profile
+        except Exception:
+            pass
+
+    if liaison is not None and organization is not None:
+        visible = IncidentCapture.objects.filter(organization=organization)
+    else:
+        visible = IncidentCapture.objects.all()
+
+    incident_id = request.GET.get("incident_id")
+    if not incident_id:
+        return JsonResponse({"error": "incident_id required"}, status=400)
+    try:
+        inc = IncidentCapture.objects.get(id=int(incident_id))
+    except (ValueError, TypeError, IncidentCapture.DoesNotExist):
+        return JsonResponse({"error": "Incident not found"}, status=404)
+
+    if not visible.filter(id=inc.id).exists():
+        return JsonResponse({"error": "Incident not found"}, status=404)
+
+    logs, packets = _reports_counts_for_capture(inc)
+    summary = _reports_summary_text(inc)
+    sev = inc.get_severity_display() if hasattr(inc, "get_severity_display") else (inc.severity or "")
+    return JsonResponse(
+        {
+            "id": inc.id,
+            "title": inc.title or "",
+            "severity_display": str(sev).strip(),
+            "incident_situation_logs": logs,
+            "incident_shift_packets": packets,
+            "report_summary_text": summary,
+        }
+    )
 
 
 def reports_page(request):
@@ -461,17 +597,6 @@ def reports_pdf(request):
         return auth_redirect
 
     context = _build_report_context(request)
-
-    # If user selected a specific incident on the UI, it should be sent as:
-    #   /reports/pdf/?incident_id=<IncidentCapture.id>
-    # so the PDF matches the preview.
-    incident_id = request.GET.get("incident_id")
-    if incident_id:
-        try:
-            context["preview_incident"] = IncidentCapture.objects.get(id=incident_id)
-        except (IncidentCapture.DoesNotExist, ValueError, TypeError):
-            # Fall back to whatever _build_report_context selected.
-            pass
     buffer = BytesIO()
 
     doc = SimpleDocTemplate(
@@ -503,7 +628,7 @@ def reports_pdf(request):
     story.append(Paragraph(f"Current Status: {current_status}", body_style))
     story.append(Spacer(1, 0.2 * inch))
 
-    # Incident overview (no separate "Preview Incident" section)
+    # Incident overview
     preview_incident = context.get("preview_incident")
     story.append(Spacer(1, 0.05 * inch))
     if preview_incident:
@@ -518,13 +643,29 @@ def reports_pdf(request):
         story.append(Paragraph("<b>Description:</b> —", body_style))
     story.append(Spacer(1, 0.2 * inch))
 
-    # Situation logs and shift packets counts
+    isl = context.get("incident_situation_logs", 0)
+    isp = context.get("incident_shift_packets", 0)
+    story.append(Paragraph("Metrics (selected incident)", subtitle_style))
+    story.append(Spacer(1, 0.1 * inch))
+    story.append(Paragraph(f"Situation logs for this incident: {isl}", body_style))
+    story.append(Paragraph(f"Shift packet history rows for this incident: {isp}", body_style))
+
     total_situation_logs = context.get("total_situation_logs", 0)
     total_shift_packets = context.get("total_shift_packets", 0)
-    story.append(Paragraph("Metrics", subtitle_style))
     story.append(Spacer(1, 0.1 * inch))
-    story.append(Paragraph(f"Total Situation Logs: {total_situation_logs}", body_style))
-    story.append(Paragraph(f"Total Shift Packets: {total_shift_packets}", body_style))
+    story.append(Paragraph("System-wide totals", subtitle_style))
+    story.append(Spacer(1, 0.08 * inch))
+    story.append(Paragraph(f"Total situation log entries (all incidents): {total_situation_logs}", body_style))
+    story.append(Paragraph(f"Total shift packet records (all): {total_shift_packets}", body_style))
+
+    summary = (context.get("report_summary_text") or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    if summary:
+        story.append(Spacer(1, 0.2 * inch))
+        story.append(Paragraph("Summary", subtitle_style))
+        story.append(Spacer(1, 0.08 * inch))
+        for line in summary.split("\n"):
+            if line.strip():
+                story.append(Paragraph(line, body_style))
 
     story.append(Spacer(1, 0.3 * inch))
     story.append(
@@ -653,15 +794,23 @@ def api_situation_logs(request):
     """
     API endpoint to fetch situation logs as JSON.
     Used by the Reports page to display logs in a modal.
+    Optional: ?incident_id=<core_incidents.id> filters to that capture incident.
     """
     auth_redirect = _require_auth(request)
     if auth_redirect:
         return JsonResponse({'error': 'Unauthorized'}, status=401)
 
     try:
-        # Fetch incident events (situation logs)
-        logs = IncidentEvent.objects.all().order_by('-created_time')[:100]
-        
+        logs_qs = IncidentEvent.objects.all().order_by("-created_time")
+        incident_id = request.GET.get("incident_id")
+        if incident_id:
+            try:
+                logs_qs = logs_qs.filter(incident_id=int(incident_id))
+            except (ValueError, TypeError):
+                pass
+        total = logs_qs.count()
+        logs = logs_qs[:100]
+
         logs_data = []
         for log in logs:
             department = 'System'
@@ -680,7 +829,7 @@ def api_situation_logs(request):
                 'status': 'ACTIVE',  # Default status
             })
         
-        return JsonResponse({'logs': logs_data, 'total': len(logs_data)}, safe=False)
+        return JsonResponse({"logs": logs_data, "total": total}, safe=False)
     except Exception as e:
         return JsonResponse({'error': str(e), 'logs': [], 'total': 0}, status=500)
 

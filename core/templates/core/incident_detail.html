@@ -5,6 +5,7 @@
 
 {% block content %}
 <div class="app-container">
+    <span id="incidentIdMeta" data-incident-id="{{ incident.id }}" style="display:none" aria-hidden="true"></span>
     <nav class="sidebar">
         <a href="{% url 'dashboard' %}" class="sidebar-header" style="text-decoration: none; color: inherit; display: flex; align-items: center; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
             <i class="fa-solid fa-shield-halved logo-icon"></i>
@@ -346,8 +347,10 @@
                                                             ">
                                                                 {% if user_table %}
                                                                     {{ user_table.agency_name|first|upper }}
-                                                                {% else %}
+                                                                {% elif liaison %}
                                                                     {{ liaison.user.get_full_name|first|default:liaison.user.username|first|upper }}
+                                                                {% else %}
+                                                                    ?
                                                                 {% endif %}
                                                             </div>
                                                             <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">
@@ -357,13 +360,13 @@
                                                     </td>
                                                     <td style="padding: 1.25rem 1.5rem;">
                                                         <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">
-                                                            {% if user_table %}{{ user_table.primary_liaison_name }}{% else %}{{ liaison.user.get_full_name|default:liaison.user.username }}{% endif %}
+                                                            {% if user_table %}{{ user_table.name }}{% elif liaison %}{{ liaison.user.get_full_name|default:liaison.user.username }}{% else %}—{% endif %}
                                                         </div>
                                                     </td>
                                                     <td style="padding: 1.25rem 1.5rem; color: #6c757d; font-size: 0.9rem;">
                                                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                                                             <i class="fa-solid fa-envelope" style="color: #adb5bd; font-size: 0.85rem;"></i>
-                                                            <span>{% if user_table %}{{ user_table.liaison_email }}{% else %}{{ liaison.user.email|default:"Not available" }}{% endif %}</span>
+                                                            <span>{% if user_table %}{{ user_table.email_id }}{% elif liaison %}{{ liaison.user.email|default:"Not available" }}{% else %}—{% endif %}</span>
                                                         </div>
                                                     </td>
                                                     <td style="padding: 1.25rem 1.5rem; color: #6c757d; font-size: 0.9rem;">
@@ -917,17 +920,6 @@
         firstIcon.style.transform = 'rotate(180deg)';
     });
 
-    // Hidden meta element for incident id
-    document.addEventListener('DOMContentLoaded', function() {
-        if (!document.getElementById('incidentIdMeta')) {
-            const span = document.createElement('span');
-            span.id = 'incidentIdMeta';
-            span.setAttribute('data-incident-id', '{{ incident.id }}');
-            span.style.display = 'none';
-            document.body.appendChild(span);
-        }
-    });
-
     function getIncidentId() {
         const el = document.getElementById('incidentIdMeta');
         const raw = el ? el.getAttribute('data-incident-id') : null;
@@ -936,8 +928,6 @@
     }
 
     // User Assignment Functions
-    const incidentId = getIncidentId();
-
     function toggleUserSelection() {
         const container = document.getElementById('usersTableContainer');
         const btn = document.getElementById('assignUsersBtn');
@@ -1011,6 +1001,12 @@
     }
 
     function saveSelectedUsers() {
+        const incidentId = getIncidentId();
+        if (incidentId == null) {
+            alert('Incident ID is missing. Please refresh the page.');
+            return;
+        }
+
         const checkboxes = document.querySelectorAll('.user-checkbox:checked');
         const userIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
         
@@ -1029,17 +1025,29 @@
                 'X-CSRFToken': '{{ csrf_token }}',
                 'Content-Type': 'application/json',
             },
+            credentials: 'same-origin',
             body: JSON.stringify({
                 user_ids: userIds
             }),
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(async (response) => {
+            const ct = response.headers.get('content-type') || '';
+            let data = {};
+            if (ct.includes('application/json')) {
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    /* non-JSON body */
+                }
+            }
+            if (!response.ok) {
+                alert('Error: ' + (data.error || ('HTTP ' + response.status + ' ' + response.statusText)));
+                return;
+            }
             if (data.error) {
                 alert('Error: ' + data.error);
                 return;
             }
-
             if (data.success) {
                 location.reload();
             }
@@ -1173,29 +1181,49 @@
     function assignUser(externalUserId, userName, userEmail) {
         const errorDiv = document.getElementById('assignUserError');
         errorDiv.style.display = 'none';
+
+        const incidentId = getIncidentId();
+        if (incidentId == null) {
+            errorDiv.textContent = 'Incident ID is missing. Please refresh the page.';
+            errorDiv.style.display = 'block';
+            return;
+        }
         
         if (!confirm(`Assign ${userName} (${userEmail}) to this incident?`)) {
             return;
         }
 
-        fetch(`/api/incidents/${incidentId}/assign-user/`, {
+        fetch(`/api/incidents/${incidentId}/assign-users/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': '{{ csrf_token }}',
                 'Content-Type': 'application/json',
             },
+            credentials: 'same-origin',
             body: JSON.stringify({
-                external_user_id: externalUserId
+                user_ids: [externalUserId]
             }),
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(async (response) => {
+            const ct = response.headers.get('content-type') || '';
+            let data = {};
+            if (ct.includes('application/json')) {
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    /* ignore */
+                }
+            }
+            if (!response.ok) {
+                errorDiv.textContent = data.error || ('HTTP ' + response.status + ' ' + response.statusText);
+                errorDiv.style.display = 'block';
+                return;
+            }
             if (data.error) {
                 errorDiv.textContent = data.error;
                 errorDiv.style.display = 'block';
                 return;
             }
-
             if (data.success) {
                 closeAssignUserModal();
                 location.reload();
