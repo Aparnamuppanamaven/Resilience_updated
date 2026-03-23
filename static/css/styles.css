@@ -1588,7 +1588,7 @@ body {
 
 .freq-label {
     display: block;
-    font-size: 0.65rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
     color: var(--text-secondary);
     margin-bottom: 0.25rem;
