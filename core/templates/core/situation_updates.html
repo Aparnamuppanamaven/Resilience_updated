@@ -345,8 +345,8 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="update_time">Update Time</label>
-                            <input type="text" id="update_time" name="update_time" class="form-control"
-                                   placeholder="DD-MM-YYYY HH:MM">
+                            <input type="datetime-local" id="update_time" name="update_time" class="form-control"
+                                   step="60" title="Select date and time">
                         </div>
                     </div>
 
@@ -429,17 +429,16 @@
         document.getElementById('modal_incident_id').value = incidentId || '';
         document.getElementById('addSituationUpdateModal').style.display = 'flex';
 
-        // Auto-fill update_time in UI-friendly format:
-        // Backend expects: DD-MM-YYYY HH:MM
+        // Auto-fill update_time for datetime-local (YYYY-MM-DDTHH:mm)
         try {
             var dt = new Date();
             function pad2(n) { return String(n).padStart(2, '0'); }
-            var dd = pad2(dt.getDate());
-            var mm = pad2(dt.getMonth() + 1);
             var yyyy = dt.getFullYear();
+            var mm = pad2(dt.getMonth() + 1);
+            var dd = pad2(dt.getDate());
             var hh = pad2(dt.getHours());
             var min = pad2(dt.getMinutes());
-            var formatted = dd + '-' + mm + '-' + yyyy + ' ' + hh + ':' + min;
+            var formatted = yyyy + '-' + mm + '-' + dd + 'T' + hh + ':' + min;
 
             var updateTimeEl = document.getElementById('update_time');
             if (updateTimeEl) updateTimeEl.value = formatted;

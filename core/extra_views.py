@@ -118,9 +118,10 @@ def situation_updates_page(request):
         parsed_update_time = None
         if raw_update_time:
             try:
+                # HTML5 datetime-local: "YYYY-MM-DDTHH:mm" (or with seconds)
                 parsed_update_time = datetime.fromisoformat(raw_update_time)
             except ValueError:
-                # Accept the UI format: DD-MM-YYYY HH:MM
+                # Legacy UI format: DD-MM-YYYY HH:MM
                 try:
                     parsed_update_time = datetime.strptime(raw_update_time, "%d-%m-%Y %H:%M")
                     parsed_update_time = timezone.make_aware(
@@ -128,6 +129,10 @@ def situation_updates_page(request):
                     )
                 except ValueError:
                     parsed_update_time = timezone.now()
+            if parsed_update_time is not None and timezone.is_naive(parsed_update_time):
+                parsed_update_time = timezone.make_aware(
+                    parsed_update_time, timezone.get_current_timezone()
+                )
         else:
             parsed_update_time = timezone.now()
 
