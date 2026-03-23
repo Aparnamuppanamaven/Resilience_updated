@@ -467,14 +467,38 @@ def checkout(request):
                         tenant_id=tenant_id,
                     )
 
-                    # Mirror into core_users.mobile_no if a matching record exists (optional legacy UI support)
-                    if mobile_number:
-                        try:
+                    # Mirror checkout user into core_users so Admin/User Management
+                    # (which reads UsersTable) shows department/sub_department correctly.
+                    try:
+                        users_defaults = {
+                            'name': liaison_name or None,
+                            'mobile_no': mobile_number or None,
+                            'email_id': liaison_email or None,
+                            'department': dept or None,
+                            'sub_department': sub_dept or None,
+                            'agency_name': agency or '',
+                            'primary_liaison_name': liaison_name or '',
+                            'liaison_email': liaison_email or '',
+                            'key_incident_types': incidents or None,
+                            'preferred_communication_channels': channels or None,
+                            'created_at': timezone.now(),
+                        }
+                        existing_user_row = (
                             UsersTable.objects.filter(
                                 Q(liaison_email__iexact=liaison_email) | Q(email_id__iexact=liaison_email)
-                            ).update(mobile_no=mobile_number)
-                        except Exception:
-                            pass
+                            )
+                            .order_by('-id')
+                            .first()
+                        )
+                        if existing_user_row:
+                            for field_name, field_value in users_defaults.items():
+                                setattr(existing_user_row, field_name, field_value)
+                            existing_user_row.save()
+                        else:
+                            UsersTable.objects.create(**users_defaults)
+                    except Exception:
+                        # Legacy mirror should never break checkout completion.
+                        pass
 
                     # 7️⃣ Legacy login support
                     legacy_username = liaison_email.strip()

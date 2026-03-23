@@ -146,7 +146,9 @@
                                         {{ incident.title }}
                                     </a>
                                 </td>
-                                <td style="padding: 0.9rem 1rem;">—</td>
+                                <td style="padding: 0.9rem 1rem;">
+                                    {{ incident.location|default:"—" }}
+                                </td>
                                 <td style="padding: 0.9rem 1rem;">
                                     {{ incident.get_severity_display|default:incident.severity }}
                                 </td>
