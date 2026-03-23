@@ -1066,7 +1066,11 @@ def profile_edit(request):
         if request.method == 'POST':
             form = LegacyProfileEditForm(request.POST, request.FILES)
             if form.is_valid():
-                user_cred.username = form.cleaned_data['username'].strip()
+                normalized_email = (form.cleaned_data.get('email') or '').strip().lower()
+                first_name = (form.cleaned_data.get('first_name') or '').strip()
+                last_name = (form.cleaned_data.get('last_name') or '').strip()
+                full_name = " ".join([x for x in [first_name, last_name] if x]).strip()
+                user_cred.username = normalized_email
                 try:
                     user_cred.save()
                     request.session['user_credentials_username'] = user_cred.username
@@ -1078,10 +1082,21 @@ def profile_edit(request):
                 try:
                     profile = getattr(user_cred, 'profile', None)
                     if profile:
-                        profile.email = form.cleaned_data.get('email', '').strip() or user_cred.username
-                        profile.full_name = form.cleaned_data.get('username', '').strip() or profile.full_name
+                        profile.email = normalized_email or user_cred.username
+                        if full_name:
+                            profile.full_name = full_name
                         profile.mobile = (form.cleaned_data.get('mobile_number') or '').strip() or profile.mobile
                         profile.save()
+                except Exception:
+                    pass
+                try:
+                    UsersTable.objects.filter(
+                        Q(liaison_email__iexact=user_cred.username) |
+                        Q(email_id__iexact=user_cred.username)
+                    ).update(
+                        primary_liaison_name=(full_name or None),
+                        name=(full_name or None),
+                    )
                 except Exception:
                     pass
                 # Keep mobile number in sync for legacy users (tenant-scoped)
@@ -1182,9 +1197,22 @@ def profile_edit(request):
                         org_name = u.agency_name
                 except Exception:
                     pass
+            initial_email = (user_cred.username or '').strip().lower()
+            if '@' not in initial_email:
+                if profile and getattr(profile, "email", ""):
+                    initial_email = (profile.email or "").strip().lower()
+            first_name = ''
+            last_name = ''
+            full_name = (getattr(profile, 'full_name', '') or '').strip() if profile else ''
+            if full_name:
+                parts = full_name.split()
+                first_name = parts[0]
+                last_name = ' '.join(parts[1:]) if len(parts) > 1 else ''
             initial = {
-                'username': user_cred.username,
-                'email': user_cred.username,
+                'username': initial_email or (user_cred.username or '').strip(),
+                'first_name': first_name,
+                'last_name': last_name,
+                'email': initial_email,
                 'organization_name': org_name,
                 'mobile_number': (profile.mobile if profile else '') or (getattr(TenantDomain.objects.filter(tenant_id=user_cred.tenant_id).first(), 'mobile', '') if user_cred.tenant_id else ''),
             }
@@ -1195,7 +1223,7 @@ def profile_edit(request):
             username = user_cred.username
             email = user_cred.username
             def get_full_name(self):
-                return self.username
+                return ((getattr(profile, 'full_name', '') if 'profile' in locals() and profile else '') or self.username)
             liaison_profile = None
             is_authenticated = True
         request.user = _MockUser()
@@ -1229,8 +1257,13 @@ def profile_edit(request):
     if request.method == 'POST':
         form = ProfileEditForm(request.POST, request.FILES)
         if form.is_valid():
-            request.user.username = form.cleaned_data['username'].strip()
-            request.user.email = form.cleaned_data['email'].strip()
+            normalized_email = (form.cleaned_data.get('email') or '').strip().lower()
+            first_name = (form.cleaned_data.get('first_name') or '').strip()
+            last_name = (form.cleaned_data.get('last_name') or '').strip()
+            request.user.username = normalized_email
+            request.user.email = normalized_email
+            request.user.first_name = first_name
+            request.user.last_name = last_name
             request.user.save()
             liaison.phone = (form.cleaned_data.get('mobile_number') or '').strip() or ''
             organization.name = (form.cleaned_data.get('organization_name') or '').strip() or organization.name
@@ -1269,8 +1302,10 @@ def profile_edit(request):
             return redirect('dashboard')
     else:
         form = ProfileEditForm(initial={
-            'username': request.user.username or '',
-            'email': request.user.email or '',
+            'username': request.user.email or request.user.username or '',
+            'first_name': request.user.first_name or '',
+            'last_name': request.user.last_name or '',
+            'email': request.user.email or request.user.username or '',
             'organization_name': organization.name or '',
             'mobile_number': liaison.phone or '',
         })

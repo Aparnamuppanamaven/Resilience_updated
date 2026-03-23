@@ -960,6 +960,24 @@ class ProfileEditForm(forms.Form):
             'placeholder': 'Username',
         })
     )
+    first_name = forms.CharField(
+        max_length=150,
+        required=False,
+        label="First name",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'First name',
+        })
+    )
+    last_name = forms.CharField(
+        max_length=150,
+        required=False,
+        label="Last name",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Last name',
+        })
+    )
     email = forms.EmailField(
         label="Email",
         widget=forms.EmailInput(attrs={
@@ -984,6 +1002,12 @@ class ProfileEditForm(forms.Form):
             'placeholder': 'Mobile number',
         })
     )
+
+    def clean_username(self):
+        username = (self.cleaned_data.get("username") or "").strip()
+        if " " in username:
+            raise forms.ValidationError("Username must not contain spaces.")
+        return username
 
 
 class LegacyProfileEditForm(forms.Form):
@@ -1004,6 +1028,24 @@ class LegacyProfileEditForm(forms.Form):
             'placeholder': 'Username / email',
         })
     )
+    first_name = forms.CharField(
+        max_length=150,
+        required=False,
+        label="First name",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'First name',
+        })
+    )
+    last_name = forms.CharField(
+        max_length=150,
+        required=False,
+        label="Last name",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Last name',
+        })
+    )
     email = forms.EmailField(
         label="Email",
         widget=forms.EmailInput(attrs={
@@ -1029,6 +1071,12 @@ class LegacyProfileEditForm(forms.Form):
             'placeholder': 'Mobile number',
         })
     )
+
+    def clean_username(self):
+        username = (self.cleaned_data.get("username") or "").strip()
+        if " " in username:
+            raise forms.ValidationError("Username must not contain spaces.")
+        return username
 
 
 class UserCreateForm(forms.ModelForm):
