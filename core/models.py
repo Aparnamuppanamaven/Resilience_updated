@@ -709,6 +709,31 @@ class UsersTable(models.Model):
         return f"{self.primary_liaison_name} ({self.agency_name})"
 
 
+class AssignedUsers(models.Model):
+    """
+    Manual table `assigned_users`: stores incident ↔ core_users assignments.
+
+    Expected FK columns (see your ALTER): incident_id → core_incidents(id), core_user_id → core_users(id).
+    """
+
+    id = models.AutoField(primary_key=True)
+    incident_id = models.BigIntegerField(db_column="incident_id")
+    core_user_id = models.IntegerField(null=True, blank=True, db_column="core_user_id")
+    agency_name = models.CharField(max_length=255, blank=True, null=True)
+    primary_liaison = models.CharField(max_length=100, blank=True, null=True)
+    email = models.CharField(max_length=255, blank=True, null=True)
+    incident_types = models.CharField(max_length=255, blank=True, null=True)
+    communication_channels = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = "assigned_users"
+        managed = False
+
+    def __str__(self):
+        return f"assigned_users #{self.pk} incident={self.incident_id}"
+
+
 class UserProfile(models.Model):
     """Extended user profile with additional fields"""
     ROLE_CHOICES = [

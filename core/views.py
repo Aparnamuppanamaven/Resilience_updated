@@ -65,52 +65,52 @@ from .models import (
     IncidentShiftSchedule,
     State,
     Counties,
+    AssignedUsers,
 )
 from .extra_views import _ensure_incident_for_capture
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, CreateIncidentForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm, ProfileEditForm, LegacyProfileEditForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
 from .payment_utils import generate_invoice_id, calculate_due_date, ensure_unique_invoice_id
+from .email_utils import send_checkout_confirmation_email, send_new_user_notification_email
 
-# Session-backed incident ↔ core_users assignments (no core_incident_user_mapping / no new DB tables)
-SESSION_INCIDENT_CORE_USER_IDS = "incident_core_user_assigns"
+import logging
 
-
-def _get_session_incident_core_user_ids(request, incident_id):
-    store = request.session.get(SESSION_INCIDENT_CORE_USER_IDS) or {}
-    raw = store.get(str(incident_id), [])
-    out = []
-    for x in raw:
-        try:
-            out.append(int(x))
-        except (TypeError, ValueError):
-            pass
-    return out
+logger = logging.getLogger(__name__)
 
 
-def _merge_session_incident_core_user_ids(request, incident_id, new_ids):
-    store = dict(request.session.get(SESSION_INCIDENT_CORE_USER_IDS) or {})
-    key = str(incident_id)
-    cur = []
-    seen = set()
-    for x in store.get(key, []):
-        try:
-            i = int(x)
-        except (TypeError, ValueError):
+def _assigned_core_user_ids_for_incident(incident_id):
+    """core_users.id values persisted in assigned_users for this incident."""
+    try:
+        return [
+            int(x)
+            for x in AssignedUsers.objects.filter(incident_id=incident_id)
+            .exclude(core_user_id__isnull=True)
+            .values_list("core_user_id", flat=True)
+        ]
+    except Exception as exc:
+        logger.warning("assigned_users query failed: %s", exc)
+        return []
+
+
+def _persist_assigned_users_for_incident(incident, valid_core_user_ids):
+    """Insert rows into assigned_users (skip duplicates for same incident + core_users)."""
+    now = timezone.now()
+    for uid in valid_core_user_ids:
+        ut = UsersTable.objects.filter(pk=uid).first()
+        if not ut:
             continue
-        if i not in seen:
-            seen.add(i)
-            cur.append(i)
-    for nid in new_ids:
-        try:
-            i = int(nid)
-        except (TypeError, ValueError):
+        if AssignedUsers.objects.filter(incident_id=incident.id, core_user_id=uid).exists():
             continue
-        if i not in seen:
-            seen.add(i)
-            cur.append(i)
-    store[key] = cur
-    request.session[SESSION_INCIDENT_CORE_USER_IDS] = store
-    request.session.modified = True
+        AssignedUsers.objects.create(
+            incident_id=incident.id,
+            core_user_id=uid,
+            agency_name=ut.agency_name or "",
+            primary_liaison=(ut.name or "")[:100],
+            email=(ut.email_id or "")[:255],
+            incident_types=(ut.key_incident_types or "")[:255],
+            communication_channels=(ut.preferred_communication_channels or "")[:255],
+            created_at=now,
+        )
 
 
 def _assignable_core_users_qs(request, organization):
@@ -145,7 +145,6 @@ def _assignable_core_users_qs(request, organization):
     if dept:
         return base.filter(department__iexact=dept)
     return base
-from .email_utils import send_checkout_confirmation_email, send_new_user_notification_email
 
 
 def detect_existing_user(email):
@@ -3318,7 +3317,7 @@ def incident_copy_view(request):
 
     if incident:
         try:
-            for uid in _get_session_incident_core_user_ids(request, incident.id):
+            for uid in _assigned_core_user_ids_for_incident(incident.id):
                 user_table = UsersTable.objects.filter(pk=uid).first()
                 if not user_table:
                     continue
@@ -3381,7 +3380,7 @@ def incident_copy_view(request):
     if organization:
         all_users = _assignable_core_users_qs(request, organization).order_by('-created_at')
         if incident:
-            ex = _get_session_incident_core_user_ids(request, incident.id)
+            ex = _assigned_core_user_ids_for_incident(incident.id)
             if ex:
                 all_users = all_users.exclude(id__in=ex)
     else:
@@ -3478,7 +3477,7 @@ def incident_detail(request, incident_id):
         sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
     
     all_users = _assignable_core_users_qs(request, organization).order_by('-created_at')
-    assigned_ids = _get_session_incident_core_user_ids(request, incident.id)
+    assigned_ids = _assigned_core_user_ids_for_incident(incident.id)
     if assigned_ids:
         all_users = all_users.exclude(id__in=assigned_ids)
 
@@ -3619,7 +3618,7 @@ def search_users_for_assignment(request):
 
     if incident_id:
         try:
-            ex = _get_session_incident_core_user_ids(request, int(incident_id))
+            ex = _assigned_core_user_ids_for_incident(int(incident_id))
             if ex:
                 users = users.exclude(id__in=ex)
         except (TypeError, ValueError):
@@ -3639,7 +3638,7 @@ def search_users_for_assignment(request):
 
 @csrf_exempt
 def assign_users_to_incident(request, incident_id):
-    """Assign core_users rows to an incident (session-backed; same-dept filter via core_liaison)."""
+    """Assign core_users rows to an incident; persisted in assigned_users + same-dept filter via core_liaison."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
@@ -3712,7 +3711,15 @@ def assign_users_to_incident(request, incident_id):
                 status=400,
             )
 
-        _merge_session_incident_core_user_ids(request, incident.id, valid_ids)
+        try:
+            with transaction.atomic():
+                _persist_assigned_users_for_incident(incident, valid_ids)
+        except Exception as exc:
+            logger.exception("assigned_users insert failed")
+            return JsonResponse(
+                {'error': f'Could not save assignments: {exc}'},
+                status=500,
+            )
 
         id_to_row = {
             ut.id: ut for ut in UsersTable.objects.filter(id__in=valid_ids)
@@ -3939,7 +3946,7 @@ def incident_log_history_pdf(request, incident_id):
         
         assigned_users_data = []
         try:
-            for uid in _get_session_incident_core_user_ids(request, incident.id):
+            for uid in _assigned_core_user_ids_for_incident(incident.id):
                 user_table = UsersTable.objects.filter(pk=uid).first()
                 if not user_table:
                     continue
