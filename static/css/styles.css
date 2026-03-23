@@ -1598,7 +1598,10 @@ body {
 .freq-value {
     font-weight: 600;
     color: #0f172a;
-    font-size: 1rem;
+    font-size: 0.8rem;
+}
+.alert-points {
+    margin: 0 0 0 35px;
 }
 
 .alert-desc {
