@@ -105,10 +105,8 @@ def _persist_assigned_users_for_incident(incident, valid_core_user_ids):
             incident_id=incident.id,
             core_user_id=uid,
             agency_name=ut.agency_name or "",
-            primary_liaison=(ut.name or "")[:100],
-            email=(ut.email_id or "")[:255],
-            incident_types=(ut.key_incident_types or "")[:255],
-            communication_channels=(ut.preferred_communication_channels or "")[:255],
+            user_name=(ut.name or ut.primary_liaison_name or "")[:255],
+            user_email=(ut.email_id or ut.liaison_email or "")[:255],
             created_at=now,
         )
 

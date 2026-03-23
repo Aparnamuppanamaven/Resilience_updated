@@ -719,12 +719,11 @@ class AssignedUsers(models.Model):
     id = models.AutoField(primary_key=True)
     incident_id = models.BigIntegerField(db_column="incident_id")
     core_user_id = models.IntegerField(null=True, blank=True, db_column="core_user_id")
-    agency_name = models.CharField(max_length=255, blank=True, null=True)
-    primary_liaison = models.CharField(max_length=100, blank=True, null=True)
-    email = models.CharField(max_length=255, blank=True, null=True)
-    incident_types = models.CharField(max_length=255, blank=True, null=True)
-    communication_channels = models.CharField(max_length=255, blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
+    agency_name = models.CharField(max_length=255, blank=True, null=True, db_column="agency_name")
+    # Fields aligned to assigned_users table columns.
+    user_name = models.CharField(max_length=255, blank=True, null=True, db_column="user_name")
+    user_email = models.CharField(max_length=255, blank=True, null=True, db_column="user_email")
+    created_at = models.DateTimeField(blank=True, null=True, db_column="created_at")
 
     class Meta:
         db_table = "assigned_users"
