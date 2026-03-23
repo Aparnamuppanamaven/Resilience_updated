@@ -56,4 +56,9 @@ coverage.xml
 
 *.sql
 
+# Uploaded user images
+media/
+media/user_images/user_aria_20260302074613.jpg
+media/user_images/legacy_7.*
+
 

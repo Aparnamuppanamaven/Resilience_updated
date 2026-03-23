@@ -1,0 +1,7 @@
+Collecting APScheduler
+  Downloading apscheduler-3.11.2-py3-none-any.whl.metadata (6.4 kB)
+Requirement already satisfied: tzlocal>=3.0 in c:\users\mavenuser\appdata\local\programs\python\python311\lib\site-packages (from APScheduler) (5.3.1)
+Requirement already satisfied: tzdata in c:\users\mavenuser\appdata\local\programs\python\python311\lib\site-packages (from tzlocal>=3.0->APScheduler) (2025.2)
+Downloading apscheduler-3.11.2-py3-none-any.whl (64 kB)
+Installing collected packages: APScheduler
+Successfully installed APScheduler-3.11.2
