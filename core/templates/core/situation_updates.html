@@ -183,9 +183,8 @@
                         <table class="incidents-table" style="table-layout: fixed; width: 100%; min-width: 1680px; border-collapse: separate; border-spacing: 0;">
                             <thead>
                                 <tr style="background: #f9fafb;">
-                                    <th style="width: 50px; padding: 0.6rem 1rem; text-align: center;">#</th>
+                                    <th style="width: 80px; padding: 0.6rem 1rem; text-align: center; white-space: nowrap;">#SNO</th>
                                     <th style="width: 140px; padding: 0.6rem 1rem; white-space: nowrap;">Timestamp</th>
-                                    <th style="width: 120px; padding: 0.6rem 1rem;">Department</th>
                                     <th style="width: 250px; padding: 0.6rem 1rem;">What Happened</th>
                                     <th style="width: 250px; padding: 0.6rem 1rem;">Actions Taken / Resources</th>
                                     <th style="width: 250px; padding: 0.6rem 1rem;">Next Steps Recommended</th>
@@ -198,12 +197,9 @@
                                 {% if situation_updates %}
                                     {% for update in situation_updates %}
                                         <tr>
-                                            <td style="width: 50px; padding: 0.75rem 1rem; text-align: center; vertical-align: top;">{{ forloop.counter }}</td>
+                                            <td style="width: 80px; padding: 0.75rem 1rem; text-align: center; vertical-align: top; white-space: nowrap;">{{ forloop.counter }}</td>
                                             <td style="width: 140px; padding: 0.75rem 1rem; white-space: nowrap; vertical-align: top;">
                                                 {{ update.update_time|date:"d/m/Y H:i" }}
-                                            </td>
-                                            <td style="width: 120px; padding: 0.75rem 1rem; vertical-align: top;">
-                                                {{ update.department|default:"—" }}
                                             </td>
                                             <td style="width: 250px; padding: 0.75rem 1rem; word-wrap: break-word; white-space: normal; vertical-align: top;">
                                                 {# What Happened: show ONLY the main narrative text #}

@@ -113,6 +113,16 @@ def _persist_assigned_users_for_incident(incident, valid_core_user_ids):
         )
 
 
+def _remove_assigned_user_for_incident(incident_id, core_user_id):
+    """Delete assignment row(s) for one incident + core_users id pair."""
+    qs = AssignedUsers.objects.filter(
+        incident_id=incident_id,
+        core_user_id=core_user_id,
+    )
+    deleted_count, _ = qs.delete()
+    return deleted_count
+
+
 def _assignable_core_users_qs(request, organization):
     """
     core_users rows linked to the org (via liaison emails) and filtered to the
@@ -3769,6 +3779,59 @@ def assign_users_to_incident(request, incident_id):
         
     except IncidentCapture.DoesNotExist:
         return JsonResponse({'error': 'Incident not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def remove_user_from_incident(request, incident_id):
+    """Unassign one core_users row from an incident."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    try:
+        organization = None
+        if request.user.is_authenticated:
+            try:
+                liaison = request.user.liaison_profile
+                organization = liaison.organization
+            except (Liaison.DoesNotExist, AttributeError):
+                return JsonResponse({'error': 'Organization not found'}, status=400)
+        elif 'user_credentials_id' in request.session:
+            organization = Organization.objects.first()
+
+        if 'user_credentials_id' in request.session:
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id)
+                organization = incident.organization
+            except IncidentCapture.DoesNotExist:
+                return JsonResponse({'error': 'Incident not found'}, status=404)
+        else:
+            if not organization:
+                return JsonResponse({'error': 'Organization not found'}, status=400)
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+            except IncidentCapture.DoesNotExist:
+                return JsonResponse({'error': 'Incident not found'}, status=404)
+
+        data = json.loads(request.body or "{}")
+        raw_user_id = data.get('user_id')
+        try:
+            user_id = int(raw_user_id)
+        except (TypeError, ValueError):
+            return JsonResponse({'error': 'Valid user_id is required'}, status=400)
+
+        deleted_count = _remove_assigned_user_for_incident(incident.id, user_id)
+        if deleted_count == 0:
+            return JsonResponse({'error': 'Assignment not found for this incident'}, status=404)
+
+        return JsonResponse({
+            'success': True,
+            'message': 'User removed successfully',
+        })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
