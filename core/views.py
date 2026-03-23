@@ -147,6 +147,26 @@ def _assignable_core_users_qs(request, organization):
     return base
 
 
+def _get_actionby_user_id(request, liaison=None):
+    """
+    Resolve current actor id for audit logs across both auth pathways.
+    Priority: Liaison user id -> Django auth user id -> legacy session id.
+    """
+    if liaison is not None:
+        liaison_user_id = getattr(getattr(liaison, "user", None), "id", None)
+        if liaison_user_id is not None:
+            return liaison_user_id
+
+    request_user_id = getattr(request.user, "id", None)
+    if request_user_id is not None:
+        return request_user_id
+
+    legacy_user_id = request.session.get("user_credentials_id")
+    if legacy_user_id:
+        return legacy_user_id
+    return None
+
+
 def detect_existing_user(email):
     """
     Check if email exists in database (User, Liaison, or ExternalUser tables).
@@ -3062,7 +3082,7 @@ def incidents_list(request):
                     log_system_action(
                         tenant_id=getattr(organization, "tenant_id", None) if organization else None,
                         entity="Incident",
-                        actionby=getattr(request.user, "id", None),
+                        actionby=_get_actionby_user_id(request, liaison),
                         actionon=f"{capture_obj.id}:{capture_obj.title}",
                         action="Update",
                     )
