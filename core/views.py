@@ -2273,6 +2273,11 @@ def admin_module(request):
 
 def logout_view(request):
     """Logout: clear auth and session, redirect to index (default state). No message displayed."""
+    # Undisplayed flash messages live in the message storage object, not only in the session row.
+    # After session.flush(), MessageMiddleware can re-save them into the new session unless we
+    # consume them here (otherwise the next /login/ can show e.g. "Welcome back, user@…!").
+    list(messages.get_messages(request))
+
     # Clear all session data including flags that might cause redirect loops
     request.session.pop('user_credentials_id', None)
     request.session.pop('user_credentials_username', None)
@@ -2962,6 +2967,9 @@ def incidents_list(request):
                     messages.success(request, "Shift cadence updated.")
                 except Exception as e:
                     messages.error(request, f"Could not update shift cadence: {e}")
+            _next = (request.POST.get("next") or "").strip()
+            if _next == "dashboard":
+                return redirect("dashboard")
             return redirect("incidents_list")
 
         # Full incident edit from the incidents list modal
