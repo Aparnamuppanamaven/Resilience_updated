@@ -263,111 +263,11 @@
                         </div>
                     {% endif %}
 
-                <div class="card-body" style="padding: 0;">
-                    <div class="table-responsive" style="max-height: 340px; overflow-y: auto; overflow-x: auto;">
-                        <table class="incidents-table shift-packet-history-table">
-                            <thead>
-                                <tr style="background: #f9fafb;">
-                                    <th style="padding: 0.6rem 1rem;">Created At</th>
-                                    <th style="padding: 0.6rem 1rem;">Input Summary</th>
-                                    <th style="padding: 0.6rem 1rem;">What Changed</th>
-                                    <th style="padding: 0.6rem 1rem;">Why It Matters</th>
-                                    <th style="padding: 0.6rem 1rem;">Decision</th>
-                                    <th style="padding: 0.6rem 1rem;">Decision Maker</th>
-                                    <th style="padding: 0.6rem 1rem;">Type</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% if history_entries %}
-                                    {% for entry in history_entries %}
-                                        <tr>
-                                            <td style="padding: 0.75rem 1rem;">{{ entry.created_at|date:"m/d/Y H:i" }}</td>
-                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.input_summary }}</td>
-                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.what_changed }}</td>
-                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.why_it_matters }}</td>
-                                            <td style="padding: 0.75rem 1rem; max-width: 320px; white-space: normal;">{{ entry.decision_summary }}</td>
-                                            <td style="padding: 0.75rem 1rem;">{{ entry.decision_maker|default:"—" }}</td>
-                                            <td style="padding: 0.75rem 1rem;">
-                                                {% with tx_type_norm=entry.tx_type|default:""|cut:" "|upper %}
-                                                    <span class="status-badge {% if tx_type_norm == 'AI' %}status-normal{% else %}status-watch{% endif %}">
-                                                        {% if tx_type_norm == 'AI' %}
-                                                            <span style="font-size: 0.75rem; font-weight: 700; letter-spacing: 0.2px;">AI</span>
-                                                        {% else %}
-                                                            <img
-                                                                src="/media/user_images/human_logo.jpg"
-                                                                alt="Manual"
-                                                                title="Manual"
-                                                                style="width: 14px; height: 14px; object-fit: contain; display: inline-block;"
-                                                            >
-                                                        {% endif %}
-                                                    </span>
-                                                {% endwith %}
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                {% else %}
-                                    <tr>
-                                        <td colspan="7" style="padding: 0.75rem 1rem; text-align: center; color: #6b7280;">
-                                            {% if selected_incident %}
-                                                No shift packet history found for this incident yet.
-                                            {% else %}
-                                                Select an incident to view shift packet history.
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
-
                 </div>
             </div>
         </div>
     </main>
 </div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-/* Shift Packet History table: better wrapping, spacing, and responsiveness */
-.shift-packet-history-table.incidents-table {
-    table-layout: fixed;
-    width: 100%;
-    min-width: 1200px;
-    border-collapse: separate;
-    border-spacing: 0;
-}
-
-.shift-packet-history-table.incidents-table th,
-.shift-packet-history-table.incidents-table td {
-    padding: 0.65rem 0.9rem;
-    font-size: 0.875rem;
-    line-height: 1.35rem;
-    vertical-align: top;
-    white-space: normal;
-    word-break: break-word;
-}
-
-.shift-packet-history-table.incidents-table thead th {
-    background: #0b1f3b;
-    color: #e5edf7;
-    font-weight: 600;
-}
-
-.shift-packet-history-table.incidents-table tbody tr:nth-child(even) {
-    background: #f9fafb;
-}
-
-.shift-packet-history-table.incidents-table tbody tr:nth-child(odd) {
-    background: #ffffff;
-}
-
-@media (max-width: 1024px) {
-    .shift-packet-history-table.incidents-table {
-        min-width: 1000px;
-    }
-}
-</style>
 {% endblock %}
 
 {% block extra_js %}
