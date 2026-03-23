@@ -152,7 +152,7 @@ def _call_ai_provider(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         decision = {
             "summary": "No explicit decision identified from incoming data.",
-            "decision_maker": "Unknown",
+            "decision_maker": "",
             "decision_time": None,
         }
 
@@ -301,7 +301,12 @@ def generate_shift_packet_ai_summary(ctx: IncidentContext) -> Dict[str, Any]:
         "what_changed": raw.get("what_changed", "") or "",
         "why_it_matters": raw.get("why_it_matters", "") or "",
         "decision_summary": decision_block.get("summary", "") or "",
-        "decision_maker": decision_block.get("decision_maker", "") or "",
+        # Normalize 'Unknown' → empty so UI shows 'Not applicable'
+        "decision_maker": (
+            (decision_block.get("decision_maker", "") or "")
+            if (decision_block.get("decision_maker", "") or "").strip().lower() != "unknown"
+            else ""
+        ),
         "decision_time": decision_time_dt,
     }
 

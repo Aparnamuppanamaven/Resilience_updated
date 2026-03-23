@@ -48,6 +48,7 @@ urlpatterns = [
     path('reports/pdf/', extra_views.reports_pdf, name='reports_pdf'),
     path('api/reports/incident/', extra_views.api_reports_incident, name='api_reports_incident'),
     path('api/situation-logs/', extra_views.api_situation_logs, name='api_situation_logs'),
+    path('api/report-summary/', extra_views.api_report_summary, name='api_report_summary'),
     path('system-logs/', extra_views.system_logs_page, name='system_logs'),
     # User Management reuses the Admin Module UI and features
     path('user-management/', views.admin_module, name='user_management'),

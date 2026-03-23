@@ -23,6 +23,9 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 from reportlab.lib.enums import TA_LEFT
 
+from django.contrib.auth.models import User
+from django.db.models import Q
+
 from .models import (
     Incident,
     IncidentCapture,
@@ -31,6 +34,7 @@ from .models import (
     OperationalUpdate,
     ShiftPacket,
     ShiftPacketHistory,
+    ShiftPacketSchedulerLog,
     SystemSettings,
     Organization,
     TxLog,
@@ -504,7 +508,13 @@ def _build_report_context(request):
         report_summary_text = _reports_summary_text(preview_incident)
 
     try:
-        total_situation_logs = IncidentEvent.objects.count()
+        # "Situation logs" for Reports should exclude internal scheduler noise AND
+        # shift-packet generation system events.
+        total_situation_logs = (
+            IncidentEvent.objects.exclude(event_desc__icontains="[SCHEDULER]")
+            .exclude(event_desc__icontains="was auto-generated for this incident")
+            .count()
+        )
     except Exception:
         total_situation_logs = 0
 
@@ -745,11 +755,32 @@ def system_logs_page(request):
             }
         )
 
+    scheduler_logs = []
+    try:
+        for row in ShiftPacketSchedulerLog.objects.select_related("incident").order_by(
+            "-triggered_at"
+        )[:200]:
+            inc = row.incident
+            cap_label = f"INC-{inc.id}" if inc else "—"
+            scheduler_logs.append(
+                {
+                    "run_id": row.run_id,
+                    "incident_label": cap_label,
+                    "triggered_at": row.triggered_at,
+                    "next_scheduled": row.next_scheduled,
+                    "schedule_status": row.schedule_status,
+                    "message": (row.message or "")[:500],
+                }
+            )
+    except Exception:
+        scheduler_logs = []
+
     context = {
         "organization": organization,
         "current_status": current_status,
         "last_sync_display": last_sync_display,
         "logs": enriched_logs,
+        "scheduler_logs": scheduler_logs,
     }
     return render(request, "core/system_logs.html", context)
 
@@ -806,35 +837,113 @@ def api_situation_logs(request):
         return JsonResponse({'error': 'Unauthorized'}, status=401)
 
     try:
-        logs_qs = IncidentEvent.objects.all().order_by("-created_time")
+        # Reports "View Situation Logs" should show Situation Updates (core_situation_updates)
+        # for the selected capture incident.
         incident_id = request.GET.get("incident_id")
-        if incident_id:
-            try:
-                logs_qs = logs_qs.filter(incident_id=int(incident_id))
-            except (ValueError, TypeError):
-                pass
-        total = logs_qs.count()
-        logs = logs_qs[:100]
+        if not incident_id:
+            return JsonResponse(
+                {"logs": [], "total": 0, "error": "Please select an incident."},
+                status=400,
+            )
+
+        capture_incident = IncidentCapture.objects.filter(id=incident_id).first()
+        if capture_incident is None:
+            return JsonResponse(
+                {"logs": [], "total": 0, "error": "Selected incident not found."},
+                status=404,
+            )
+
+        from .models import SituationUpdate
+
+        qs = SituationUpdate.objects.filter(incident_id=capture_incident.id).order_by(
+            "-update_time"
+        )
+        total = qs.count()
+        updates = list(qs[:200])
 
         logs_data = []
-        for log in logs:
-            department = 'System'
-            if log.user_log:
-                try:
-                    liaison = log.user_log.liaison_profile
-                    department = liaison.organization.name if liaison.organization else 'Operations'
-                except Exception:
-                    department = 'System'
-            
-            logs_data.append({
-                'id': log.id,
-                'timestamp': log.created_time.strftime('%m/%d/%Y %H:%M') if log.created_time else 'N/A',
-                'department': department,
-                'description': log.event_desc or 'No description',
-                'status': 'ACTIVE',  # Default status
-            })
-        
+        for su in updates:
+            desc = su.description or su.title or "No description"
+            status = su.status_change or "LOGGED"
+            logs_data.append(
+                {
+                    "id": su.id,
+                    "timestamp": su.update_time.strftime("%m/%d/%Y %H:%M")
+                    if su.update_time
+                    else "N/A",
+                    "department": su.department or "—",
+                    "description": desc,
+                    "status": status.upper() if isinstance(status, str) else "LOGGED",
+                }
+            )
         return JsonResponse({"logs": logs_data, "total": total}, safe=False)
     except Exception as e:
         return JsonResponse({'error': str(e), 'logs': [], 'total': 0}, status=500)
 
+
+def api_report_summary(request):
+    """
+    API endpoint used by Reports → "Generate Summary Report".
+    Builds a concise incident-specific narrative from Situation Updates.
+    """
+    auth_redirect = _require_auth(request)
+    if auth_redirect:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    try:
+        incident_id = request.GET.get("incident_id")
+        if not incident_id:
+            return JsonResponse({"error": "Please select an incident."}, status=400)
+
+        incident = IncidentCapture.objects.filter(id=incident_id).first()
+        if incident is None:
+            return JsonResponse({"error": "Selected incident not found."}, status=404)
+
+        from .models import SituationUpdate
+
+        qs = SituationUpdate.objects.filter(incident_id=incident.id).order_by("-update_time")
+        total_updates = qs.count()
+        recent = list(qs[:8])
+
+        if not recent:
+            paragraphs = [
+                "No updates received for this incident during the selected period. Continue monitoring."
+            ]
+        else:
+            latest_time = recent[0].update_time.strftime("%b %d, %Y %H:%M") if recent[0].update_time else "N/A"
+            departments = sorted({(su.department or "").strip() for su in recent if (su.department or "").strip()})
+            dep_text = ", ".join(departments) if departments else "multiple teams"
+
+            paragraphs = [
+                f'Incident "{incident.title}" has {total_updates} recorded situation update(s). Latest update: {latest_time}.',
+                f"Recent updates involve {dep_text}. Review the entries below for operational changes and next steps.",
+            ]
+
+            # Add a compact digest of recent unique items (avoid dumping raw logs)
+            digest = []
+            seen = set()
+            for su in reversed(recent):  # chronological within the recent window
+                text = (su.description or su.title or "").strip()
+                if not text:
+                    continue
+                key = text.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                digest.append(text)
+                if len(digest) >= 5:
+                    break
+
+            if digest:
+                paragraphs.append("Key recent updates: " + " | ".join(digest) + ".")
+
+        return JsonResponse(
+            {
+                "incident_id": incident.id,
+                "incident_title": incident.title,
+                "total_updates": total_updates,
+                "paragraphs": paragraphs,
+            }
+        )
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

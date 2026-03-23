@@ -255,10 +255,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function loadReportForSelectedIncident(scrollIntoView) {
         const selectedOption = incidentSelect.options[incidentSelect.selectedIndex];
-        if (!selectedOption || !selectedOption.value) {
-            alert('Please select an incident first.');
-            return;
-        }
+        if (!selectedOption || !selectedOption.value) return;
 
         const incidentId = selectedOption.value;
         const summaryBox = document.getElementById('previewAISummary');

@@ -3364,6 +3364,7 @@ def incident_copy_view(request):
                     SELECT id, event_description, created_time, user_id
                     FROM core_incident_events
                     WHERE incident_id = %s
+                      AND (event_description IS NULL OR event_description NOT LIKE '[SCHEDULER]%%')
                     ORDER BY created_time DESC
                     """,
                     [incident.id]
@@ -3538,6 +3539,7 @@ def incident_detail(request, incident_id):
                 SELECT id, event_description, created_time, user_id
                 FROM core_incident_events
                 WHERE incident_id = %s
+                  AND (event_description IS NULL OR event_description NOT LIKE '[SCHEDULER]%%')
                 ORDER BY created_time DESC
                 """,
                 [incident.id]
@@ -3995,6 +3997,7 @@ def incident_log_history_pdf(request, incident_id):
                     SELECT id, event_description, created_time, user_id
                     FROM core_incident_events
                     WHERE incident_id = %s
+                      AND (event_description IS NULL OR event_description NOT LIKE '[SCHEDULER]%%')
                     ORDER BY created_time ASC
                     """,
                     [incident.id]
@@ -4968,6 +4971,7 @@ def incident_case_history_csv(request, incident_id):
                     SELECT id, event_description, created_time, user_id
                     FROM core_incident_events
                     WHERE incident_id = %s
+                      AND (event_description IS NULL OR event_description NOT LIKE '[SCHEDULER]%%')
                     ORDER BY created_time ASC
                     """,
                     [incident.id]

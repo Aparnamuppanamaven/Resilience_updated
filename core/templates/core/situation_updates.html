@@ -180,7 +180,7 @@
                 </div>
                 <div class="card-body" style="padding: 0;">
                     <div class="table-responsive" style="max-height: 60vh; overflow-y: auto; overflow-x: auto;">
-                        <table class="incidents-table" style="table-layout: fixed; width: 100%; min-width: 1800px; border-collapse: separate; border-spacing: 0;">
+                        <table class="incidents-table" style="table-layout: fixed; width: 100%; min-width: 1680px; border-collapse: separate; border-spacing: 0;">
                             <thead>
                                 <tr style="background: #f9fafb;">
                                     <th style="width: 50px; padding: 0.6rem 1rem; text-align: center;">#</th>
@@ -192,7 +192,6 @@
                                     <th style="width: 150px; padding: 0.6rem 1rem;">Reported By</th>
                                     <th style="width: 120px; padding: 0.6rem 1rem;">Status</th>
                                     <th style="width: 120px; padding: 0.6rem 1rem;">Attachments</th>
-                                    <th style="width: 120px; padding: 0.6rem 1rem; text-align: center;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -259,19 +258,6 @@
                                                 {% else %}
                                                     <span style="color:#9ca3af; font-size:0.8rem;">—</span>
                                                 {% endif %}
-                                            </td>
-                                            <td style="width: 120px; padding: 0.75rem 1rem; text-align: center; vertical-align: top;">
-                                                <div class="open-incidents-actions">
-                                                    <a href="#" class="btn-action-icon btn-action-update" title="Edit (coming soon)">
-                                                        <i class="fa-solid fa-pencil"></i>
-                                                    </a>
-                                                    <a href="#" class="btn-action-icon btn-action-pdf" title="Export PDF (coming soon)">
-                                                        <i class="fa-solid fa-file-pdf"></i>
-                                                    </a>
-                                                    <a href="#" class="btn-action-icon btn-action-excel" title="View log details (coming soon)">
-                                                        <i class="fa-solid fa-list"></i>
-                                                    </a>
-                                                </div>
                                             </td>
                                         </tr>
                                     {% endfor %}
