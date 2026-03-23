@@ -68,14 +68,16 @@
         <div class="view-container">
             <div class="card" style="margin-bottom: 1rem;">
                 <div class="card-header">
-                    <h3 class="card-title">Select Incident</h3>
+                   
                     <span style="font-size: 0.85rem; color: #6b7280;">Select an incident to add a situation update</span>
                 </div>
                 <div class="card-body" style="padding: 1rem;">
-                    <div class="form-group" style="margin-bottom: 0; position: relative; max-width: 75%;">
-                        <label class="form-label" for="incident_search_input">Incident</label>
+                    <div class="form-group" style="margin-bottom: 0; position: relative; display: flex; align-items: center; gap: 1rem; width: 100%;">
+                        <label class="form-label" for="incident_search_input" style="white-space: nowrap; margin-bottom: 0; font-weight: 600; color: #111827;">
+                            Select Incident
+                        </label>
                         <!-- Custom single searchable dropdown -->
-                        <div id="incident_dropdown_wrapper" style="position: relative;">
+                        <div id="incident_dropdown_wrapper" style="position: relative; flex: 1 1 auto; min-width: 0; max-width: 520px;">
                             <input
                                 type="text"
                                 id="incident_search_input"
