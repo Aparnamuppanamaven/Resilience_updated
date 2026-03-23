@@ -180,17 +180,17 @@
                 </div>
                 <div class="card-body" style="padding: 0;">
                     <div class="table-responsive" style="max-height: 60vh; overflow-y: auto; overflow-x: auto;">
-                        <table class="incidents-table" style="table-layout: fixed; width: 100%; min-width: 1680px; border-collapse: separate; border-spacing: 0;">
+                        <table class="incidents-table" style="table-layout: fixed; width: 100%; min-width: 1100px; border-collapse: separate; border-spacing: 0;">
                             <thead>
                                 <tr style="background: #f9fafb;">
                                     <th style="width: 80px; padding: 0.6rem 1rem; text-align: center; white-space: nowrap;">#SNO</th>
                                     <th style="width: 140px; padding: 0.6rem 1rem; white-space: nowrap;">Timestamp</th>
-                                    <th style="width: 250px; padding: 0.6rem 1rem;">What Happened</th>
-                                    <th style="width: 250px; padding: 0.6rem 1rem;">Actions Taken / Resources</th>
-                                    <th style="width: 250px; padding: 0.6rem 1rem;">Next Steps Recommended</th>
+                                    <th style="width: 250px; padding: 0.6rem 1rem; white-space: nowrap;">What Happened</th>
+                                    <th style="width: 250px; padding: 0.6rem 1rem; white-space: nowrap;">Actions Taken / Resources</th>
+                                    <th style="width: 250px; padding: 0.6rem 1rem; white-space: nowrap;">Next Steps Recommended</th>
                                     <th style="width: 150px; padding: 0.6rem 1rem;">Reported By</th>
                                     <th style="width: 120px; padding: 0.6rem 1rem;">Status</th>
-                                    <th style="width: 120px; padding: 0.6rem 1rem;">Attachments</th>
+                                    <th style="width: 120px; padding: 0.6rem 1rem; white-space: nowrap;">Attachments</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -237,7 +237,7 @@
                                             <td style="width: 150px; padding: 0.75rem 1rem; vertical-align: top;">
                                                 {{ update.reported_by|default:"—" }}
                                             </td>
-                                            <td style="width: 120px; padding: 0.75rem 1rem; vertical-align: top;">
+                                            <td style="width: 120px; padding: 0.75rem 1rem; vertical-align: top; white-space: nowrap;">
                                                 {% if update.status_change %}
                                                     <span class="status-badge status-alert">
                                                         {{ update.status_change|title }}
