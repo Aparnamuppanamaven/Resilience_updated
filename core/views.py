@@ -1204,6 +1204,17 @@ def profile_edit(request):
             first_name = ''
             last_name = ''
             full_name = (getattr(profile, 'full_name', '') or '').strip() if profile else ''
+            if not full_name:
+                try:
+                    u = UsersTable.objects.filter(
+                        Q(liaison_email__iexact=user_cred.username) |
+                        Q(email_id__iexact=user_cred.username) |
+                        Q(primary_liaison_name__iexact=user_cred.username)
+                    ).first()
+                    if u:
+                        full_name = (u.primary_liaison_name or u.name or '').strip()
+                except Exception:
+                    pass
             if full_name:
                 parts = full_name.split()
                 first_name = parts[0]
