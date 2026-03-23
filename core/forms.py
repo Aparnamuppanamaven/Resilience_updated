@@ -804,7 +804,7 @@ class CreateIncidentForm(forms.Form):
         widget=forms.Textarea(attrs={
             'class': 'form-control',
             'rows': 2,
-            'placeholder': 'Why it matters - operational impact...',
+            'placeholder': 'Enter impact',
         }),
     )
     casualties = forms.CharField(

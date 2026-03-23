@@ -66,10 +66,51 @@
         </header>
 
         <div class="view-container">
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <div class="card-header">
+                    <h3 class="card-title">Shift packet scheduler (audit)</h3>
+                    <span style="font-size: 0.85rem; color: #6b7280;">Runs from <code>core_shiftpacket_scheduler_log</code> — generation, skips, errors</span>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div class="table-responsive" style="max-height: 45vh; overflow-y: auto;">
+                        <table class="incidents-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                            <thead>
+                                <tr style="background: #f9fafb;">
+                                    <th style="padding: 0.6rem 1rem; text-align: left;">Run ID</th>
+                                    <th style="padding: 0.6rem 1rem; text-align: left;">Capture incident</th>
+                                    <th style="padding: 0.6rem 1rem; text-align: left;">Triggered</th>
+                                    <th style="padding: 0.6rem 1rem; text-align: left;">Next scheduled</th>
+                                    <th style="padding: 0.6rem 1rem; text-align: left;">Status</th>
+                                    <th style="padding: 0.6rem 1rem; text-align: left;">Detail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in scheduler_logs %}
+                                <tr>
+                                    <td style="padding: 0.75rem 1rem;">{{ s.run_id }}</td>
+                                    <td style="padding: 0.75rem 1rem;">{{ s.incident_label }}</td>
+                                    <td style="padding: 0.75rem 1rem;">{{ s.triggered_at|date:"M d, Y H:i" }}</td>
+                                    <td style="padding: 0.75rem 1rem;">{{ s.next_scheduled|date:"M d, Y H:i" }}</td>
+                                    <td style="padding: 0.75rem 1rem;"><span style="font-weight:600;">{{ s.schedule_status }}</span></td>
+                                    <td style="padding: 0.75rem 1rem; font-size: 0.85rem; color: #374151;">{{ s.message }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" style="padding: 0.75rem 1rem; color: #6b7280; text-align: center;">
+                                        No scheduler audit rows yet (table may be empty or unavailable).
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Log Entries</h3>
-                    <span style="font-size: 0.85rem; color: #6b7280;">Sample entries: login, incident creation, situation update</span>
+                    <h3 class="card-title">Other log entries (sample)</h3>
+                    <span style="font-size: 0.85rem; color: #6b7280;">Placeholder until TxLog is wired</span>
                 </div>
                 <div class="card-body" style="padding: 0;">
                     <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">

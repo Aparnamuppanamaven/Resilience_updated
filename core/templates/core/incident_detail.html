@@ -5,6 +5,7 @@
 
 {% block content %}
 <div class="app-container">
+    <span id="incidentIdMeta" data-incident-id="{{ incident.id }}" style="display:none" aria-hidden="true"></span>
     <nav class="sidebar">
         <a href="{% url 'dashboard' %}" class="sidebar-header" style="text-decoration: none; color: inherit; display: flex; align-items: center; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
             <i class="fa-solid fa-shield-halved logo-icon"></i>
@@ -306,23 +307,15 @@
                                         <table class="users-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
                                             <thead>
                                                 <tr style="background: linear-gradient(to right, #f8f9fa, #f1f3f5);">
-                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
-                                                        <i class="fa-solid fa-building" style="margin-right: 0.5rem; color: #667eea;"></i>Agency Name
+                                                    <th style="padding: 0.75rem 1rem; width: 40px; text-align: center;"></th>
+                                                    <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-building" style="margin-right: 0.5rem; color: #667eea;"></i>Agency
                                                     </th>
-                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
-                                                        <i class="fa-solid fa-user" style="margin-right: 0.5rem; color: #f5576c;"></i>Primary Liaison
+                                                    <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-user" style="margin-right: 0.5rem; color: #f5576c;"></i>User Name
                                                     </th>
-                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
-                                                        <i class="fa-solid fa-envelope" style="margin-right: 0.5rem; color: #4facfe;"></i>Email
-                                                    </th>
-                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
-                                                        <i class="fa-solid fa-exclamation-triangle" style="margin-right: 0.5rem; color: #00f2fe;"></i>Incident Types
-                                                    </th>
-                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
-                                                        <i class="fa-solid fa-comments" style="margin-right: 0.5rem; color: #f093fb;"></i>Communication Channels
-                                                    </th>
-                                                    <th style="padding: 1rem 1.5rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
-                                                        <i class="fa-solid fa-calendar" style="margin-right: 0.5rem; color: #f093fb;"></i>Created At
+                                                    <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #495057; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e9ecef;">
+                                                        <i class="fa-solid fa-envelope" style="margin-right: 0.5rem; color: #4facfe;"></i>User Email
                                                     </th>
                                                 </tr>
                                             </thead>
@@ -330,11 +323,36 @@
                                                 {% for item in assigned_users_data %}
                                                 {% with liaison=item.liaison user_table=item.user_table %}
                                                 <tr class="user-row" style="border-bottom: 1px solid #f1f3f5; background: white;">
-                                                    <td style="padding: 1.25rem 1.5rem;">
+                                                    <td style="padding: 0.75rem 1rem; text-align: center;">
+                                                        {% if user_table %}
+                                                        <button type="button"
+                                                                data-user-id="{{ user_table.id }}"
+                                                                onclick="removeAssignedUserFromButton(this)"
+                                                                style="
+                                                                    display: inline-flex;
+                                                                    align-items: center;
+                                                                    justify-content: center;
+                                                                    width: 26px;
+                                                                    height: 26px;
+                                                                    border-radius: 999px;
+                                                                    border: 1px solid #ef4444;
+                                                                    background: #fef2f2;
+                                                                    color: #ef4444;
+                                                                    cursor: pointer;
+                                                                    font-size: 0.8rem;
+                                                                "
+                                                                title="Remove assigned user">
+                                                            <span>−</span>
+                                                        </button>
+                                                        {% else %}
+                                                        <span style="color: #adb5bd;">—</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td style="padding: 0.75rem 1rem;">
                                                         <div style="display: flex; align-items: center; gap: 0.75rem;">
                                                             <div style="
-                                                                width: 40px;
-                                                                height: 40px;
+                                                                width: 32px;
+                                                                height: 32px;
                                                                 border-radius: 50%;
                                                                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                                                                 display: flex;
@@ -342,71 +360,28 @@
                                                                 justify-content: center;
                                                                 color: white;
                                                                 font-weight: 600;
-                                                                font-size: 0.9rem;
+                                                                font-size: 0.8rem;
                                                             ">
                                                                 {% if user_table %}
                                                                     {{ user_table.agency_name|first|upper }}
-                                                                {% else %}
+                                                                {% elif liaison %}
                                                                     {{ liaison.user.get_full_name|first|default:liaison.user.username|first|upper }}
+                                                                {% else %}
+                                                                    ?
                                                                 {% endif %}
                                                             </div>
-                                                            <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">
+                                                            <div style="font-weight: 500; color: #212529; font-size: 0.9rem;">
                                                                 {% if user_table %}{{ user_table.agency_name }}{% else %}N/A{% endif %}
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td style="padding: 1.25rem 1.5rem;">
-                                                        <div style="font-weight: 600; color: #212529; font-size: 0.95rem;">
-                                                            {% if user_table %}{{ user_table.primary_liaison_name }}{% else %}{{ liaison.user.get_full_name|default:liaison.user.username }}{% endif %}
+                                                    <td style="padding: 0.75rem 1rem; font-weight: 500; color: #212529; font-size: 0.9rem;">
+                                                        <div>
+                                                            {% if user_table %}{{ user_table.name }}{% elif liaison %}{{ liaison.user.get_full_name|default:liaison.user.username }}{% else %}—{% endif %}
                                                         </div>
                                                     </td>
-                                                    <td style="padding: 1.25rem 1.5rem; color: #6c757d; font-size: 0.9rem;">
-                                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                            <i class="fa-solid fa-envelope" style="color: #adb5bd; font-size: 0.85rem;"></i>
-                                                            <span>{% if user_table %}{{ user_table.liaison_email }}{% else %}{{ liaison.user.email|default:"Not available" }}{% endif %}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td style="padding: 1.25rem 1.5rem; color: #6c757d; font-size: 0.9rem;">
-                                                        {% if user_table and user_table.key_incident_types %}
-                                                            <span style="
-                                                                padding: 4px 10px;
-                                                                border-radius: 12px;
-                                                                background: #e3f2fd;
-                                                                color: #1976d2;
-                                                                font-size: 0.85rem;
-                                                                font-weight: 500;
-                                                            ">
-                                                                {{ user_table.key_incident_types }}
-                                                            </span>
-                                                        {% else %}
-                                                            <span style="color: #adb5bd; font-style: italic;">Not specified</span>
-                                                        {% endif %}
-                                                    </td>
-                                                    <td style="padding: 1.25rem 1.5rem; color: #6c757d; font-size: 0.9rem;">
-                                                        {% if user_table and user_table.preferred_communication_channels %}
-                                                            <span style="
-                                                                padding: 4px 10px;
-                                                                border-radius: 12px;
-                                                                background: #f3e8ff;
-                                                                color: #7c3aed;
-                                                                font-size: 0.85rem;
-                                                                font-weight: 500;
-                                                            ">
-                                                                {{ user_table.preferred_communication_channels }}
-                                                            </span>
-                                                        {% else %}
-                                                            <span style="color: #adb5bd; font-style: italic;">Not specified</span>
-                                                        {% endif %}
-                                                    </td>
-                                                    <td style="padding: 1.25rem 1.5rem; color: #6c757d; font-size: 0.9rem;">
-                                                        {% if user_table and user_table.created_at %}
-                                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                                <i class="fa-solid fa-calendar" style="color: #adb5bd; font-size: 0.85rem;"></i>
-                                                                <span>{{ user_table.created_at|date:"M d, Y g:i A" }}</span>
-                                                            </div>
-                                                        {% else %}
-                                                            <span style="color: #adb5bd; font-style: italic;">Not available</span>
-                                                        {% endif %}
+                                                    <td style="padding: 0.75rem 1rem; color: #6c757d; font-size: 0.875rem;">
+                                                        {% if user_table %}{{ user_table.email_id }}{% elif liaison %}{{ liaison.user.email|default:"Not available" }}{% else %}—{% endif %}
                                                     </td>
                                                 </tr>
                                                 {% endwith %}
@@ -917,17 +892,6 @@
         firstIcon.style.transform = 'rotate(180deg)';
     });
 
-    // Hidden meta element for incident id
-    document.addEventListener('DOMContentLoaded', function() {
-        if (!document.getElementById('incidentIdMeta')) {
-            const span = document.createElement('span');
-            span.id = 'incidentIdMeta';
-            span.setAttribute('data-incident-id', '{{ incident.id }}');
-            span.style.display = 'none';
-            document.body.appendChild(span);
-        }
-    });
-
     function getIncidentId() {
         const el = document.getElementById('incidentIdMeta');
         const raw = el ? el.getAttribute('data-incident-id') : null;
@@ -936,8 +900,6 @@
     }
 
     // User Assignment Functions
-    const incidentId = getIncidentId();
-
     function toggleUserSelection() {
         const container = document.getElementById('usersTableContainer');
         const btn = document.getElementById('assignUsersBtn');
@@ -1011,6 +973,12 @@
     }
 
     function saveSelectedUsers() {
+        const incidentId = getIncidentId();
+        if (incidentId == null) {
+            alert('Incident ID is missing. Please refresh the page.');
+            return;
+        }
+
         const checkboxes = document.querySelectorAll('.user-checkbox:checked');
         const userIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
         
@@ -1029,17 +997,29 @@
                 'X-CSRFToken': '{{ csrf_token }}',
                 'Content-Type': 'application/json',
             },
+            credentials: 'same-origin',
             body: JSON.stringify({
                 user_ids: userIds
             }),
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(async (response) => {
+            const ct = response.headers.get('content-type') || '';
+            let data = {};
+            if (ct.includes('application/json')) {
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    /* non-JSON body */
+                }
+            }
+            if (!response.ok) {
+                alert('Error: ' + (data.error || ('HTTP ' + response.status + ' ' + response.statusText)));
+                return;
+            }
             if (data.error) {
                 alert('Error: ' + data.error);
                 return;
             }
-
             if (data.success) {
                 location.reload();
             }
@@ -1048,6 +1028,65 @@
             alert('Error assigning users. Please try again.');
             console.error('Error:', error);
         });
+    }
+
+    function removeAssignedUser(userId) {
+        const incidentId = getIncidentId();
+        if (incidentId == null) {
+            alert('Incident ID is missing. Please refresh the page.');
+            return;
+        }
+        if (!confirm('Remove this user from this incident?')) {
+            return;
+        }
+
+        fetch(`/api/incidents/${incidentId}/remove-user/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                user_id: userId
+            }),
+        })
+        .then(async (response) => {
+            const ct = response.headers.get('content-type') || '';
+            let data = {};
+            if (ct.includes('application/json')) {
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    /* non-JSON body */
+                }
+            }
+            if (!response.ok) {
+                alert('Error: ' + (data.error || ('HTTP ' + response.status + ' ' + response.statusText)));
+                return;
+            }
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            if (data.success) {
+                location.reload();
+            }
+        })
+        .catch(error => {
+            alert('Error removing user. Please try again.');
+            console.error('Error:', error);
+        });
+    }
+
+    function removeAssignedUserFromButton(buttonEl) {
+        if (!buttonEl) return;
+        const userId = Number(buttonEl.getAttribute('data-user-id'));
+        if (!Number.isFinite(userId)) {
+            alert('Invalid user id.');
+            return;
+        }
+        removeAssignedUser(userId);
     }
 
     // Submit incident event log
@@ -1173,29 +1212,49 @@
     function assignUser(externalUserId, userName, userEmail) {
         const errorDiv = document.getElementById('assignUserError');
         errorDiv.style.display = 'none';
+
+        const incidentId = getIncidentId();
+        if (incidentId == null) {
+            errorDiv.textContent = 'Incident ID is missing. Please refresh the page.';
+            errorDiv.style.display = 'block';
+            return;
+        }
         
         if (!confirm(`Assign ${userName} (${userEmail}) to this incident?`)) {
             return;
         }
 
-        fetch(`/api/incidents/${incidentId}/assign-user/`, {
+        fetch(`/api/incidents/${incidentId}/assign-users/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': '{{ csrf_token }}',
                 'Content-Type': 'application/json',
             },
+            credentials: 'same-origin',
             body: JSON.stringify({
-                external_user_id: externalUserId
+                user_ids: [externalUserId]
             }),
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(async (response) => {
+            const ct = response.headers.get('content-type') || '';
+            let data = {};
+            if (ct.includes('application/json')) {
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    /* ignore */
+                }
+            }
+            if (!response.ok) {
+                errorDiv.textContent = data.error || ('HTTP ' + response.status + ' ' + response.statusText);
+                errorDiv.style.display = 'block';
+                return;
+            }
             if (data.error) {
                 errorDiv.textContent = data.error;
                 errorDiv.style.display = 'block';
                 return;
             }
-
             if (data.success) {
                 closeAssignUserModal();
                 location.reload();

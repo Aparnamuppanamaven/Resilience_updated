@@ -31,6 +31,7 @@ urlpatterns = [
     path('incidents/<int:incident_id>/case-history.csv', views.incident_case_history_csv, name='incident_case_history_csv'),
     path('api/search-users/', views.search_users_for_assignment, name='search_users_for_assignment'),
     path('api/incidents/<int:incident_id>/assign-users/', views.assign_users_to_incident, name='assign_users_to_incident'),
+    path('api/incidents/<int:incident_id>/remove-user/', views.remove_user_from_incident, name='remove_user_from_incident'),
     path('api/incidents/<int:incident_id>/add-event-log/', views.add_incident_event_log, name='add_incident_event_log'),
     path('api/department-services/', views.department_services_api, name='department_services_api'),
     path('api/counties-by-state/', views.counties_by_state_api, name='counties_by_state_api'),
@@ -46,7 +47,9 @@ urlpatterns = [
     ),
     path('reports/', extra_views.reports_page, name='reports'),
     path('reports/pdf/', extra_views.reports_pdf, name='reports_pdf'),
+    path('api/reports/incident/', extra_views.api_reports_incident, name='api_reports_incident'),
     path('api/situation-logs/', extra_views.api_situation_logs, name='api_situation_logs'),
+    path('api/report-summary/', extra_views.api_report_summary, name='api_report_summary'),
     path('system-logs/', extra_views.system_logs_page, name='system_logs'),
     # User Management reuses the Admin Module UI and features
     path('user-management/', views.admin_module, name='user_management'),

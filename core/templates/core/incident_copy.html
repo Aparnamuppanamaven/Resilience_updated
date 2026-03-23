@@ -341,14 +341,16 @@
                                                 font-size: 0.8rem;
                                             ">
                                                 {% if user_table %}
-                                                    {{ user_table.primary_liaison_name|first|upper }}
-                                                {% else %}
+                                                    {{ user_table.name|default:user_table.primary_liaison_name|first|upper }}
+                                                {% elif liaison %}
                                                     {{ liaison.user.get_full_name|first|default:liaison.user.username|first|upper }}
+                                                {% else %}
+                                                    ?
                                                 {% endif %}
                                             </div>
                                             <div>
                                                 <div style="font-size: 0.9rem; font-weight: 600; color: #111827;">
-                                                    {% if user_table %}{{ user_table.primary_liaison_name }}{% else %}{{ liaison.user.get_full_name|default:liaison.user.username }}{% endif %}
+                                                    {% if user_table %}{{ user_table.name }}{% elif liaison %}{{ liaison.user.get_full_name|default:liaison.user.username }}{% else %}—{% endif %}
                                                 </div>
                                                 <div style="font-size: 0.8rem; color: #6b7280;">
                                                     {% if user_table %}{{ user_table.agency_name }}{% else %}N/A{% endif %}
@@ -356,7 +358,7 @@
                                             </div>
                                         </div>
                                         <div style="font-size: 0.8rem; color: #6b7280;">
-                                            {% if user_table %}{{ user_table.liaison_email }}{% else %}{{ liaison.user.email|default:"Not available" }}{% endif %}
+                                            {% if user_table %}{{ user_table.email_id }}{% elif liaison %}{{ liaison.user.email|default:"Not available" }}{% else %}—{% endif %}
                                         </div>
                                     </div>
                                     {% endwith %}
@@ -714,17 +716,29 @@ function saveSelectedUsersFromModal() {
             'X-CSRFToken': '{{ csrf_token }}',
             'Content-Type': 'application/json',
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
             user_ids: userIds
         }),
     })
-    .then(response => response.json())
-    .then(data => {
+    .then(async (response) => {
+        const ct = response.headers.get('content-type') || '';
+        let data = {};
+        if (ct.includes('application/json')) {
+            try {
+                data = await response.json();
+            } catch (e) {
+                /* ignore */
+            }
+        }
+        if (!response.ok) {
+            alert('Error: ' + (data.error || ('HTTP ' + response.status + ' ' + response.statusText)));
+            return;
+        }
         if (data.error) {
             alert('Error: ' + data.error);
             return;
         }
-
         if (data.success) {
             closeAssignUsersModal();
             location.reload();

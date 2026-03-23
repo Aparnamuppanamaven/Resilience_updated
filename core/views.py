@@ -65,12 +65,116 @@ from .models import (
     IncidentShiftSchedule,
     State,
     Counties,
+    AssignedUsers,
 )
 from .extra_views import _ensure_incident_for_capture
 from .forms import CheckoutForm, OnboardingForm, OperationalUpdateForm, CreateIncidentForm, UserSignupForm, UserLoginForm, SetupPasswordForm, CompleteRegistrationForm, PaymentForm, UserCreateForm, ProfileEditForm, LegacyProfileEditForm
 from .password_token import make_setup_password_token, get_user_from_setup_password_token
 from .payment_utils import generate_invoice_id, calculate_due_date, ensure_unique_invoice_id
 from .email_utils import send_checkout_confirmation_email, send_new_user_notification_email
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _assigned_core_user_ids_for_incident(incident_id):
+    """core_users.id values persisted in assigned_users for this incident."""
+    try:
+        return [
+            int(x)
+            for x in AssignedUsers.objects.filter(incident_id=incident_id)
+            .exclude(core_user_id__isnull=True)
+            .values_list("core_user_id", flat=True)
+        ]
+    except Exception as exc:
+        logger.warning("assigned_users query failed: %s", exc)
+        return []
+
+
+def _persist_assigned_users_for_incident(incident, valid_core_user_ids):
+    """Insert rows into assigned_users (skip duplicates for same incident + core_users)."""
+    now = timezone.now()
+    for uid in valid_core_user_ids:
+        ut = UsersTable.objects.filter(pk=uid).first()
+        if not ut:
+            continue
+        if AssignedUsers.objects.filter(incident_id=incident.id, core_user_id=uid).exists():
+            continue
+        AssignedUsers.objects.create(
+            incident_id=incident.id,
+            core_user_id=uid,
+            agency_name=ut.agency_name or "",
+            primary_liaison=(ut.name or "")[:100],
+            email=(ut.email_id or "")[:255],
+            incident_types=(ut.key_incident_types or "")[:255],
+            communication_channels=(ut.preferred_communication_channels or "")[:255],
+            created_at=now,
+        )
+
+
+def _remove_assigned_user_for_incident(incident_id, core_user_id):
+    """Delete assignment row(s) for one incident + core_users id pair."""
+    qs = AssignedUsers.objects.filter(
+        incident_id=incident_id,
+        core_user_id=core_user_id,
+    )
+    deleted_count, _ = qs.delete()
+    return deleted_count
+
+
+def _assignable_core_users_qs(request, organization):
+    """
+    core_users rows linked to the org (via liaison emails) and filtered to the
+    logged-in liaison's core_liaison.dept vs core_users.department.
+    """
+    liaison_emails_qs = Liaison.objects.filter(
+        organization=organization
+    ).select_related("user").values_list("user__email", flat=True)
+    liaison_emails = [e.strip().lower() for e in liaison_emails_qs if e]
+    base = UsersTable.objects.filter(
+        Q(liaison_email__in=liaison_emails) | Q(email_id__in=liaison_emails)
+    )
+    dept = ""
+    if request.user.is_authenticated:
+        try:
+            liaison = request.user.liaison_profile
+            dept = (liaison.dept or "").strip()
+        except Exception:
+            pass
+    if not dept and "user_credentials_id" in request.session:
+        uname = (request.session.get("user_credentials_username") or "").strip()
+        if uname:
+            row = UsersTable.objects.filter(
+                Q(primary_liaison_name__iexact=uname)
+                | Q(liaison_email__iexact=uname)
+                | Q(email_id__iexact=uname)
+            ).first()
+            if row:
+                dept = (row.department or "").strip()
+    if dept:
+        return base.filter(department__iexact=dept)
+    return base
+
+
+def _get_actionby_user_id(request, liaison=None):
+    """
+    Resolve current actor id for audit logs across both auth pathways.
+    Priority: Liaison user id -> Django auth user id -> legacy session id.
+    """
+    if liaison is not None:
+        liaison_user_id = getattr(getattr(liaison, "user", None), "id", None)
+        if liaison_user_id is not None:
+            return liaison_user_id
+
+    request_user_id = getattr(request.user, "id", None)
+    if request_user_id is not None:
+        return request_user_id
+
+    legacy_user_id = request.session.get("user_credentials_id")
+    if legacy_user_id:
+        return legacy_user_id
+    return None
 
 
 def detect_existing_user(email):
@@ -1939,6 +2043,36 @@ def admin_module(request):
             liaison_email = request.POST.get('liaison_email', '').strip()
             key_incident_types = request.POST.get('key_incident_types', '').strip() or None
             preferred_communication_channels = request.POST.get('preferred_communication_channels', '').strip() or None
+
+            # Agency / shift blocks are hidden in the admin UI; fill DB-required fields when omitted.
+            logged_row = None
+            if 'user_credentials_id' in request.session:
+                u = request.session.get('user_credentials_username', '')
+                try:
+                    logged_row = UsersTable.objects.filter(
+                        Q(primary_liaison_name__icontains=u) | Q(liaison_email__icontains=u)
+                    ).first()
+                except Exception:
+                    pass
+            elif request.user.is_authenticated:
+                try:
+                    user_email = getattr(request.user, 'email', '')
+                    user_username = getattr(request.user, 'username', '')
+                    logged_row = UsersTable.objects.filter(
+                        Q(liaison_email__icontains=user_email)
+                        | Q(primary_liaison_name__icontains=user_username)
+                        | Q(liaison_email__icontains=user_username)
+                    ).first()
+                except Exception:
+                    pass
+            if not agency_name and logged_row and getattr(logged_row, 'agency_name', None):
+                agency_name = (logged_row.agency_name or '').strip()
+            if not agency_name:
+                agency_name = 'Unknown'
+            if not primary_liaison_name:
+                primary_liaison_name = name
+            if not liaison_email:
+                liaison_email = email_id
             
             # Optional profile image (file upload)
             user_image_file = request.FILES.get('user_image')
@@ -1961,7 +2095,7 @@ def admin_module(request):
                 except Exception as upload_exc:
                     messages.error(request, f'Profile picture could not be uploaded: {upload_exc}')
             
-            # Validation
+            # Validation (only fields shown on the Create User modal; agency/shift are optional in UI)
             required_fields = {
                 'name': name,
                 'mobile_no': mobile_no,
@@ -1969,10 +2103,6 @@ def admin_module(request):
                 'department': department,
                 'sub_department': sub_department,
                 'role': role,
-                'shift_id': shift_id,
-                'agency_name': agency_name,
-                'primary_liaison_name': primary_liaison_name,
-                'liaison_email': liaison_email,
             }
             
             # Check if shift is flexible and validate flexible shift fields
@@ -2172,6 +2302,11 @@ def admin_module(request):
 
 def logout_view(request):
     """Logout: clear auth and session, redirect to index (default state). No message displayed."""
+    # Undisplayed flash messages live in the message storage object, not only in the session row.
+    # After session.flush(), MessageMiddleware can re-save them into the new session unless we
+    # consume them here (otherwise the next /login/ can show e.g. "Welcome back, user@…!").
+    list(messages.get_messages(request))
+
     # Clear all session data including flags that might cause redirect loops
     request.session.pop('user_credentials_id', None)
     request.session.pop('user_credentials_username', None)
@@ -2861,6 +2996,9 @@ def incidents_list(request):
                     messages.success(request, "Shift cadence updated.")
                 except Exception as e:
                     messages.error(request, f"Could not update shift cadence: {e}")
+            _next = (request.POST.get("next") or "").strip()
+            if _next == "dashboard":
+                return redirect("dashboard")
             return redirect("incidents_list")
 
         # Full incident edit from the incidents list modal
@@ -2954,7 +3092,7 @@ def incidents_list(request):
                     log_system_action(
                         tenant_id=getattr(organization, "tenant_id", None) if organization else None,
                         entity="Incident",
-                        actionby=getattr(request.user, "id", None),
+                        actionby=_get_actionby_user_id(request, liaison),
                         actionon=f"{capture_obj.id}:{capture_obj.title}",
                         action="Update",
                     )
@@ -3216,27 +3354,15 @@ def incident_copy_view(request):
             incident = None
 
     if incident:
-        # Reuse the assignment + log logic from incident_detail
-        from django.db import connection
         try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT l.id FROM core_liaison l
-                    INNER JOIN core_incident_user_mapping m ON l.id = m.user_id
-                    WHERE m.incident_id = %s AND m.is_active = 1
-                    """,
-                    [incident.id]
-                )
-                liaison_ids = [row[0] for row in cursor.fetchall()]
-                assigned_liaisons = Liaison.objects.filter(id__in=liaison_ids) if liaison_ids else []
-
-                for liaison in assigned_liaisons:
-                    user_table = UsersTable.objects.filter(liaison_email__iexact=liaison.user.email).first()
-                    assigned_users_data.append({
-                        'liaison': liaison,
-                        'user_table': user_table,
-                    })
+            for uid in _assigned_core_user_ids_for_incident(incident.id):
+                user_table = UsersTable.objects.filter(pk=uid).first()
+                if not user_table:
+                    continue
+                assigned_users_data.append({
+                    'liaison': None,
+                    'user_table': user_table,
+                })
         except Exception:
             assigned_users_data = []
 
@@ -3248,6 +3374,7 @@ def incident_copy_view(request):
                     SELECT id, event_description, created_time, user_id
                     FROM core_incident_events
                     WHERE incident_id = %s
+                      AND (event_description IS NULL OR event_description NOT LIKE '[SCHEDULER]%%')
                     ORDER BY created_time DESC
                     """,
                     [incident.id]
@@ -3289,8 +3416,14 @@ def incident_copy_view(request):
         except Exception:
             incident_logs = []
 
-    # Get all users for user assignment modal (filtered to exclude already-assigned users below)
-    all_users = UsersTable.objects.all().order_by('-created_at')
+    if organization:
+        all_users = _assignable_core_users_qs(request, organization).order_by('-created_at')
+        if incident:
+            ex = _assigned_core_user_ids_for_incident(incident.id)
+            if ex:
+                all_users = all_users.exclude(id__in=ex)
+    else:
+        all_users = UsersTable.objects.all().order_by('-created_at')
     department_categories = (
         Department.objects.values_list('category', flat=True)
         .distinct()
@@ -3382,99 +3515,28 @@ def incident_detail(request, incident_id):
     else:
         sync_time_display = last_sync.strftime("%b %d, %Y at %I:%M %p")
     
-    # Get all users from UsersTable that have a valid Liaison in this organization
-    # (so assignment will succeed and no "No Liaison found" error appears).
-    liaison_emails_qs = Liaison.objects.filter(
-        organization=organization
-    ).select_related("user").values_list("user__email", flat=True)
-    liaison_emails = [e.strip().lower() for e in liaison_emails_qs if e]
+    all_users = _assignable_core_users_qs(request, organization).order_by('-created_at')
+    assigned_ids = _assigned_core_user_ids_for_incident(incident.id)
+    if assigned_ids:
+        all_users = all_users.exclude(id__in=assigned_ids)
 
-    all_users = UsersTable.objects.filter(
-        Q(liaison_email__in=liaison_emails) | Q(email_id__in=liaison_emails)
-    ).order_by('-created_at')
-    
     # Get list of available department categories (for filtering users by department)
     department_categories = (
         Department.objects.values_list('category', flat=True)
         .distinct()
         .order_by('category')
     )
-    
-    # Ensure mapping table exists (create if not exists)
-    from django.db import connection
-    try:
-        with connection.cursor() as cursor:
-            # Check if table exists
-            cursor.execute("""
-                SELECT COUNT(*) FROM information_schema.tables 
-                WHERE table_schema = DATABASE() 
-                AND table_name = 'core_incident_user_mapping'
-            """)
-            table_exists = cursor.fetchone()[0] > 0
-            
-            if not table_exists:
-                cursor.execute("""
-                    CREATE TABLE core_incident_user_mapping (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        user_id INT NOT NULL,
-                        incident_id BIGINT NOT NULL,
-                        mapped_user_id INT NULL,
-                        is_active TINYINT(1) NOT NULL DEFAULT 1,
-                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        INDEX idx_incident_active (incident_id, is_active),
-                        INDEX idx_user_active (user_id, is_active)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                """)
-    except Exception as e:
-        # Table might already exist or error - continue anyway
-        pass
-    
-    # Get currently assigned users (Liaisons) - only active assignments
-    assigned_liaisons = []
-    assigned_users_data = []  # List of dicts with liaison + UsersTable data
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT l.id FROM core_liaison l
-                INNER JOIN core_incident_user_mapping m ON l.id = m.user_id
-                WHERE m.incident_id = %s AND m.is_active = 1
-                """,
-                [incident.id]
-            )
-            liaison_ids = [row[0] for row in cursor.fetchall()]
-            assigned_liaisons = Liaison.objects.filter(id__in=liaison_ids) if liaison_ids else []
-            
-            # Get UsersTable data for each assigned liaison
-            for liaison in assigned_liaisons:
-                user_table = UsersTable.objects.filter(liaison_email__iexact=liaison.user.email).first()
-                assigned_users_data.append({
-                    'liaison': liaison,
-                    'user_table': user_table,  # Can be None if not found in UsersTable
-                })
-    except Exception as e:
-        # If table doesn't exist yet or error, return empty list
-        assigned_liaisons = []
-        assigned_users_data = []
 
-    # Exclude already-assigned users from the "Select Users" list
-    try:
-        assigned_emails = [
-            (l.user.email or "").strip().lower()
-            for l in assigned_liaisons
-            if getattr(l, "user", None) is not None
-        ]
-        assigned_emails = [e for e in assigned_emails if e]
-        if assigned_emails:
-            assigned_user_ids = list(
-                UsersTable.objects.filter(
-                    Q(liaison_email__in=assigned_emails) | Q(email_id__in=assigned_emails)
-                ).values_list("id", flat=True)
-            )
-            if assigned_user_ids:
-                all_users = all_users.exclude(id__in=assigned_user_ids)
-    except Exception:
-        pass
+    assigned_liaisons = []
+    assigned_users_data = []
+    for uid in assigned_ids:
+        user_table = UsersTable.objects.filter(pk=uid).first()
+        if not user_table:
+            continue
+        assigned_users_data.append({
+            'liaison': None,
+            'user_table': user_table,
+        })
     
     # Get incident event logs
     # Note: IncidentEvent has ForeignKey to Incident, but we're using IncidentCapture
@@ -3487,6 +3549,7 @@ def incident_detail(request, incident_id):
                 SELECT id, event_description, created_time, user_id
                 FROM core_incident_events
                 WHERE incident_id = %s
+                  AND (event_description IS NULL OR event_description NOT LIKE '[SCHEDULER]%%')
                 ORDER BY created_time DESC
                 """,
                 [incident.id]
@@ -3579,53 +3642,34 @@ def search_users_for_assignment(request):
         except (IncidentCapture.DoesNotExist, ValueError):
             organization = None
 
-    # Base search in UsersTable by name, email, or agency
     users = UsersTable.objects.filter(
+        Q(name__icontains=query) |
+        Q(email_id__icontains=query) |
         Q(primary_liaison_name__icontains=query) |
         Q(liaison_email__icontains=query) |
         Q(agency_name__icontains=query)
     )
 
-    # Restrict to users that have a valid Liaison in the current organization
     if organization:
-        liaison_emails_qs = Liaison.objects.filter(
-            organization=organization
-        ).select_related("user").values_list("user__email", flat=True)
-        liaison_emails = [e.strip().lower() for e in liaison_emails_qs if e]
-        if liaison_emails:
-            users = users.filter(
-                Q(liaison_email__in=liaison_emails) | Q(email_id__in=liaison_emails)
-            )
+        assignable = _assignable_core_users_qs(request, organization)
+        users = users.filter(id__in=assignable.values('id'))
 
-    users = users.order_by('-created_at')[:50]  # Limit to 50 results
+    users = users.order_by('-created_at')[:50]
 
-    # If incident_id is provided, exclude already-assigned users for that incident
     if incident_id:
         try:
-            from django.db import connection
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT l.id, u.email
-                    FROM core_liaison l
-                    INNER JOIN auth_user u ON u.id = l.user_id
-                    INNER JOIN core_incident_user_mapping m ON l.id = m.user_id
-                    WHERE m.incident_id = %s AND m.is_active = 1
-                    """,
-                    [int(incident_id)],
-                )
-                assigned_emails = [row[1].strip().lower() for row in cursor.fetchall() if row[1]]
-            if assigned_emails:
-                users = users.exclude(Q(liaison_email__in=assigned_emails) | Q(email_id__in=assigned_emails))
-        except Exception:
+            ex = _assigned_core_user_ids_for_incident(int(incident_id))
+            if ex:
+                users = users.exclude(id__in=ex)
+        except (TypeError, ValueError):
             pass
     
     results = []
     for user_row in users:
         results.append({
             'id': user_row.id,
-            'name': user_row.primary_liaison_name or user_row.name,
-            'email': user_row.liaison_email or user_row.email_id,
+            'name': user_row.name or user_row.primary_liaison_name or '',
+            'email': user_row.email_id or user_row.liaison_email or '',
             'agency': user_row.agency_name,
         })
     
@@ -3634,7 +3678,7 @@ def search_users_for_assignment(request):
 
 @csrf_exempt
 def assign_users_to_incident(request, incident_id):
-    """Assign multiple users to an incident by mapping UsersTable → Liaison"""
+    """Assign core_users rows to an incident; persisted in assigned_users + same-dept filter via core_liaison."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
@@ -3679,127 +3723,115 @@ def assign_users_to_incident(request, incident_id):
         if not user_ids or not isinstance(user_ids, list):
             return JsonResponse({'error': 'User IDs list required'}, status=400)
         
-        # Map each UsersTable → User (by email) → Liaison
-        assigned_liaisons = []
+        assignable = _assignable_core_users_qs(request, organization)
+        valid_ids = []
         errors = []
-        
-        for user_table_id in user_ids:
+
+        for raw_id in user_ids:
             try:
-                user_table = UsersTable.objects.get(id=user_table_id)
+                uid = int(raw_id)
+            except (TypeError, ValueError):
+                errors.append(f'Invalid user id: {raw_id!r}')
+                continue
+            try:
+                user_table = UsersTable.objects.get(id=uid)
             except UsersTable.DoesNotExist:
-                errors.append(f'User ID {user_table_id} not found')
+                errors.append(f'User ID {uid} not found')
                 continue
-            
-            # Map UsersTable → User (by email) → Liaison
-            user = User.objects.filter(email__iexact=user_table.liaison_email).first()
-            if not user:
-                errors.append(f'No Django User found for email {user_table.liaison_email}')
+            if not assignable.filter(pk=uid).exists():
+                errors.append(
+                    f'User ID {uid} is not assignable (wrong department or not linked to this organization).'
+                )
                 continue
-            
-            # Find Liaison for this user in the same organization
-            liaison = Liaison.objects.filter(user=user, organization=organization).first()
-            if not liaison:
-                errors.append(f'No Liaison found for user {user_table.liaison_email} in this organization')
-                continue
-            
-            assigned_liaisons.append(liaison)
-        
-        if not assigned_liaisons:
-            return JsonResponse({'error': 'No valid users could be assigned. ' + '; '.join(errors)}, status=400)
-        
-        # Get logged-in user ID (who is making the assignment)
-        mapped_user_id = None
-        if request.user.is_authenticated:
-            mapped_user_id = request.user.id
-        elif 'user_credentials_id' in request.session:
-            # For legacy UserCredentials, we don't have a direct User.id
-            # Could map to a default user or leave NULL
-            mapped_user_id = None
-        
-        # Ensure mapping table exists (create if not exists)
-        from django.db import connection
+            valid_ids.append(uid)
+
+        if not valid_ids:
+            return JsonResponse(
+                {'error': 'No valid users could be assigned. ' + ('; '.join(errors) if errors else '')},
+                status=400,
+            )
+
         try:
-            with connection.cursor() as cursor:
-                # Check if table exists
-                cursor.execute("""
-                    SELECT COUNT(*) FROM information_schema.tables 
-                    WHERE table_schema = DATABASE() 
-                    AND table_name = 'core_incident_user_mapping'
-                """)
-                table_exists = cursor.fetchone()[0] > 0
-                
-                if not table_exists:
-                    cursor.execute("""
-                        CREATE TABLE core_incident_user_mapping (
-                            id INT AUTO_INCREMENT PRIMARY KEY,
-                            user_id INT NOT NULL,
-                            incident_id BIGINT NOT NULL,
-                            mapped_user_id INT NULL,
-                            is_active TINYINT(1) NOT NULL DEFAULT 1,
-                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            INDEX idx_incident_active (incident_id, is_active),
-                            INDEX idx_user_active (user_id, is_active)
-                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                    """)
-        except Exception:
-            pass  # Table might already exist or error - continue anyway
-        
-        # Do NOT deactivate existing assignments here.
-        # This endpoint appends new assignments and keeps current ones active.
-        
-        # Resolve tenant_id for assignments (from incident or organization)
-        tenant_id = None
-        if hasattr(incident, 'tenant_id') and incident.tenant_id:
-            tenant_id = incident.tenant_id
-        elif organization and hasattr(organization, 'tenant_id'):
-            tenant_id = organization.tenant_id
-        
-        # Insert new active assignments (skip users already assigned)
-        assignment_errors = []
-        for liaison in assigned_liaisons:
-            try:
-                with connection.cursor() as cursor:
-                    # Skip if already actively assigned
-                    cursor.execute(
-                        "SELECT COUNT(*) FROM core_incident_user_mapping WHERE incident_id = %s AND user_id = %s AND is_active = 1",
-                        [incident.id, liaison.id],
-                    )
-                    already = cursor.fetchone()[0] > 0
-                    if already:
-                        continue
-                    cursor.execute(
-                        """
-                        INSERT INTO core_incident_user_mapping 
-                        (user_id, incident_id, mapped_user_id, is_active, created_at, tenant_id) 
-                        VALUES (%s, %s, %s, 1, NOW(), %s)
-                        """,
-                        [liaison.id, incident.id, mapped_user_id, tenant_id]
-                    )
-            except Exception as e:
-                assignment_errors.append(f'Error assigning {liaison.user.email}: {str(e)}')
-        
-        if assignment_errors:
-            errors.extend(assignment_errors)
-        
-        # Also set the first one as created_by for backward compatibility
-        if assigned_liaisons:
-            incident.created_by = assigned_liaisons[0]
-            incident.save()
-        
+            with transaction.atomic():
+                _persist_assigned_users_for_incident(incident, valid_ids)
+        except Exception as exc:
+            logger.exception("assigned_users insert failed")
+            return JsonResponse(
+                {'error': f'Could not save assignments: {exc}'},
+                status=500,
+            )
+
+        id_to_row = {
+            ut.id: ut for ut in UsersTable.objects.filter(id__in=valid_ids)
+        }
+        assigned_rows = [id_to_row[i] for i in valid_ids if i in id_to_row]
         return JsonResponse({
             'success': True,
-            'message': f'{len(assigned_liaisons)} user(s) assigned successfully',
+            'message': f'{len(valid_ids)} user(s) assigned successfully',
             'assigned_users': [
                 {
-                    'name': l.user.get_full_name() or l.user.username,
-                    'email': l.user.email,
+                    'name': ut.name or '',
+                    'email': ut.email_id or '',
                 }
-                for l in assigned_liaisons
-            ]
+                for ut in assigned_rows
+            ],
         })
         
     except IncidentCapture.DoesNotExist:
         return JsonResponse({'error': 'Incident not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def remove_user_from_incident(request, incident_id):
+    """Unassign one core_users row from an incident."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    if not request.user.is_authenticated and 'user_credentials_id' not in request.session:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    try:
+        organization = None
+        if request.user.is_authenticated:
+            try:
+                liaison = request.user.liaison_profile
+                organization = liaison.organization
+            except (Liaison.DoesNotExist, AttributeError):
+                return JsonResponse({'error': 'Organization not found'}, status=400)
+        elif 'user_credentials_id' in request.session:
+            organization = Organization.objects.first()
+
+        if 'user_credentials_id' in request.session:
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id)
+                organization = incident.organization
+            except IncidentCapture.DoesNotExist:
+                return JsonResponse({'error': 'Incident not found'}, status=404)
+        else:
+            if not organization:
+                return JsonResponse({'error': 'Organization not found'}, status=400)
+            try:
+                incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
+            except IncidentCapture.DoesNotExist:
+                return JsonResponse({'error': 'Incident not found'}, status=404)
+
+        data = json.loads(request.body or "{}")
+        raw_user_id = data.get('user_id')
+        try:
+            user_id = int(raw_user_id)
+        except (TypeError, ValueError):
+            return JsonResponse({'error': 'Valid user_id is required'}, status=400)
+
+        deleted_count = _remove_assigned_user_for_incident(incident.id, user_id)
+        if deleted_count == 0:
+            return JsonResponse({'error': 'Assignment not found for this incident'}, status=404)
+
+        return JsonResponse({
+            'success': True,
+            'message': 'User removed successfully',
+        })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
@@ -4005,45 +4037,18 @@ def incident_log_history_pdf(request, incident_id):
             except IncidentCapture.DoesNotExist:
                 return HttpResponse('Incident not found', status=404)
         
-        # Get assigned users
         assigned_users_data = []
         try:
-            from django.db import connection
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT l.id FROM core_liaison l
-                    INNER JOIN core_incident_user_mapping m ON l.id = m.user_id
-                    WHERE m.incident_id = %s AND m.is_active = 1
-                    """,
-                    [incident.id]
-                )
-                liaison_ids = [row[0] for row in cursor.fetchall()]
-                assigned_liaisons = Liaison.objects.filter(id__in=liaison_ids) if liaison_ids else []
-                
-                for liaison in assigned_liaisons:
-                    user_table = UsersTable.objects.filter(liaison_email__iexact=liaison.user.email).first()
-                    assigned_users_data.append({
-                        'liaison': liaison,
-                        'user_table': user_table,
-                    })
+            for uid in _assigned_core_user_ids_for_incident(incident.id):
+                user_table = UsersTable.objects.filter(pk=uid).first()
+                if not user_table:
+                    continue
+                assigned_users_data.append({
+                    'liaison': None,
+                    'user_table': user_table,
+                })
         except Exception:
             assigned_users_data = []
-
-        # Exclude already-assigned users from the "Select Users" list on this page
-        try:
-            assigned_emails = [
-                (l.user.email or "").strip().lower()
-                for l in assigned_liaisons
-                if getattr(l, "user", None) is not None
-            ]
-            assigned_emails = [e for e in assigned_emails if e]
-            if assigned_emails:
-                all_users = all_users.exclude(
-                    Q(liaison_email__in=assigned_emails) | Q(email_id__in=assigned_emails)
-                )
-        except Exception:
-            pass
         
         # Get incident logs
         incident_logs = []
@@ -4055,6 +4060,7 @@ def incident_log_history_pdf(request, incident_id):
                     SELECT id, event_description, created_time, user_id
                     FROM core_incident_events
                     WHERE incident_id = %s
+                      AND (event_description IS NULL OR event_description NOT LIKE '[SCHEDULER]%%')
                     ORDER BY created_time ASC
                     """,
                     [incident.id]
@@ -5028,6 +5034,7 @@ def incident_case_history_csv(request, incident_id):
                     SELECT id, event_description, created_time, user_id
                     FROM core_incident_events
                     WHERE incident_id = %s
+                      AND (event_description IS NULL OR event_description NOT LIKE '[SCHEDULER]%%')
                     ORDER BY created_time ASC
                     """,
                     [incident.id]
