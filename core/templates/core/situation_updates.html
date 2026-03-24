@@ -186,8 +186,8 @@
                             <thead>
                                 <tr style="background: #f9fafb;">
                                     <th style="width: 80px; padding: 0.6rem 1rem; text-align: center; white-space: nowrap;">#SNO</th>
-                                    <th style="width: 140px; padding: 0.6rem 1rem; white-space: nowrap;">Timestamp</th>
-                                    <th style="width: 250px; padding: 0.6rem 1rem; white-space: nowrap;">What Happened</th>
+                                    <th style="width: 180px; padding: 0.6rem 1rem; white-space: nowrap;">Timestamp</th>
+                                    <th style="width: 280px; padding: 0.6rem 1.4rem 0.6rem 1rem; white-space: nowrap;">What Happened</th>
                                     <th style="width: 250px; padding: 0.6rem 1rem; white-space: nowrap;">Actions Taken / Resources</th>
                                     <th style="width: 250px; padding: 0.6rem 1rem; white-space: nowrap;">Next Steps Recommended</th>
                                     <th style="width: 150px; padding: 0.6rem 1rem;">Reported By</th>
@@ -200,10 +200,10 @@
                                     {% for update in situation_updates %}
                                         <tr>
                                             <td style="width: 80px; padding: 0.75rem 1rem; text-align: center; vertical-align: top; white-space: nowrap;">{{ forloop.counter }}</td>
-                                            <td style="width: 140px; padding: 0.75rem 1rem; white-space: nowrap; vertical-align: top;">
+                                            <td style="width: 180px; padding: 0.75rem 1.1rem 0.75rem 1rem; white-space: nowrap; vertical-align: top; border-right: 1px solid #f3f4f6;">
                                                 {{ update.update_time|date:"d/m/Y H:i" }}
                                             </td>
-                                            <td style="width: 250px; padding: 0.75rem 1rem; word-wrap: break-word; white-space: normal; vertical-align: top;">
+                                            <td style="width: 280px; padding: 0.75rem 1rem 0.75rem 1.3rem; word-wrap: break-word; white-space: normal; vertical-align: top;">
                                                 {# What Happened: show ONLY the main narrative text #}
                                                 <span style="font-size: 0.9rem; color: #111827;">
                                                     {% if update.description %}
@@ -236,8 +236,10 @@
                                                     <span>—</span>
                                                 {% endif %}
                                             </td>
-                                            <td style="width: 150px; padding: 0.75rem 1rem; vertical-align: top;">
-                                                {{ update.reported_by|default:"—" }}
+                                            <td style="width: 180px; padding: 0.75rem 1rem 0.75rem 1.25rem; vertical-align: middle; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 1px solid #f9fafb;" title="{{ update.reported_by|default:'—' }}">
+                                                <span style="display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                    {{ update.reported_by|default:"—" }}
+                                                </span>
                                             </td>
                                             <td style="width: 120px; padding: 0.75rem 1rem; vertical-align: top; white-space: nowrap;">
                                                 {% if update.status_change %}
@@ -249,10 +251,12 @@
                                                 {% endif %}
                                             </td>
                                             <td style="width: 120px; padding: 0.75rem 1rem; vertical-align: top;">
-                                                {% if update.attachments %}
-                                                    <a href="{{ MEDIA_URL }}{{ update.attachments }}" target="_blank" style="margin-right: 0.4rem;" title="View attachment">
-                                                        <i class="fa-solid fa-paperclip"></i>
-                                                    </a>
+                                                {% if update.attachment_links %}
+                                                    {% for file_path in update.attachment_links %}
+                                                        <a href="{{ MEDIA_URL }}{{ file_path }}" target="_blank" style="margin-right: 0.4rem;" title="View attachment {{ forloop.counter }}">
+                                                            <i class="fa-solid fa-paperclip"></i>
+                                                        </a>
+                                                    {% endfor %}
                                                 {% else %}
                                                     <span style="color:#9ca3af; font-size:0.8rem;">—</span>
                                                 {% endif %}

@@ -8,6 +8,7 @@ These do NOT persist data yet – they are meant for front-end review only.
 from datetime import timedelta
 import json
 from io import BytesIO
+from pathlib import Path
 
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -15,6 +16,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.urls import reverse
 from django.contrib.auth.models import User
+from django.core.files.storage import default_storage
+from django.utils.text import get_valid_filename
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -144,14 +147,20 @@ def situation_updates_page(request):
 
         if incident:
             # SituationUpdate.attachments is a CharField in this project.
-            # We store uploaded filenames (not the file contents).
+            # Persist the uploaded file to MEDIA and store a relative media path.
             attachments_value = request.POST.get("attachments") or ""
             try:
                 uploaded_files = request.FILES.getlist("attachments_file")
                 if uploaded_files:
-                    attachments_value = ",".join(f.name for f in uploaded_files)
-                    # keep within model max_length
-                    attachments_value = attachments_value[:100]
+                    first_file = uploaded_files[0]
+                    original_name = Path(first_file.name).name
+                    safe_name = get_valid_filename(original_name)
+                    timestamp_prefix = timezone.now().strftime("%Y%m%d%H%M%S")
+                    rel_path = (
+                        f"situation_updates/{incident.id}/{timestamp_prefix}_{safe_name}"
+                    )
+                    saved_path = default_storage.save(rel_path, first_file)
+                    attachments_value = str(saved_path).replace("\\", "/")[:100]
             except Exception:
                 pass
 
@@ -227,6 +236,13 @@ def situation_updates_page(request):
             situation_updates = list(
                 SituationUpdate.objects.filter(incident=selected_incident).order_by("-update_time")
             )
+            for item in situation_updates:
+                raw_attachments = (item.attachments or "").strip()
+                item.attachment_links = [
+                    path.strip()
+                    for path in raw_attachments.split(",")
+                    if path and path.strip()
+                ]
         except (IncidentCapture.DoesNotExist, ValueError, TypeError):
             selected_incident = None
             situation_updates = []
@@ -460,7 +476,8 @@ def _build_report_context(request):
     Shared helper for the Reports page and PDF generation.
 
     Incidents are scoped like Incident Management (org filter for liaison users).
-    Preview uses ?incident_id= when present (must be in the visible list), else the first incident.
+    Preview uses ?incident_id= when present (must be in the visible list).
+    If no incident is selected, preview remains empty and the UI shows placeholders.
     Metrics for the tiles are per selected incident; total_situation_logs remains a global count.
     """
     organization, current_status, last_sync_display = _get_org_and_status(request)
@@ -495,9 +512,6 @@ def _build_report_context(request):
                 preview_incident = cand
         except (IncidentCapture.DoesNotExist, ValueError, TypeError):
             preview_incident = None
-
-    if preview_incident is None and incidents:
-        preview_incident = incidents[0]
 
     if preview_incident is None:
         incident_situation_logs = 0

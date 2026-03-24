@@ -134,7 +134,7 @@
                                     {% if preview_incident %}
                                         {{ preview_incident.title }}
                                     {% else %}
-                                        Severe Weather – North Region
+                                        Select an incident
                                     {% endif %}
                                 </span>
                             </div>
@@ -144,11 +144,11 @@
                                 <span class="card-title" style="font-size: 0.8rem; text-transform: uppercase; color: #6b7280;">Severity</span>
                             </div>
                             <div class="card-body" style="padding-top: 0;">
-                                <span id="previewSeverity" class="status-badge status-alert">
+                                <span id="previewSeverity" class="status-badge {% if preview_incident %}status-alert{% else %}status-normal{% endif %}">
                                     {% if preview_incident %}
                                         {{ preview_incident.get_severity_display }}
                                     {% else %}
-                                        High
+                                        —
                                     {% endif %}
                                 </span>
                             </div>
