@@ -201,15 +201,17 @@
             <div style="margin-bottom: 1rem;">
                 <strong>Logs matching filter: <span id="situationLogsModalTotal">0</span></strong>
             </div>
-            <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
-                <table class="incidents-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+            <div class="table-responsive" style="max-height: 60vh; overflow-y: auto; overflow-x: auto;">
+                <table class="incidents-table" style="width: 100%; min-width: 980px; table-layout: fixed; border-collapse: separate; border-spacing: 0;">
                     <thead>
                         <tr style="background: #f9fafb;">
-                            <th style="padding: 0.6rem 1rem;">#SNO</th>
-                            <th style="padding: 0.6rem 1rem;">Timestamp</th>
-                            <th style="padding: 0.6rem 1rem;">Department</th>
-                            <th style="padding: 0.6rem 1rem;">Action / Description</th>
-                            <th style="padding: 0.6rem 1rem;">Status</th>
+
+                <th style="width: 50px; padding: 0.6rem 0.75rem; white-space: nowrap; text-align: center;">#SNO</th>
+                            <th style="width: 160px; padding: 0.6rem 1rem; white-space: nowrap;">Timestamp</th>
+                            <th style="width: 180px; padding: 0.6rem 1rem; white-space: nowrap;">Department</th>
+                            <th style="width: 470px; padding: 0.6rem 1rem;">Action / Description</th>
+                            <th style="width: 120px; padding: 0.6rem 1rem; white-space: nowrap; text-align: center;">Status</th>
+
                         </tr>
                     </thead>
                     <tbody id="situationLogsTableBody">
@@ -234,12 +236,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const reportsPdfBaseUrl = "{% url 'reports_pdf' %}";
     const apiSituationLogsUrl = "{% url 'api_situation_logs' %}";
     const apiReportsIncidentUrl = "{% url 'api_reports_incident' %}";
+    const initialPreviewIncidentId = "{{ preview_incident.id|default:'' }}";
 
-    {% if preview_incident %}
-    if (downloadPdfIconLink) {
-        downloadPdfIconLink.href = reportsPdfBaseUrl + "?incident_id=" + encodeURIComponent("{{ preview_incident.id }}");
+    if (downloadPdfIconLink && initialPreviewIncidentId) {
+        downloadPdfIconLink.href = reportsPdfBaseUrl + "?incident_id=" + encodeURIComponent(initialPreviewIncidentId);
     }
-    {% endif %}
 
     function applySeverityBadge(el, severityText) {
         const severity = (severityText || '').toLowerCase();
@@ -341,11 +342,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         const statusClass = log.status === 'ACTIVE' ? 'status-normal' : 'status-watch';
                         html += `
                             <tr>
-                                <td style="padding: 0.75rem 1rem;">${index + 1}</td>
-                                <td style="padding: 0.75rem 1rem;">${log.timestamp}</td>
-                                <td style="padding: 0.75rem 1rem;">${log.department}</td>
-                                <td style="padding: 0.75rem 1rem;">${log.description}</td>
-                                <td style="padding: 0.75rem 1rem;"><span class="status-badge ${statusClass}">${log.status}</span></td>
+                                <td style="padding: 0.75rem 0.75rem; text-align: center; vertical-align: top; white-space: nowrap;">${index + 1}</td>
+                                <td style="padding: 0.75rem 1rem; vertical-align: top; white-space: nowrap;">${log.timestamp}</td>
+                                <td style="padding: 0.75rem 1rem; vertical-align: top; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${log.department || '—'}">${log.department || '—'}</td>
+                                <td style="padding: 0.75rem 1rem; vertical-align: top; white-space: normal; word-break: break-word;">${log.description || '—'}</td>
+                                <td style="padding: 0.75rem 1rem; text-align: center; vertical-align: top; white-space: nowrap;"><span class="status-badge ${statusClass}">${log.status || '—'}</span></td>
                             </tr>
                         `;
                     });
