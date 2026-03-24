@@ -1326,9 +1326,7 @@ def dashboard(request):
             getattr(inc, "incident_hours", None)
             or dashboard_cadence_by_uid.get(getattr(inc, "incident_uid", None))
         )
-    all_incidents = _filter_incidents_by_county(
-        request, list(all_incidents), liaison=liaison
-    )
+    all_incidents = list(all_incidents)
 
     # Users count (from core_users table)
     try:
