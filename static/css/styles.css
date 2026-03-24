@@ -1588,7 +1588,7 @@ body {
 
 .freq-label {
     display: block;
-    font-size: 0.65rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
     color: var(--text-secondary);
     margin-bottom: 0.25rem;
@@ -1598,12 +1598,31 @@ body {
 .freq-value {
     font-weight: 600;
     color: #0f172a;
-    font-size: 1rem;
+    font-size: 0.8rem;
 }
 .alert-points {
-    margin: 0 0 0 1.25rem;
-    padding-left: 0.5rem;
-    color: #64748b;
+    margin: 10px 0 0 20px;
+    padding: 0;
+    list-style: none; /* remove default bullets */
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+.alert-points li {
+    position: relative;
+    margin-bottom: 6px;
+}
+ 
+/* ✅ Check icon */
+.alert-points li::before {
+    content: "\f00c"; /* Font Awesome check */
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    position: absolute;
+    left: -15px;
+    color: #22c55e; /* green check */
+    font-size: 12px;
 }
 
 .alert-points li {

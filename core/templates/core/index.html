@@ -168,7 +168,7 @@
         </div>
     </div>
 </section>
-
+ 
 <section class="alerts-section">
     <div class="container">
         <div class="section-header" style="text-align: left; margin-bottom: 2rem;">
@@ -185,19 +185,25 @@
                 </div>
                 <h3>Normal (No Alert)</h3>
                 <div class="frequency-box">
-                    <span class="freq-label"><i class="fa-regular fa-clock"></i> FREQUENCY</span>
+                    <span class="freq-label"><i class="fa-regular fa-clock"></i>    Frequency</span>
                     <span class="freq-value">1* / 24h</span>
                 </div>
                 <div class="frequency-box">
                     <span class="freq-label"><i class="fa-solid fa-circle-check"></i> INCLUDED</span>
                     <span class="freq-value">Included in Phase-0 and Phase-1</span>
                 </div>
-                <div class="alert-desc">
-                    <ul class="alert-points">
-                        <li>1 update / 24h</li>
-                        <li>Routine monitoring</li>
-                    </ul>
-                </div>
+                <!-- MODE -->
+    <div class="frequency-box">
+        <span class="freq-label">
+            <i class="fa-solid fa-wave-square"></i> Mode
+        </span>
+   
+        <ul class="alert-points">
+                    <li>1 update / 24h</li>
+                    <li>Routine monitoring</li>
+                </ul>
+    </div>
+    <p class="alert-desc">Daily updates and status reports.</p>
                 <div class="status-bar bar-green">PHASE-0 & PHASE-1</div>
             </div>
             <div class="alert-card level-b">
@@ -207,20 +213,26 @@
                 </div>
                 <h3>Emergency Watch</h3>
                 <div class="frequency-box">
-                    <span class="freq-label"><i class="fa-regular fa-clock"></i> FREQUENCY</span>
+                    <span class="freq-label"><i class="fa-regular fa-clock"></i> Frequency</span>
                     <span class="freq-value">~Every 8 hours</span>
                 </div>
                 <div class="frequency-box">
-                    <span class="freq-label">ACTIVATION COST</span>
+                    <span class="freq-label"><i class="fa-solid fa-dollar-sign"></i> ACTIVATION COST</span>
                     <span class="freq-value">$250 — Half Day (≤12h)<br>$500 — Full Day (≤24h)</span>
                     <span style="display:block;margin-top:0.5rem;font-size:0.875rem;font-weight:500;color:var(--text-secondary);line-height:1.4;">Only billed when activated. No charge when inactive.</span>
                 </div>
-                <div class="alert-desc">
-                    <ul class="alert-points">
-                        <li>3 updates / 24h</li>
-                        <li>Enhanced monitoring</li>
-                    </ul>
-                </div>
+                <!-- MODE -->
+    <div class="frequency-box">
+        <span class="freq-label">
+            <i class="fa-solid fa-circle-nodes"></i> Mode
+        </span>
+       
+        <ul class="alert-points">
+                    <li>3 updates / 24h</li>
+                    <li>Enhanced monitoring</li>
+                </ul>
+    </div>
+                <p class="alert-desc">Enhanced monitoring and coordination (=3*/24&NoBreak;h).</p>
                 <div class="status-bar bar-yellow">PHASE-0 ELIGIBLE</div>
             </div>
             <div class="alert-card level-c">
@@ -229,22 +241,29 @@
                     <span class="alert-badge">ALERT LEVEL C – RED ALERT</span>
                 </div>
                 <h3>High Alert</h3>
+               
                 <div class="frequency-box">
-                    <span class="freq-label"><i class="fa-regular fa-clock"></i> FREQUENCY</span>
+                    <span class="freq-label"><i class="fa-regular fa-clock"></i> Frequency</span>
                     <span class="freq-value">~Every 3-4 hours</span>
                 </div>
                 <div class="frequency-box">
-                    <span class="freq-label">ACTIVATION COST</span>
+                    <span class="freq-label"> <i class="fa-solid fa-bolt"></i> ACTIVATION COST</span>
                     <span class="freq-value">$1,750 — Half Day (≤12h)<br>$3,500 — Full Day (≤24h)</span>
                     <span style="display:block;margin-top:0.5rem;font-size:0.875rem;font-weight:500;color:var(--text-secondary);line-height:1.4;">For active incident response and critical coordination.</span>
                 </div>
-                <div class="alert-desc">
-                    <ul class="alert-points">
-                        <li>Updates every 2–4h</li>
-                        <li>24/7 active incident mode</li>
-                        <li>Real-time event logging</li>
-                    </ul>
-                </div>
+                 <!-- MODE -->
+    <div class="frequency-box">
+        <span class="freq-label">
+            <i class="fa-solid fa-fire" style="color: red;"></i> Mode
+        </span>
+        <span class="freq-value"><i class="fa-solid fa-clock" style="color: #f87171;"></i> 24/7 active incident posture</span>
+        <ul class="alert-points">
+                    <li>Updates every 2–4h</li>
+                    <li>24/7 active incident mode</li>
+                    <li>Real-time event logging</li>
+                </ul>
+    </div>
+    <p class="alert-desc">Critical incident management (=6-8*/24&NoBreak;h).</p>
                 <div class="status-bar bar-red">PHASE-1 REQUIRED</div>
             </div>
         </div>
@@ -255,6 +274,7 @@
         <div style="clear: both;"></div>
     </div>
 </section>
+ 
 
 <section id="pricing" class="pricing-section">
     <div class="container">
@@ -288,13 +308,12 @@
             <div class="pricing-header">
                 <h3>Enterprise</h3>
                 <div class="price">$75,000 <span class="period">one-time license</span></div>
-<<<<<<< HEAD
+
                     <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-secondary);">
                         Includes Year-1 maintenance. Enables High Alert (Level C) capability.
                     </p>
-=======
-                <p style="margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">Includes Year-1 maintenance. Enables High Alert (Level C) capability.</p>
->>>>>>> 7c6e57f0dc75754410eacd24f0a2140e6c93ded4
+
+               
                 <p>Phase-1 Install (Enterprise Scale)</p>
             </div>
                 <div class="timeline-box" style="margin-bottom: 1.5rem;">
