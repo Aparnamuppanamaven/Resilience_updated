@@ -42,6 +42,8 @@ from .models import (
     Organization,
     TxLog,
     UserCredentials,
+    Liaison,
+    UsersTable,
 )
 
 
@@ -97,6 +99,112 @@ def _require_auth(request):
     return None
 
 
+def _normalize_county(value):
+    if value is None:
+        return ""
+    return str(value).strip().casefold()
+
+
+def _county_for_incident_capture(incident):
+    if not incident:
+        return ""
+    try:
+        cb = getattr(incident, "created_by", None)
+        if cb is not None:
+            c = getattr(cb, "county", None) or ""
+            if _normalize_county(c):
+                return _normalize_county(c)
+    except Exception:
+        pass
+    try:
+        org = getattr(incident, "organization", None)
+        if org is not None:
+            li = Liaison.objects.filter(organization=org).exclude(county__exact="").first()
+            if li:
+                return _normalize_county(li.county)
+    except Exception:
+        pass
+    return ""
+
+
+def _county_for_users_table(ut):
+    if not ut:
+        return ""
+    for email in (ut.email_id, ut.liaison_email):
+        if not email:
+            continue
+        li = Liaison.objects.filter(user__email__iexact=email.strip()).first()
+        if li:
+            return _normalize_county(li.county or "")
+    return ""
+
+
+def _legacy_users_table_row(request):
+    if not request.session.get("user_credentials_id"):
+        return None
+    uname = (request.session.get("user_credentials_username") or "").strip()
+    if not uname:
+        return None
+    return UsersTable.objects.filter(
+        Q(primary_liaison_name__iexact=uname)
+        | Q(liaison_email__iexact=uname)
+        | Q(email_id__iexact=uname)
+    ).first()
+
+
+def _county_for_request_user(request):
+    if request.user.is_authenticated:
+        try:
+            li = request.user.liaison_profile
+            c = _normalize_county(getattr(li, "county", "") or "")
+            if c:
+                return c
+        except Exception:
+            pass
+    ut = _legacy_users_table_row(request)
+    if ut is not None:
+        return _county_for_users_table(ut)
+    return ""
+
+
+def _user_can_access_incident_capture(request, incident):
+    if not incident:
+        return False
+    inc_c = _county_for_incident_capture(incident)
+    user_c = _county_for_request_user(request)
+    if inc_c:
+        if not user_c:
+            return False
+        return inc_c == user_c
+    # Fallback if incident county is unavailable: preserve existing org behavior.
+    if request.user.is_authenticated:
+        try:
+            li = request.user.liaison_profile
+            lo_id = getattr(li, "organization_id", None) or getattr(
+                getattr(li, "organization", None), "pk", None
+            )
+            return lo_id is not None and int(incident.organization_id) == int(lo_id)
+        except Exception:
+            return False
+    ut = _legacy_users_table_row(request)
+    if ut is not None:
+        try:
+            emails = Liaison.objects.filter(organization=incident.organization).values_list(
+                "user__email", flat=True
+            )
+            em = {e.strip().lower() for e in emails if e}
+            for e in (ut.email_id, ut.liaison_email):
+                if e and e.strip().lower() in em:
+                    return True
+        except Exception:
+            return False
+    return False
+
+
+def _filter_incidents_by_county(request, incidents):
+    return [inc for inc in incidents if _user_can_access_incident_capture(request, inc)]
+
+
 def situation_updates_page(request):
     """
     UI-only Situation Updates page.
@@ -116,6 +224,8 @@ def situation_updates_page(request):
         try:
             incident = IncidentCapture.objects.get(id=incident_id)
         except (IncidentCapture.DoesNotExist, ValueError, TypeError):
+            incident = None
+        if incident is not None and not _user_can_access_incident_capture(request, incident):
             incident = None
 
         from django.utils import timezone
@@ -215,6 +325,7 @@ def situation_updates_page(request):
             return redirect(f"{reverse('situation_updates')}?incident_id={incident.id}")
 
     incidents = IncidentCapture.objects.all().order_by("-reported_time")[:50]
+    incidents = _filter_incidents_by_county(request, list(incidents))
 
     # Load distinct department categories for the Department/Sub Department dropdowns
     from .models import Department
@@ -231,6 +342,8 @@ def situation_updates_page(request):
     if incident_id_param:
         try:
             selected_incident = IncidentCapture.objects.get(id=incident_id_param)
+            if not _user_can_access_incident_capture(request, selected_incident):
+                raise IncidentCapture.DoesNotExist
             from .models import SituationUpdate
 
             situation_updates = list(
@@ -300,6 +413,7 @@ def shift_packets_page(request):
     organization, current_status, last_sync_display = _get_org_and_status(request)
     # Use capture incidents for the dropdown, but map them to Incident for scheduling/history
     incidents = IncidentCapture.objects.all().order_by("-reported_time")[:50]
+    incidents = _filter_incidents_by_county(request, list(incidents))
     selected_incident_capture = None
     selected_incident = None
     incident_id_param = request.GET.get("incident_id")
@@ -309,6 +423,8 @@ def shift_packets_page(request):
     if incident_id_param:
         try:
             selected_incident_capture = IncidentCapture.objects.get(id=incident_id_param)
+            if not _user_can_access_incident_capture(request, selected_incident_capture):
+                raise IncidentCapture.DoesNotExist
             selected_incident = _ensure_incident_for_capture(selected_incident_capture, organization)
         except (IncidentCapture.DoesNotExist, ValueError, TypeError):
             selected_incident_capture = None
@@ -322,6 +438,9 @@ def shift_packets_page(request):
         if incident_id and shift_hours:
             try:
                 capture_obj = IncidentCapture.objects.get(id=incident_id)
+                if not _user_can_access_incident_capture(request, capture_obj):
+                    capture_obj = None
+                    raise IncidentCapture.DoesNotExist
                 incident_obj = _ensure_incident_for_capture(capture_obj, organization)
                 shift_hours_int = int(shift_hours)
             except (IncidentCapture.DoesNotExist, ValueError, TypeError):
@@ -496,7 +615,7 @@ def _build_report_context(request):
     else:
         incidents_qs = IncidentCapture.objects.all().order_by("-reported_time")[:50]
 
-    incidents = list(incidents_qs)
+    incidents = _filter_incidents_by_county(request, list(incidents_qs))
     visible_ids = {i.id for i in incidents}
     for inc in incidents:
         lc, pc = _reports_counts_for_capture(inc)
@@ -575,6 +694,7 @@ def api_reports_incident(request):
         visible = IncidentCapture.objects.filter(organization=organization)
     else:
         visible = IncidentCapture.objects.all()
+    visible_ids = {i.id for i in _filter_incidents_by_county(request, list(visible))}
 
     incident_id = request.GET.get("incident_id")
     if not incident_id:
@@ -584,7 +704,7 @@ def api_reports_incident(request):
     except (ValueError, TypeError, IncidentCapture.DoesNotExist):
         return JsonResponse({"error": "Incident not found"}, status=404)
 
-    if not visible.filter(id=inc.id).exists():
+    if inc.id not in visible_ids:
         return JsonResponse({"error": "Incident not found"}, status=404)
 
     logs, packets = _reports_counts_for_capture(inc)
@@ -866,6 +986,11 @@ def api_situation_logs(request):
                 {"logs": [], "total": 0, "error": "Selected incident not found."},
                 status=404,
             )
+        if not _user_can_access_incident_capture(request, capture_incident):
+            return JsonResponse(
+                {"logs": [], "total": 0, "error": "Access denied: Cross-county operations are not permitted"},
+                status=403,
+            )
 
         from .models import SituationUpdate
 
@@ -912,6 +1037,11 @@ def api_report_summary(request):
         incident = IncidentCapture.objects.filter(id=incident_id).first()
         if incident is None:
             return JsonResponse({"error": "Selected incident not found."}, status=404)
+        if not _user_can_access_incident_capture(request, incident):
+            return JsonResponse(
+                {"error": "Access denied: Cross-county operations are not permitted"},
+                status=403,
+            )
 
         from .models import SituationUpdate
 
