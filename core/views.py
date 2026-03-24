@@ -121,6 +121,269 @@ def _remove_assigned_user_for_incident(incident_id, core_user_id):
     return deleted_count
 
 
+# --- County-based incident access (uses existing core_liaison.county; no migrations) ---
+
+def _normalize_county(value):
+    if value is None:
+        return ""
+    return str(value).strip().casefold()
+
+
+def _county_access_denied_message():
+    return "Access denied: Cross-county operations are not permitted"
+
+
+def _county_for_incident_capture(incident):
+    """County for an incident: creator liaison's county, else first liaison on the org with county set."""
+    if not incident:
+        return ""
+    try:
+        cb = getattr(incident, "created_by", None)
+        if cb is not None:
+            c = getattr(cb, "county", None) or ""
+            if _normalize_county(c):
+                return _normalize_county(c)
+    except Exception:
+        pass
+    try:
+        org = getattr(incident, "organization", None)
+        if org is not None:
+            li = (
+                Liaison.objects.filter(organization=org)
+                .exclude(county__exact="")
+                .first()
+            )
+            if li:
+                return _normalize_county(li.county)
+    except Exception:
+        pass
+    return ""
+
+
+def _county_for_users_table(ut):
+    """Resolve county for a core_users row via matching auth Liaison email."""
+    if not ut:
+        return ""
+    for email in (ut.email_id, ut.liaison_email):
+        if not email:
+            continue
+        liaison = Liaison.objects.filter(user__email__iexact=email.strip()).first()
+        if liaison:
+            return _normalize_county(liaison.county or "")
+    return ""
+
+
+def _liaison_for_request(request):
+    if not request.user.is_authenticated:
+        return None
+    try:
+        return request.user.liaison_profile
+    except Exception:
+        return None
+
+
+def _legacy_users_table_row(request):
+    if not request.session.get("user_credentials_id"):
+        return None
+    uname = (request.session.get("user_credentials_username") or "").strip()
+    if not uname:
+        return None
+    return UsersTable.objects.filter(
+        Q(primary_liaison_name__iexact=uname)
+        | Q(liaison_email__iexact=uname)
+        | Q(email_id__iexact=uname)
+    ).first()
+
+
+def _county_for_request_user(request, liaison=None):
+    if liaison is None:
+        liaison = _liaison_for_request(request)
+    if liaison is not None:
+        c = _normalize_county(getattr(liaison, "county", "") or "")
+        if c:
+            return c
+    ut = _legacy_users_table_row(request)
+    if ut is not None:
+        return _county_for_users_table(ut)
+    return ""
+
+
+def _legacy_user_in_incident_org(ut, organization):
+    if not ut or not organization:
+        return False
+    emails = Liaison.objects.filter(organization=organization).values_list(
+        "user__email", flat=True
+    )
+    em = {e.strip().lower() for e in emails if e}
+    for e in (ut.email_id, ut.liaison_email):
+        if e and e.strip().lower() in em:
+            return True
+    return False
+
+
+def _liaison_organization_id(liaison):
+    """Works for real Liaison rows and dashboard MockProfile (only has .organization)."""
+    if liaison is None:
+        return None
+    oid = getattr(liaison, "organization_id", None)
+    if oid is not None:
+        return oid
+    org = getattr(liaison, "organization", None)
+    if org is None:
+        return None
+    return getattr(org, "pk", None)
+
+
+def user_can_access_incident_capture(request, incident, liaison=None):
+    """
+    If the incident has a county on file, only matching-county users may access.
+    If the incident has no county, fall back to organization / legacy org linkage.
+    """
+    if not incident:
+        return False
+    inc_c = _county_for_incident_capture(incident)
+    user_c = _county_for_request_user(request, liaison=liaison)
+    if inc_c:
+        if not user_c:
+            return False
+        return inc_c == user_c
+    if liaison is None:
+        liaison = _liaison_for_request(request)
+    if liaison is not None:
+        try:
+            lo_id = _liaison_organization_id(liaison)
+            if lo_id is None:
+                return False
+            return int(incident.organization_id) == int(lo_id)
+        except Exception:
+            return False
+    ut = _legacy_users_table_row(request)
+    if ut is not None:
+        return _legacy_user_in_incident_org(ut, incident.organization)
+    return False
+
+
+def _log_incident_access_denied(request, incident_id, extra=""):
+    logger.warning(
+        "incident access denied: incident_id=%s user=%s county=%s %s",
+        incident_id,
+        getattr(request.user, "id", None),
+        _county_for_request_user(request),
+        extra,
+    )
+
+
+def _guard_incident_json(request, incident, liaison=None):
+    if user_can_access_incident_capture(request, incident, liaison=liaison):
+        return None
+    _log_incident_access_denied(request, getattr(incident, "id", None))
+    return JsonResponse({"error": _county_access_denied_message()}, status=403)
+
+
+def _guard_incident_redirect(request, incident, liaison=None):
+    if user_can_access_incident_capture(request, incident, liaison=liaison):
+        return None
+    _log_incident_access_denied(request, getattr(incident, "id", None))
+    messages.error(request, _county_access_denied_message())
+    return redirect("incidents_list")
+
+
+def _guard_incident_http(request, incident, liaison=None):
+    """403 plain HttpResponse for PDF/CSV endpoints."""
+    if user_can_access_incident_capture(request, incident, liaison=liaison):
+        return None
+    _log_incident_access_denied(request, getattr(incident, "id", None))
+    return HttpResponse(_county_access_denied_message(), status=403)
+
+
+def _core_user_is_admin_or_staff(ut):
+    """True if this core_users row should be hidden from incident assignment UI."""
+    if not ut:
+        return False
+    r = (getattr(ut, "role", None) or "").strip().lower()
+    if r in ("admin", "administrator"):
+        return True
+    try:
+        for email in (ut.email_id, ut.liaison_email):
+            if not email:
+                continue
+            u = User.objects.filter(email__iexact=email.strip()).first()
+            if u and (getattr(u, "is_staff", False) or getattr(u, "is_superuser", False)):
+                return True
+    except Exception:
+        pass
+    try:
+        # Requirement: liaison accounts should not appear in incident assignee lists.
+        for email in (ut.email_id, ut.liaison_email):
+            if not email:
+                continue
+            if Liaison.objects.filter(user__email__iexact=email.strip()).exists():
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _exclude_admin_core_users(qs):
+    """Remove admin/staff/liaison rows from assignment picker queryset."""
+    try:
+        qs = qs.exclude(role__iexact="admin").exclude(role__iexact="administrator")
+    except Exception:
+        pass
+    try:
+        staff_emails = [
+            e.strip().lower()
+            for e in User.objects.filter(Q(is_staff=True) | Q(is_superuser=True)).values_list(
+                "email", flat=True
+            )
+            if e
+        ]
+        for em in staff_emails:
+            qs = qs.exclude(Q(email_id__iexact=em) | Q(liaison_email__iexact=em))
+    except Exception:
+        pass
+    try:
+        liaison_emails = [
+            e.strip().lower()
+            for e in Liaison.objects.values_list("user__email", flat=True)
+            if e
+        ]
+        for em in liaison_emails:
+            qs = qs.exclude(Q(email_id__iexact=em) | Q(liaison_email__iexact=em))
+    except Exception:
+        pass
+    return qs
+
+
+def _assigned_users_data_for_incident(incident_id):
+    """Build assigned user cards; omit admin/staff accounts from the list (UX)."""
+    assigned_users_data = []
+    try:
+        for uid in _assigned_core_user_ids_for_incident(incident_id):
+            user_table = UsersTable.objects.filter(pk=uid).first()
+            if not user_table:
+                continue
+            if _core_user_is_admin_or_staff(user_table):
+                continue
+            assigned_users_data.append(
+                {
+                    "liaison": None,
+                    "user_table": user_table,
+                }
+            )
+    except Exception:
+        pass
+    return assigned_users_data
+
+
+def _filter_incidents_by_county(request, incidents, liaison=None):
+    out = []
+    for inc in incidents:
+        if user_can_access_incident_capture(request, inc, liaison=liaison):
+            out.append(inc)
+    return out
+
+
 def _assignable_core_users_qs(request, organization):
     """
     core_users rows linked to the org (via liaison emails) and filtered to the
@@ -151,8 +414,10 @@ def _assignable_core_users_qs(request, organization):
             if row:
                 dept = (row.department or "").strip()
     if dept:
-        return base.filter(department__iexact=dept)
-    return base
+        qs = base.filter(department__iexact=dept)
+    else:
+        qs = base
+    return _exclude_admin_core_users(qs)
 
 
 def _get_actionby_user_id(request, liaison=None):
@@ -1043,7 +1308,10 @@ def dashboard(request):
         # Legacy UserCredentials users and any fallback case:
         # show all incidents (no org filter) so previously captured data is visible.
         all_incidents = IncidentCapture.objects.all().order_by('-reported_time')
-    
+    all_incidents = _filter_incidents_by_county(
+        request, list(all_incidents), liaison=liaison
+    )
+
     # Users count (from core_users table)
     try:
         if organization and getattr(organization, "tenant_id", None) is not None:
@@ -1421,6 +1689,11 @@ def capture(request):
                 selected_incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
         except IncidentCapture.DoesNotExist:
             pass
+        if selected_incident and not user_can_access_incident_capture(
+            request, selected_incident, liaison=liaison
+        ):
+            selected_incident = None
+            messages.error(request, _county_access_denied_message())
     
     if request.method == 'POST':
         form = OperationalUpdateForm(request.POST)
@@ -2133,13 +2406,27 @@ def admin_module(request):
                     ).first()
                 except Exception:
                     pass
+            creator_liaison_email = ""
+            if request.user.is_authenticated:
+                try:
+                    creator_liaison = request.user.liaison_profile
+                    creator_liaison_email = (
+                        getattr(getattr(creator_liaison, "user", None), "email", "") or ""
+                    ).strip()
+                except Exception:
+                    creator_liaison_email = ""
+
             if not agency_name and logged_row and getattr(logged_row, 'agency_name', None):
                 agency_name = (logged_row.agency_name or '').strip()
             if not agency_name:
                 agency_name = 'Unknown'
             if not primary_liaison_name:
                 primary_liaison_name = name
-            if not liaison_email:
+            # Enforce creator-liaison inheritance for county-aware access:
+            # _county_for_users_table resolves county from Liaison by this email.
+            if creator_liaison_email:
+                liaison_email = creator_liaison_email
+            elif not liaison_email:
                 liaison_email = email_id
             
             # Optional profile image (file upload)
@@ -3051,6 +3338,11 @@ def incidents_list(request):
             if incident_id and shift_hours and organization:
                 try:
                     capture_obj = IncidentCapture.objects.get(id=incident_id)
+                    if not user_can_access_incident_capture(
+                        request, capture_obj, liaison=liaison
+                    ):
+                        messages.error(request, _county_access_denied_message())
+                        return redirect("incidents_list")
                     normalized_incident = _ensure_incident_for_capture(capture_obj, organization)
                     shift_hours_int = int(shift_hours)
                     IncidentShiftSchedule.objects.update_or_create(
@@ -3105,6 +3397,12 @@ def incidents_list(request):
                             request,
                             "Could not update incident: incident not found (invalid incident id).",
                         )
+                        return redirect("incidents_list")
+
+                    if not user_can_access_incident_capture(
+                        request, capture_obj, liaison=liaison
+                    ):
+                        messages.error(request, _county_access_denied_message())
                         return redirect("incidents_list")
 
                     # NOTE:
@@ -3253,11 +3551,17 @@ def incidents_list(request):
         incidents_qs = IncidentCapture.objects.filter(
             organization=organization
         ).order_by('-reported_time')
-        incidents = list(incidents_qs)
+        incidents = _filter_incidents_by_county(
+            request, list(incidents_qs), liaison=liaison
+        )
     else:
         # Legacy UserCredentials users and any fallback case:
         # show all incidents (no org filter) so previously captured data is visible.
-        incidents = list(IncidentCapture.objects.all().order_by('-reported_time'))
+        incidents = _filter_incidents_by_county(
+            request,
+            list(IncidentCapture.objects.all().order_by('-reported_time')),
+            liaison=None,
+        )
     
     # Attach any existing shift cadence configuration to each incident for display
     uids = [inc.incident_uid for inc in incidents if getattr(inc, "incident_uid", None) is not None]
@@ -3384,6 +3688,7 @@ def incident_copy_view(request):
         ).order_by('-reported_time')
     else:
         incidents = IncidentCapture.objects.all().order_by('-reported_time')
+    incidents = _filter_incidents_by_county(request, list(incidents), liaison=liaison)
 
     # System status / sync info (same as incidents_list)
     settings_obj, created = SystemSettings.objects.get_or_create(
@@ -3420,17 +3725,14 @@ def incident_copy_view(request):
             incident = IncidentCapture.objects.get(id=selected_id)
         except IncidentCapture.DoesNotExist:
             incident = None
+        if incident:
+            deny = _guard_incident_redirect(request, incident, liaison=liaison)
+            if deny:
+                return deny
 
     if incident:
         try:
-            for uid in _assigned_core_user_ids_for_incident(incident.id):
-                user_table = UsersTable.objects.filter(pk=uid).first()
-                if not user_table:
-                    continue
-                assigned_users_data.append({
-                    'liaison': None,
-                    'user_table': user_table,
-                })
+            assigned_users_data = _assigned_users_data_for_incident(incident.id)
         except Exception:
             assigned_users_data = []
 
@@ -3490,6 +3792,12 @@ def incident_copy_view(request):
             ex = _assigned_core_user_ids_for_incident(incident.id)
             if ex:
                 all_users = all_users.exclude(id__in=ex)
+            inc_c_grid = _county_for_incident_capture(incident)
+            if inc_c_grid:
+                keep_ids = [
+                    u.id for u in all_users if _county_for_users_table(u) == inc_c_grid
+                ]
+                all_users = UsersTable.objects.filter(id__in=keep_ids).order_by('-created_at')
     else:
         all_users = UsersTable.objects.all().order_by('-created_at')
     department_categories = (
@@ -3557,6 +3865,10 @@ def incident_detail(request, incident_id):
     except IncidentCapture.DoesNotExist:
         messages.error(request, 'Incident not found.')
         return redirect('incidents_list')
+
+    deny = _guard_incident_redirect(request, incident, liaison=liaison)
+    if deny:
+        return deny
     
     # Get or create system settings for status display
     settings_obj, created = SystemSettings.objects.get_or_create(
@@ -3587,6 +3899,12 @@ def incident_detail(request, incident_id):
     assigned_ids = _assigned_core_user_ids_for_incident(incident.id)
     if assigned_ids:
         all_users = all_users.exclude(id__in=assigned_ids)
+    inc_c_pick = _county_for_incident_capture(incident)
+    if inc_c_pick:
+        keep_ids = [
+            u.id for u in all_users if _county_for_users_table(u) == inc_c_pick
+        ]
+        all_users = UsersTable.objects.filter(id__in=keep_ids).order_by('-created_at')
 
     # Get list of available department categories (for filtering users by department)
     department_categories = (
@@ -3596,15 +3914,7 @@ def incident_detail(request, incident_id):
     )
 
     assigned_liaisons = []
-    assigned_users_data = []
-    for uid in assigned_ids:
-        user_table = UsersTable.objects.filter(pk=uid).first()
-        if not user_table:
-            continue
-        assigned_users_data.append({
-            'liaison': None,
-            'user_table': user_table,
-        })
+    assigned_users_data = _assigned_users_data_for_incident(incident.id)
     
     # Get incident event logs
     # Note: IncidentEvent has ForeignKey to Incident, but we're using IncidentCapture
@@ -3694,6 +4004,18 @@ def search_users_for_assignment(request):
     incident_id = request.GET.get('incident_id', '').strip()
     if not query:
         return JsonResponse({'users': []})
+
+    liaison = _liaison_for_request(request)
+    incident_for_county = None
+    if incident_id:
+        try:
+            incident_for_county = IncidentCapture.objects.get(id=int(incident_id))
+        except (IncidentCapture.DoesNotExist, ValueError):
+            incident_for_county = None
+        if incident_for_county:
+            deny = _guard_incident_json(request, incident_for_county, liaison=liaison)
+            if deny:
+                return deny
     
     # Determine organization (from logged-in liaison or incident, similar to incident_detail)
     organization = None
@@ -3703,12 +4025,8 @@ def search_users_for_assignment(request):
             organization = liaison.organization
         except (Liaison.DoesNotExist, AttributeError):
             organization = None
-    if (not organization) and incident_id:
-        try:
-            incident = IncidentCapture.objects.get(id=int(incident_id))
-            organization = incident.organization
-        except (IncidentCapture.DoesNotExist, ValueError):
-            organization = None
+    if (not organization) and incident_for_county:
+        organization = incident_for_county.organization
 
     users = UsersTable.objects.filter(
         Q(name__icontains=query) |
@@ -3731,9 +4049,15 @@ def search_users_for_assignment(request):
                 users = users.exclude(id__in=ex)
         except (TypeError, ValueError):
             pass
+
+    inc_c = _county_for_incident_capture(incident_for_county) if incident_for_county else ""
     
     results = []
     for user_row in users:
+        if _core_user_is_admin_or_staff(user_row):
+            continue
+        if inc_c and _county_for_users_table(user_row) != inc_c:
+            continue
         results.append({
             'id': user_row.id,
             'name': user_row.name or user_row.primary_liaison_name or '',
@@ -3757,6 +4081,7 @@ def assign_users_to_incident(request, incident_id):
     try:
         # Get organization
         organization = None
+        liaison = None
         if request.user.is_authenticated:
             try:
                 liaison = request.user.liaison_profile
@@ -3783,6 +4108,10 @@ def assign_users_to_incident(request, incident_id):
                 incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
             except IncidentCapture.DoesNotExist:
                 return JsonResponse({'error': 'Incident not found'}, status=404)
+
+        deny = _guard_incident_json(request, incident, liaison=liaison)
+        if deny:
+            return deny
         
         # Get user IDs from POST data (list of UsersTable IDs)
         data = json.loads(request.body)
@@ -3794,6 +4123,7 @@ def assign_users_to_incident(request, incident_id):
         assignable = _assignable_core_users_qs(request, organization)
         valid_ids = []
         errors = []
+        inc_c = _county_for_incident_capture(incident)
 
         for raw_id in user_ids:
             try:
@@ -3806,9 +4136,20 @@ def assign_users_to_incident(request, incident_id):
             except UsersTable.DoesNotExist:
                 errors.append(f'User ID {uid} not found')
                 continue
+            if _core_user_is_admin_or_staff(user_table):
+                errors.append(
+                    f'User ID {uid} cannot be assigned (administrator accounts are excluded from incident teams).'
+                )
+                continue
             if not assignable.filter(pk=uid).exists():
                 errors.append(
                     f'User ID {uid} is not assignable (wrong department or not linked to this organization).'
+                )
+                continue
+            ut_c = _county_for_users_table(user_table)
+            if inc_c and (not ut_c or ut_c != inc_c):
+                errors.append(
+                    f'User ID {uid}: {_county_access_denied_message()}'
                 )
                 continue
             valid_ids.append(uid)
@@ -3828,6 +4169,13 @@ def assign_users_to_incident(request, incident_id):
                 {'error': f'Could not save assignments: {exc}'},
                 status=500,
             )
+
+        logger.info(
+            "incident_assign actor_user_id=%s incident_id=%s added_core_user_ids=%s",
+            _get_actionby_user_id(request, liaison),
+            incident.id,
+            valid_ids,
+        )
 
         id_to_row = {
             ut.id: ut for ut in UsersTable.objects.filter(id__in=valid_ids)
@@ -3862,6 +4210,7 @@ def remove_user_from_incident(request, incident_id):
 
     try:
         organization = None
+        liaison = None
         if request.user.is_authenticated:
             try:
                 liaison = request.user.liaison_profile
@@ -3885,6 +4234,10 @@ def remove_user_from_incident(request, incident_id):
             except IncidentCapture.DoesNotExist:
                 return JsonResponse({'error': 'Incident not found'}, status=404)
 
+        deny = _guard_incident_json(request, incident, liaison=liaison)
+        if deny:
+            return deny
+
         data = json.loads(request.body or "{}")
         raw_user_id = data.get('user_id')
         try:
@@ -3895,6 +4248,13 @@ def remove_user_from_incident(request, incident_id):
         deleted_count = _remove_assigned_user_for_incident(incident.id, user_id)
         if deleted_count == 0:
             return JsonResponse({'error': 'Assignment not found for this incident'}, status=404)
+
+        logger.info(
+            "incident_unassign actor_user_id=%s incident_id=%s removed_core_user_id=%s",
+            _get_actionby_user_id(request, liaison),
+            incident.id,
+            user_id,
+        )
 
         return JsonResponse({
             'success': True,
@@ -3917,6 +4277,7 @@ def add_incident_event_log(request, incident_id):
     try:
         # Get organization
         organization = None
+        liaison = None
         if request.user.is_authenticated:
             try:
                 liaison = request.user.liaison_profile
@@ -3943,6 +4304,10 @@ def add_incident_event_log(request, incident_id):
                 incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
             except IncidentCapture.DoesNotExist:
                 return JsonResponse({'error': 'Incident not found'}, status=404)
+
+        deny = _guard_incident_json(request, incident, liaison=liaison)
+        if deny:
+            return deny
         
         # Get log description from POST data
         data = json.loads(request.body)
@@ -4079,6 +4444,7 @@ def incident_log_history_pdf(request, incident_id):
     try:
         # Get organization
         organization = None
+        liaison = None
         if request.user.is_authenticated:
             try:
                 liaison = request.user.liaison_profile
@@ -4104,19 +4470,12 @@ def incident_log_history_pdf(request, incident_id):
                 incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
             except IncidentCapture.DoesNotExist:
                 return HttpResponse('Incident not found', status=404)
+
+        deny = _guard_incident_http(request, incident, liaison=liaison)
+        if deny:
+            return deny
         
-        assigned_users_data = []
-        try:
-            for uid in _assigned_core_user_ids_for_incident(incident.id):
-                user_table = UsersTable.objects.filter(pk=uid).first()
-                if not user_table:
-                    continue
-                assigned_users_data.append({
-                    'liaison': None,
-                    'user_table': user_table,
-                })
-        except Exception:
-            assigned_users_data = []
+        assigned_users_data = _assigned_users_data_for_incident(incident.id)
         
         # Get incident logs
         incident_logs = []
@@ -4775,6 +5134,7 @@ def generate_incident_shift_packet_pdf(request, incident_id):
 
     try:
         organization = None
+        liaison = None
         if request.user.is_authenticated:
             try:
                 liaison = request.user.liaison_profile
@@ -4797,6 +5157,10 @@ def generate_incident_shift_packet_pdf(request, incident_id):
                 incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
             except IncidentCapture.DoesNotExist:
                 return HttpResponse('Incident not found', status=404)
+
+        deny = _guard_incident_http(request, incident, liaison=liaison)
+        if deny:
+            return deny
 
         # Load Shift Packet history entries for this incident (via shared incident_uid)
         history_entries = []
@@ -5068,6 +5432,7 @@ def incident_case_history_csv(request, incident_id):
     try:
         # Get organization similar to generate_incident_shift_packet_pdf
         organization = None
+        liaison = None
         if request.user.is_authenticated:
             try:
                 liaison = request.user.liaison_profile
@@ -5091,6 +5456,10 @@ def incident_case_history_csv(request, incident_id):
                 incident = IncidentCapture.objects.get(id=incident_id, organization=organization)
             except IncidentCapture.DoesNotExist:
                 return HttpResponse('Incident not found', status=404)
+
+        deny = _guard_incident_http(request, incident, liaison=liaison)
+        if deny:
+            return deny
 
         # Build incident logs using same logic as PDF generation
         incident_logs = []
