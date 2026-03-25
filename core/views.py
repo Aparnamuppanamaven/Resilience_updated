@@ -1560,10 +1560,17 @@ def profile_edit(request):
     if request.method == 'POST':
         form = ProfileEditForm(request.POST, request.FILES)
         if form.is_valid():
+            # Capture old identifiers so legacy `UsersTable` photo mirroring still finds the correct row
+            # even if the user changes username/email in this POST.
+            old_email = (request.user.email or "").strip()
+            old_username = (request.user.username or "").strip()
+            old_full_name = (request.user.get_full_name() or "").strip()
+
+            normalized_username = (form.cleaned_data.get('username') or '').strip()
             normalized_email = (form.cleaned_data.get('email') or '').strip().lower()
             first_name = (form.cleaned_data.get('first_name') or '').strip()
             last_name = (form.cleaned_data.get('last_name') or '').strip()
-            request.user.username = normalized_email
+            request.user.username = normalized_username
             request.user.email = normalized_email
             request.user.first_name = first_name
             request.user.last_name = last_name
@@ -1590,10 +1597,10 @@ def profile_edit(request):
                     user_image_path = f"user_images/{filename}"
                     # Primary storage: core_users.user_image — update any row matching this user (email or name)
                     q = (
-                        Q(liaison_email__iexact=request.user.email)
-                        | Q(email_id__iexact=request.user.email)
-                        | Q(primary_liaison_name__iexact=request.user.username or '')
-                        | Q(primary_liaison_name__iexact=(request.user.get_full_name() or '').strip())
+                        Q(liaison_email__iexact=old_email)
+                        | Q(email_id__iexact=old_email)
+                        | Q(primary_liaison_name__iexact=old_username or '')
+                        | Q(primary_liaison_name__iexact=old_full_name or '')
                     )
                     UsersTable.objects.filter(q).update(user_image=user_image_path)
                     # Keep liaison.profile_image in sync for backward compatibility
@@ -1605,10 +1612,10 @@ def profile_edit(request):
             return redirect('dashboard')
     else:
         form = ProfileEditForm(initial={
-            'username': request.user.email or request.user.username or '',
+            'username': request.user.username or '',
             'first_name': request.user.first_name or '',
             'last_name': request.user.last_name or '',
-            'email': request.user.email or request.user.username or '',
+            'email': request.user.email or '',
             'organization_name': organization.name or '',
             'mobile_number': liaison.phone or '',
         })
