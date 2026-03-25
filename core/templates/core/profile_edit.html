@@ -151,6 +151,15 @@
                             <a href="{% url 'dashboard' %}" class="btn btn-secondary">Cancel</a>
                         </div>
                     </form>
+
+                    <div style="margin-top: 1rem;">
+                        <form method="post" action="{% url 'profile_reset_password' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-secondary" style="width: 100%;">
+                                <i class="fa-solid fa-key"></i> Send password reset email
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

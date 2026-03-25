@@ -1173,7 +1173,7 @@ def onboarding(request):
             to_email = user.email or getattr(liaison.user, 'email', None)
             if to_email:
                 token = make_setup_password_token(user)
-                setup_url = request.build_absolute_uri(reverse('setup_password', kwargs={'token': token}))
+                setup_url = f"{request.scheme}://{request.get_host()}{reverse('setup_password', kwargs={'token': token})}"
                 try:
                     send_mail(
                         subject='Resilience – Registration completed – set up your password',
@@ -2814,11 +2814,155 @@ def setup_password(request, token):
         return redirect('login')
     form = SetupPasswordForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        user.set_password(form.cleaned_data['new_password'])
+        new_password = form.cleaned_data['new_password']
+        user.set_password(new_password)
         user.save()
+        # Legacy login support:
+        # This project also allows logging in via `UserCredentials` (legacy table)
+        # where passwords are stored as plain text in `password_hash`.
+        # If we don't update it here, the old password can still work.
+        try:
+            legacy_candidates = []
+            if getattr(user, "email", None):
+                legacy_candidates.append(user.email.strip())
+            if getattr(user, "username", None):
+                legacy_candidates.append(user.username.strip())
+            if legacy_candidates:
+                UserCredentials.objects.filter(
+                    username__in=legacy_candidates
+                ).update(password_hash=new_password)
+        except Exception:
+            # Password reset should still succeed even if legacy mirror update fails.
+            pass
         messages.success(request, 'Password set successfully. You can now log in.')
         return redirect('login')
     return render(request, 'core/setup_password.html', {'form': form})
+
+
+def forgot_password(request):
+    """
+    SMTP-based forgot-password request.
+    Sends a time-limited token link that reuses the existing setup-password page.
+    Works for Django auth users (Liaison) with an email.
+    """
+    if request.method == "POST":
+        raw = (request.POST.get("email_or_username") or "").strip()
+        email_or_username = raw
+
+        # Always return the same success response to avoid user enumeration.
+        user = None
+        try:
+            if "@" in (email_or_username or ""):
+                user = User.objects.filter(email__iexact=email_or_username).first()
+            else:
+                resolved = resolve_login_username(email_or_username)
+                if resolved:
+                    user = User.objects.filter(username=resolved).first()
+        except Exception:
+            user = None
+
+        if user and getattr(user, "email", None):
+            token = make_setup_password_token(user)
+            setup_url = f"{request.scheme}://{request.get_host()}{reverse('setup_password', kwargs={'token': token})}"
+            logger.info("forgot_password setup_url=%s", setup_url)
+            try:
+                send_mail(
+                    subject="Resilience – Password reset link",
+                    message=(
+                        "Hi,"
+                        "\n\n"
+                        "We received a request to reset your Resilience password."
+                        "\n\n"
+                        "Reset your password using the link below (valid for 7 days):"
+                        "\n"
+                        f"{setup_url}"
+                        "\n\n"
+                        "If you did not request this, you can ignore this email."
+                        "\n\n"
+                        "— Resilience Team"
+                    ),
+                    from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@resilience.example.com"),
+                    recipient_list=[user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
+
+        messages.success(
+            request,
+            "If the email exists, we sent a password reset link. Please check your inbox.",
+        )
+        return redirect("login")
+
+    return render(request, "core/forgot_password.html")
+
+
+def profile_reset_password(request):
+    """
+    Send SMTP reset link from the profile edit page (same mechanism as forgot-password).
+    This is a convenience action for logged-in users.
+    """
+    if request.method != "POST":
+        return redirect("profile_edit")
+
+    # Auth check mirrors profile_edit
+    if not request.user.is_authenticated and "user_credentials_id" not in request.session:
+        messages.error(request, "Please log in first.")
+        return redirect("login")
+
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        raw = (request.session.get("user_credentials_username") or "").strip()
+        if "@" in (raw or ""):
+            user = User.objects.filter(email__iexact=raw).first()
+        else:
+            resolved = resolve_login_username(raw)
+            if resolved:
+                user = User.objects.filter(username=resolved).first()
+
+    if user and getattr(user, "email", None):
+        token = make_setup_password_token(user)
+        setup_url = f"{request.scheme}://{request.get_host()}{reverse('setup_password', kwargs={'token': token})}"
+        try:
+            sent_count = send_mail(
+                subject="Resilience – Password reset link",
+                message=(
+                    "Hi,"
+                    "\n\n"
+                    "You requested a password reset from your profile."
+                    "\n\n"
+                    "Reset your password using the link below (valid for 7 days):"
+                    "\n"
+                    f"{setup_url}"
+                    "\n\n"
+                    "If you did not request this, you can ignore this email."
+                    "\n\n"
+                    "— Resilience Team"
+                ),
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@resilience.example.com"),
+                recipient_list=[user.email],
+                fail_silently=True,
+            )
+            logger.info(
+                "profile_reset_password email_to=%s sent_count=%s setup_url=%s",
+                user.email,
+                sent_count,
+                setup_url,
+            )
+        except Exception as exc:
+            # Still redirect with generic success text
+            logger.exception("profile_reset_password send failed: %s", exc)
+
+        messages.success(
+            request,
+            "If the email exists, we sent a password reset link. Please check your inbox.",
+        )
+    else:
+        messages.error(request, "Password reset is not available for this account.")
+
+    return redirect("profile_edit")
 
 
 @csrf_exempt

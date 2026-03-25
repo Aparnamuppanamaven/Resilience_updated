@@ -61,6 +61,8 @@ urlpatterns = [
     path('complete-registration/', views.complete_registration, name='complete_registration'),
     path('payment-failed/', views.payment_failed, name='payment_failed'),
     path('setup-password/<str:token>/', views.setup_password, name='setup_password'),
+    path('forgot-password/', views.forgot_password, name='forgot_password'),
+    path('profile/edit/reset-password/', views.profile_reset_password, name='profile_reset_password'),
     # Stripe endpoints
     path('create-payment-intent/', views.create_payment_intent, name='create_payment_intent'),
     path('webhook/', views.stripe_webhook, name='stripe_webhook'),
