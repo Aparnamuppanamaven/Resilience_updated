@@ -171,7 +171,6 @@ class IncidentCapture(models.Model):
     zipcode = models.CharField(max_length=20, null=True, blank=True, db_column='Zipcode')
     casualties = models.IntegerField(null=True, blank=True, db_column='casualties')
     source = models.CharField(max_length=100, null=True, blank=True, db_column='source')
-    incident_hours = models.CharField(max_length=10, null=True, blank=True, db_column='incident_hours')
     tenant_id = models.BigIntegerField(null=True, blank=True, db_column='tenant_id')
     
     class Meta:

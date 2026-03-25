@@ -1308,24 +1308,6 @@ def dashboard(request):
         # Legacy UserCredentials users and any fallback case:
         # show all incidents (no org filter) so previously captured data is visible.
         all_incidents = IncidentCapture.objects.all().order_by('-reported_time')
-
-    # Make cadence available on dashboard rows:
-    # prefer core_incidents.incident_hours, fallback to shift schedule if missing.
-    dashboard_uids = [
-        inc.incident_uid for inc in all_incidents if getattr(inc, "incident_uid", None) is not None
-    ]
-    if dashboard_uids:
-        dashboard_schedules = IncidentShiftSchedule.objects.filter(incident_uid__in=dashboard_uids)
-        dashboard_cadence_by_uid = {
-            s.incident_uid: s.shift_hours for s in dashboard_schedules
-        }
-    else:
-        dashboard_cadence_by_uid = {}
-    for inc in all_incidents:
-        inc.shift_cadence_hours = (
-            getattr(inc, "incident_hours", None)
-            or dashboard_cadence_by_uid.get(getattr(inc, "incident_uid", None))
-        )
     all_incidents = _filter_incidents_by_county(
         request, list(all_incidents), liaison=liaison
     )
@@ -2275,16 +2257,6 @@ def login_view(request):
             user = authenticate(request, username=auth_username, password=password)
 
             if user is not None:
-                if not is_renewal_flow and not user_has_active_subscription(user.username):
-                    messages.error(
-                        request,
-                        'Your subscription is inactive or has expired. Please renew to log in.'
-                    )
-                    return render(request, 'core/login.html', {
-                        'form': form,
-                        'existing_email': existing_email if is_renewal_flow else None
-                    })
-
                 # Log in the user
                 login(request, user)
                 # 24-hour session window
@@ -3361,8 +3333,6 @@ def incidents_list(request):
                     ):
                         messages.error(request, _county_access_denied_message())
                         return redirect("incidents_list")
-                    capture_obj.incident_hours = str(shift_hours)
-                    capture_obj.save(update_fields=["incident_hours"])
                     normalized_incident = _ensure_incident_for_capture(capture_obj, organization)
                     shift_hours_int = int(shift_hours)
                     IncidentShiftSchedule.objects.update_or_create(
@@ -3444,17 +3414,7 @@ def incidents_list(request):
                         if severity_norm in allowed_severities:
                             capture_obj.severity = severity_norm
 
-                    if shift_hours:
-                        capture_obj.incident_hours = shift_hours
-
-                    capture_obj.save(
-                        update_fields=[
-                            "status",
-                            "resolved_at",
-                        ]
-                        + (["severity"] if severity_in and capture_obj.severity else [])
-                        + (["incident_hours"] if shift_hours else [])
-                    )
+                    capture_obj.save(update_fields=["status", "resolved_at"] + (["severity"] if capture_obj.severity else []))
 
                     # Keep normalized Incident row in sync (if we have org context)
                     if organization is not None:
@@ -3539,8 +3499,6 @@ def incidents_list(request):
             if shift_cadence:
                 try:
                     shift_hours_int = int(shift_cadence)
-                    incident.incident_hours = shift_cadence
-                    incident.save(update_fields=["incident_hours"])
                     normalized_incident = _ensure_incident_for_capture(incident, organization)
                     IncidentShiftSchedule.objects.update_or_create(
                         incident=normalized_incident,
@@ -3595,8 +3553,7 @@ def incidents_list(request):
             liaison=None,
         )
     
-    # Attach shift cadence for display/edit:
-    # prefer core_incidents.incident_hours, fallback to shift schedule if missing.
+    # Attach any existing shift cadence configuration to each incident for display
     uids = [inc.incident_uid for inc in incidents if getattr(inc, "incident_uid", None) is not None]
     if uids:
         schedules = IncidentShiftSchedule.objects.filter(incident_uid__in=uids)
@@ -3604,10 +3561,7 @@ def incidents_list(request):
     else:
         cadence_by_uid = {}
     for inc in incidents:
-        inc.shift_cadence_hours = (
-            getattr(inc, "incident_hours", None)
-            or cadence_by_uid.get(getattr(inc, "incident_uid", None))
-        )
+        inc.shift_cadence_hours = cadence_by_uid.get(getattr(inc, "incident_uid", None))
     
     # Get or create system settings for status display
     settings_obj, created = SystemSettings.objects.get_or_create(
