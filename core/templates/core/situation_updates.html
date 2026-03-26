@@ -324,17 +324,28 @@
                     {% csrf_token %}
                     <input type="hidden" name="incident_id" id="modal_incident_id" value="">
 
+                    <div id="situationUpdateFormErrors" style="
+                        display: none;
+                        background: #fef2f2;
+                        border: 1px solid #fecaca;
+                        color: #991b1b;
+                        border-radius: 10px;
+                        padding: 0.75rem 1rem;
+                        margin-bottom: 1rem;
+                        font-size: 0.95rem;
+                    "></div>
+
                     <!-- Layout matches the “Add Situation Update” screenshot -->
                     <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
                             <label class="form-label" for="situationupdate_title">Situation Title</label>
                             <input type="text" id="situationupdate_title" name="situationupdate_title" class="form-control"
-                                   placeholder="Situation Title">
+                                   placeholder="Situation Title" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="update_time">Update Time</label>
                             <input type="datetime-local" id="update_time" name="update_time" class="form-control"
-                                   step="60" title="Select date and time">
+                                   step="60" title="Select date and time" required>
                         </div>
                     </div>
 
@@ -342,7 +353,7 @@
                         <label class="form-label" for="situationupdate_description">Description</label>
                         <textarea id="situationupdate_description" name="situationupdate_description" class="form-control"
                                   rows="3"
-                                  placeholder="What changed since the last update? Key operational notes, impacts, and actions."></textarea>
+                                  placeholder="What changed since the last update? Key operational notes, impacts, and actions." required></textarea>
                     </div>
 
                     <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
@@ -370,28 +381,28 @@
                     <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
                         <div class="form-group">
                             <label class="form-label" for="casualties_injured">Casualties – Injured</label>
-                            <input type="number" id="casualties_injured" name="casualties_injured" class="form-control" min="0">
+                            <input type="number" id="casualties_injured" name="casualties_injured" class="form-control" min="0" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="casualties_dead">Casualties – Dead</label>
-                            <input type="number" id="casualties_dead" name="casualties_dead" class="form-control" min="0">
+                            <input type="number" id="casualties_dead" name="casualties_dead" class="form-control" min="0" required>
                         </div>
                     </div>
 
                     <div class="dashboard-grid" style="margin-top: 0.75rem; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
                         <div class="form-group">
                             <label class="form-label" for="actions_taken">Actions Taken</label>
-                            <textarea id="actions_taken" name="actions_taken" class="form-control" rows="2"></textarea>
+                            <textarea id="actions_taken" name="actions_taken" class="form-control" rows="2" required></textarea>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="resources_deployed">Resources Deployed</label>
-                            <textarea id="resources_deployed" name="resources_deployed" class="form-control" rows="2"></textarea>
+                            <textarea id="resources_deployed" name="resources_deployed" class="form-control" rows="2" required></textarea>
                         </div>
                     </div>
 
                     <div class="form-group" style="margin-top: 0.75rem;">
                         <label class="form-label" for="next_steps">Next Steps</label>
-                        <textarea id="next_steps" name="next_steps" class="form-control" rows="2"></textarea>
+                        <textarea id="next_steps" name="next_steps" class="form-control" rows="2" required></textarea>
                     </div>
 
                     <div class="form-group" style="margin-top: 0.75rem;">
@@ -416,6 +427,11 @@
     function openAddSituationUpdateModal(incidentId) {
         document.getElementById('modal_incident_id').value = incidentId || '';
         document.getElementById('addSituationUpdateModal').style.display = 'flex';
+        var errEl = document.getElementById('situationUpdateFormErrors');
+        if (errEl) {
+            errEl.style.display = 'none';
+            errEl.innerHTML = '';
+        }
 
         // Auto-fill update_time for datetime-local (YYYY-MM-DDTHH:mm)
         try {
@@ -583,6 +599,58 @@
         document.getElementById('addSituationUpdateModal').addEventListener('click', function(e) {
             if (e.target === this) closeAddSituationUpdateModal();
         });
+
+        var form = document.getElementById('addSituationUpdateForm');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                var errEl = document.getElementById('situationUpdateFormErrors');
+                if (!errEl) return;
+
+                // Match the required fields shown in your screenshot.
+                var requiredIds = [
+                    'situationupdate_title',
+                    'update_time',
+                    'situationupdate_description',
+                    'reported_by',
+                    'confidence_level',
+                    'casualties_injured',
+                    'casualties_dead',
+                    'actions_taken',
+                    'resources_deployed',
+                    'next_steps',
+                ];
+
+                var missing = [];
+                requiredIds.forEach(function(id) {
+                    var el = document.getElementById(id);
+                    if (!el) return;
+
+                    var value = (el.value || '').trim();
+                    if (!value) {
+                        missing.push(el.getAttribute('name') || id);
+                        return;
+                    }
+
+                    // Numeric guard (casualties)
+                    if (id === 'casualties_injured' || id === 'casualties_dead') {
+                        var num = Number(value);
+                        if (Number.isNaN(num) || num < 0) {
+                            missing.push(el.getAttribute('name') || id);
+                        }
+                    }
+                });
+
+                if (missing.length > 0) {
+                    e.preventDefault();
+                    errEl.style.display = 'block';
+                    errEl.innerHTML = '<div style="font-weight: 700; margin-bottom: 0.25rem;">Please fill all required fields before submitting.</div>' +
+                        '<div style="color: #b91c1c;">Missing: ' + missing.slice(0, 6).join(', ') + (missing.length > 6 ? '...' : '') + '</div>';
+                } else {
+                    errEl.style.display = 'none';
+                    errEl.innerHTML = '';
+                }
+            });
+        }
     });
     </script>
 </div>
