@@ -382,6 +382,45 @@ def _filter_incidents_by_county(request, incidents, liaison=None):
     return out
 
 
+def _attach_shift_cadence_to_incidents(incidents, organization=None):
+    """
+    Populate `inc.shift_cadence_hours` for IncidentCapture rows.
+    Uses latest schedule and supports lookup by both schedule.incident_uid and
+    normalized Incident.incident_uid as fallback.
+    """
+    uids = [
+        getattr(inc, "incident_uid", None)
+        for inc in incidents
+        if getattr(inc, "incident_uid", None) is not None
+    ]
+    if not uids:
+        for inc in incidents:
+            inc.shift_cadence_hours = None
+        return
+
+    schedules_qs = IncidentShiftSchedule.objects.select_related("incident").filter(
+        Q(incident_uid__in=uids) | Q(incident__incident_uid__in=uids)
+    )
+    if organization is not None:
+        schedules_qs = schedules_qs.filter(incident__organization=organization)
+    schedules_qs = schedules_qs.order_by("-created_at")
+
+    cadence_by_uid = {}
+    for schedule in schedules_qs:
+        schedule_uids = (
+            getattr(schedule, "incident_uid", None),
+            getattr(getattr(schedule, "incident", None), "incident_uid", None),
+        )
+        for uid in schedule_uids:
+            if uid is None:
+                continue
+            if uid not in cadence_by_uid:
+                cadence_by_uid[uid] = schedule.shift_hours
+
+    for inc in incidents:
+        inc.shift_cadence_hours = cadence_by_uid.get(getattr(inc, "incident_uid", None))
+
+
 def _assignable_core_users_qs(request, organization):
     """
     core_users rows linked to the org (via liaison emails) and filtered to the
@@ -1309,6 +1348,7 @@ def dashboard(request):
     all_incidents = _filter_incidents_by_county(
         request, list(all_incidents), liaison=liaison
     )
+    _attach_shift_cadence_to_incidents(all_incidents, organization=organization)
 
     # Users count (from core_users table)
     try:
@@ -3702,15 +3742,8 @@ def incidents_list(request):
             liaison=None,
         )
     
-    # Attach any existing shift cadence configuration to each incident for display
-    uids = [inc.incident_uid for inc in incidents if getattr(inc, "incident_uid", None) is not None]
-    if uids:
-        schedules = IncidentShiftSchedule.objects.filter(incident_uid__in=uids)
-        cadence_by_uid = {s.incident_uid: s.shift_hours for s in schedules}
-    else:
-        cadence_by_uid = {}
-    for inc in incidents:
-        inc.shift_cadence_hours = cadence_by_uid.get(getattr(inc, "incident_uid", None))
+    # Attach any existing shift cadence configuration to each incident for display.
+    _attach_shift_cadence_to_incidents(incidents, organization=organization)
     
     # Get or create system settings for status display
     settings_obj, created = SystemSettings.objects.get_or_create(
