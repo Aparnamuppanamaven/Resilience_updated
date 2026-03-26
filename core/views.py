@@ -303,22 +303,20 @@ def _core_user_is_admin_or_staff(ut):
     r = (getattr(ut, "role", None) or "").strip().lower()
     if r in ("admin", "administrator"):
         return True
+    identity_email = (getattr(ut, "email_id", None) or getattr(ut, "liaison_email", None) or "").strip()
     try:
-        for email in (ut.email_id, ut.liaison_email):
-            if not email:
-                continue
-            u = User.objects.filter(email__iexact=email.strip()).first()
+        if identity_email:
+            u = User.objects.filter(email__iexact=identity_email).first()
             if u and (getattr(u, "is_staff", False) or getattr(u, "is_superuser", False)):
                 return True
     except Exception:
         pass
     try:
         # Requirement: liaison accounts should not appear in incident assignee lists.
-        for email in (ut.email_id, ut.liaison_email):
-            if not email:
-                continue
-            if Liaison.objects.filter(user__email__iexact=email.strip()).exists():
-                return True
+        # Use the user's own identity email only; do not treat parent liaison mapping
+        # (liaison_email for county/org linkage) as proof that this row is a liaison account.
+        if identity_email and Liaison.objects.filter(user__email__iexact=identity_email).exists():
+            return True
     except Exception:
         pass
     return False
@@ -339,7 +337,7 @@ def _exclude_admin_core_users(qs):
             if e
         ]
         for em in staff_emails:
-            qs = qs.exclude(Q(email_id__iexact=em) | Q(liaison_email__iexact=em))
+            qs = qs.exclude(email_id__iexact=em)
     except Exception:
         pass
     try:
@@ -349,7 +347,7 @@ def _exclude_admin_core_users(qs):
             if e
         ]
         for em in liaison_emails:
-            qs = qs.exclude(Q(email_id__iexact=em) | Q(liaison_email__iexact=em))
+            qs = qs.exclude(email_id__iexact=em)
     except Exception:
         pass
     return qs
