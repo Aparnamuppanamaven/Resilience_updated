@@ -2588,6 +2588,8 @@ def admin_module(request):
         users_list = UsersTable.objects.filter(
             Q(liaison_email__iexact=current_liaison_email)
             | Q(email_id__iexact=current_liaison_email)
+        ).exclude(
+            email_id__iexact=current_liaison_email
         ).order_by('-created_at')
     else:
         users_list = UsersTable.objects.all().order_by('-created_at')
