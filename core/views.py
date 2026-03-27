@@ -2562,8 +2562,35 @@ def admin_module(request):
         except Exception as e:
             messages.error(request, f'Error creating user: {str(e)}')
     
-    # Get all users from the users table
-    users_list = UsersTable.objects.all().order_by('-created_at')
+    # Resolve current liaison identity for scoped user listing.
+    # Requirement: User Management should show only users under the logged-in liaison.
+    current_liaison_email = ""
+    # Legacy session takes priority because admin_module replaces request.user with
+    # MockUser (is_authenticated=True) that does not reliably carry email.
+    if 'user_credentials_id' in request.session:
+        current_liaison_email = (
+            request.session.get('user_credentials_username', '') or ''
+        ).strip()
+    elif request.user.is_authenticated:
+        try:
+            current_liaison_email = (
+                getattr(getattr(request.user.liaison_profile, "user", None), "email", "") or ""
+            ).strip()
+        except Exception:
+            current_liaison_email = (
+                getattr(request.user, "email", "")
+                or getattr(request.user, "username", "")
+                or ""
+            ).strip()
+
+    # Get users list scoped to current liaison mapping.
+    if current_liaison_email:
+        users_list = UsersTable.objects.filter(
+            Q(liaison_email__iexact=current_liaison_email)
+            | Q(email_id__iexact=current_liaison_email)
+        ).order_by('-created_at')
+    else:
+        users_list = UsersTable.objects.all().order_by('-created_at')
     
     # Get all shifts from core_shifts table
     shifts = list(Shift.objects.all().order_by('shift_type', 'shift_start_time'))
