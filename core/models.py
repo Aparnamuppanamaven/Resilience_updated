@@ -455,8 +455,11 @@ class ShiftPacketSchedulerLog(models.Model):
     schedule_status = models.CharField(
         max_length=20,
         choices=[
-            ('generated', 'Generated'),
-            ('failed', 'Failed'),
+            ('RUNNING', 'RUNNING'),
+            ('SUCCESS', 'SUCCESS'),
+            ('FAILED', 'FAILED'),
+            ('generated', 'Generated'),  # legacy rows
+            ('failed', 'Failed'),  # legacy rows
         ],
     )
     message = models.TextField(blank=True, null=True)

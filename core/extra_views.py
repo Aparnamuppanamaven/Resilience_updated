@@ -889,6 +889,12 @@ def system_logs_page(request):
             }
         )
 
+    def _scheduler_status_display(status):
+        if not status:
+            return status
+        legacy = {"generated": "SUCCESS (legacy)", "failed": "FAILED (legacy)"}
+        return legacy.get(status, status)
+
     scheduler_logs = []
     try:
         for row in ShiftPacketSchedulerLog.objects.select_related("incident").order_by(
@@ -902,7 +908,7 @@ def system_logs_page(request):
                     "incident_label": cap_label,
                     "triggered_at": row.triggered_at,
                     "next_scheduled": row.next_scheduled,
-                    "schedule_status": row.schedule_status,
+                    "schedule_status": _scheduler_status_display(row.schedule_status),
                     "message": (row.message or "")[:500],
                 }
             )
