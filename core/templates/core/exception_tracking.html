@@ -165,12 +165,13 @@
         font-weight: 700;
     }
     .status-monitoring { background: #dcfce7; color: #166534; }
-    .status-needs-attention { background: #ffedd5; color: #9a3412; }
+    .status-closed { background: #e2e8f0; color: #334155; }
     .status-in-progress { background: #dbeafe; color: #1e3a8a; }
     .status-resolved { background: #ecfeff; color: #155e75; }
     .priority-low { background: #f3f4f6; color: #374151; }
     .priority-medium { background: #fef3c7; color: #92400e; }
     .priority-high { background: #fee2e2; color: #991b1b; }
+    .priority-critical { background: #7f1d1d; color: #fecaca; }
     .et-empty {
         padding: 1rem;
         color: #6b7280;
@@ -213,6 +214,11 @@
         </header>
 
         <div class="et-content">
+            {% if table_missing_error %}
+            <div class="alert alert-warning" style="margin-bottom: 1rem;">
+                {{ table_missing_error }}
+            </div>
+            {% endif %}
             <section class="et-card">
                 <div class="et-table-wrap">
                     <table class="et-table">
@@ -228,10 +234,27 @@
                                 <th>Reported Time</th>
                             </tr>
                         </thead>
-                        <tbody id="exceptionsBody"></tbody>
+                        <tbody id="exceptionsBody">
+                            {% for ex in exceptions %}
+                            <tr>
+                                <td>{{ ex.exception_title }}</td>
+                                <td>{{ ex.description|default:'' }}</td>
+                                <td>{{ ex.exception_type|default:'' }}</td>
+                                <td>{{ ex.department|default:'' }}</td>
+                                <td>{{ ex.sub_department|default:'' }}</td>
+                                <td>
+                                    <span class="badge {% if ex.status == 'In Progress' %}status-in-progress{% elif ex.status == 'Resolved' %}status-resolved{% elif ex.status == 'Closed' %}status-closed{% else %}status-monitoring{% endif %}">
+                                        {{ ex.status }}
+                                    </span>
+                                </td>
+                                <td><span class="badge {% if ex.priority == 'Critical' %}priority-critical{% elif ex.priority == 'High' %}priority-high{% elif ex.priority == 'Medium' %}priority-medium{% elif ex.priority == 'Low' %}priority-low{% else %}priority-medium{% endif %}">{{ ex.priority }}</span></td>
+                                <td>{% if ex.reported_time %}{{ ex.reported_time|date:"M d, Y h:i A" }}{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
                     </table>
                 </div>
-                <div id="emptyState" class="et-empty">No exceptions yet. Click "Create New Exception" to add one.</div>
+                <div id="emptyState" class="et-empty" {% if exceptions %}style="display:none;"{% endif %}>No exceptions yet. Click "Create Exception" to add one.</div>
             </section>
         </div>
     </main>
@@ -244,6 +267,7 @@
             <button id="closeExceptionModalBtn" type="button" class="et-close" aria-label="Close">&times;</button>
         </div>
         <form id="exceptionForm" class="et-form">
+            {% csrf_token %}
             <div class="et-grid">
                 <div class="et-field et-field-full">
                     <label class="et-label" for="exceptionTitle">Exception Title</label>
@@ -272,11 +296,9 @@
                     <label class="et-label" for="department">Department</label>
                     <select id="department" class="et-select" required>
                         <option value="">Select department</option>
-                        <option value="Public Works">Public Works</option>
-                        <option value="Transportation">Transportation</option>
-                        <option value="Stormwater">Stormwater</option>
-                        <option value="Road Maintenance">Road Maintenance</option>
-                        <option value="Emergency Operations">Emergency Operations</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept }}">{{ dept }}</option>
+                        {% endfor %}
                     </select>
                 </div>
 
@@ -291,9 +313,9 @@
                     <label class="et-label" for="status">Status</label>
                     <select id="status" class="et-select" required>
                         <option>Monitoring</option>
-                        <option>Needs Attention</option>
                         <option>In Progress</option>
                         <option>Resolved</option>
+                        <option>Closed</option>
                     </select>
                 </div>
 
@@ -303,6 +325,7 @@
                         <option>Low</option>
                         <option>Medium</option>
                         <option>High</option>
+                        <option>Critical</option>
                     </select>
                 </div>
 
@@ -359,6 +382,12 @@
             document.body.style.overflow = "";
         }
 
+        function getCookie(name) {
+            const parts = (`; ${document.cookie}`).split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(";").shift();
+            return "";
+        }
+
         function addRow(data) {
             const tr = document.createElement("tr");
             tr.innerHTML = `
@@ -403,32 +432,52 @@
                 return;
             }
 
-            addRow(payload);
-            form.reset();
-            document.getElementById("status").value = "Monitoring";
-            document.getElementById("priority").value = "Low";
-            document.getElementById("subDepartment").innerHTML = '<option value="">Select sub department</option>';
-            closeModal();
+            fetch("{% url 'api_exception_tracking' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCookie("csrftoken")
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(function (res) {
+                return res.json().then(function (body) {
+                    if (!res.ok) {
+                        throw new Error(body.error || "Unable to save exception");
+                    }
+                    return body;
+                });
+            })
+            .then(function (body) {
+                addRow(body.exception);
+                form.reset();
+                document.getElementById("status").value = "Monitoring";
+                document.getElementById("priority").value = "Low";
+                document.getElementById("subDepartment").innerHTML = '<option value="">Select sub department</option>';
+                closeModal();
+            })
+            .catch(function (err) {
+                alert(err.message || "Failed to submit exception");
+            });
         });
 
         const departmentSelect = document.getElementById("department");
         const subDepartmentSelect = document.getElementById("subDepartment");
-        const subDepartmentOptions = {
-            "Public Works": ["Drainage Team", "Field Operations", "Asset Inspection"],
-            "Transportation": ["Road Safety", "Traffic Operations", "Bridge Unit"],
-            "Stormwater": ["Culvert Team", "Canal Maintenance", "Flood Monitoring"],
-            "Road Maintenance": ["Pavement Repair", "Routine Maintenance", "Emergency Patch Crew"],
-            "Emergency Operations": ["Command Team", "Response Coordination", "Alerting Cell"]
-        };
 
         departmentSelect.addEventListener("change", function () {
             const selected = departmentSelect.value;
             subDepartmentSelect.innerHTML = '<option value="">Select sub department</option>';
-            (subDepartmentOptions[selected] || []).forEach(function (name) {
-                const opt = document.createElement("option");
-                opt.value = name;
-                opt.textContent = name;
-                subDepartmentSelect.appendChild(opt);
+            if (!selected) return;
+
+            fetch("{% url 'department_services_api' %}?category=" + encodeURIComponent(selected))
+            .then(function (res) { return res.json(); })
+            .then(function (body) {
+                (body.services || []).forEach(function (name) {
+                    const opt = document.createElement("option");
+                    opt.value = name;
+                    opt.textContent = name;
+                    subDepartmentSelect.appendChild(opt);
+                });
             });
         });
     })();

@@ -28,6 +28,7 @@ from reportlab.lib.enums import TA_LEFT
 
 from django.contrib.auth.models import User
 from django.db.models import Q
+from django.db.utils import ProgrammingError
 
 from .models import (
     Incident,
@@ -44,6 +45,8 @@ from .models import (
     UserCredentials,
     Liaison,
     UsersTable,
+    Department,
+    ExceptionTracker,
 )
 
 
@@ -1100,8 +1103,153 @@ def api_report_summary(request):
 
 
 def exception_tracking_page(request):
-    """
-    UI-only Exception Tracking module.
-    Frontend state only; no backend persistence.
-    """
-    return render(request, "core/exception_tracking.html")
+    """Exception Tracking module with DB-backed records."""
+    deny = _require_auth(request)
+    if deny:
+        return deny
+
+    departments = list(
+        Department.objects.values_list("category", flat=True)
+        .distinct()
+        .order_by("category")
+    )
+    exceptions = []
+    table_missing_error = None
+    try:
+        exceptions = list(ExceptionTracker.objects.all().order_by("-reported_time", "-id"))
+    except ProgrammingError as exc:
+        msg = str(exc)
+        if "exception_tracker" in msg.lower() or "1146" in msg:
+            table_missing_error = (
+                "Exception table is not created yet. Please create `Exception_tracker` "
+                "in the database to enable persistence."
+            )
+        else:
+            raise
+    return render(
+        request,
+        "core/exception_tracking.html",
+        {
+            "departments": departments,
+            "exceptions": exceptions,
+            "table_missing_error": table_missing_error,
+        },
+    )
+
+
+def api_exception_tracking(request):
+    """CRUD-lite API for exception tracking list/create."""
+    deny = _require_auth(request)
+    if deny:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    if request.method == "GET":
+        rows = []
+        try:
+            for e in ExceptionTracker.objects.all().order_by("-reported_time", "-id"):
+                rows.append(
+                    {
+                        "id": e.id,
+                        "title": e.exception_title or "",
+                        "description": e.description or "",
+                        "type": e.exception_type or "",
+                        "department": e.department or "",
+                        "subDepartment": e.sub_department or "",
+                        "status": e.status or "Monitoring",
+                        "priority": e.priority or "Medium",
+                        "reportedTime": (
+                            timezone.localtime(e.reported_time).strftime("%b %d, %Y %I:%M %p")
+                            if e.reported_time
+                            else ""
+                        ),
+                    }
+                )
+        except ProgrammingError as exc:
+            msg = str(exc)
+            if "exception_tracker" in msg.lower() or "1146" in msg:
+                return JsonResponse(
+                    {
+                        "error": (
+                            "Exception table is not created yet. "
+                            "Create `Exception_tracker` first."
+                        )
+                    },
+                    status=503,
+                )
+            raise
+        return JsonResponse({"exceptions": rows})
+
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        payload = {}
+
+    title = (payload.get("title") or "").strip()
+    description = (payload.get("description") or "").strip()
+    exception_type = (payload.get("type") or "").strip()
+    department = (payload.get("department") or "").strip()
+    sub_department = (payload.get("subDepartment") or "").strip()
+    status = (payload.get("status") or "Monitoring").strip()
+    priority = (payload.get("priority") or "Medium").strip()
+
+    if not all([title, description, exception_type, department, sub_department]):
+        return JsonResponse({"error": "Missing required fields"}, status=400)
+
+    allowed_statuses = {"Monitoring", "Resolved", "Closed", "In Progress"}
+    allowed_priorities = {"Low", "Medium", "High", "Critical"}
+    if status not in allowed_statuses:
+        return JsonResponse({"error": "Invalid status"}, status=400)
+    if priority not in allowed_priorities:
+        return JsonResponse({"error": "Invalid priority"}, status=400)
+
+    # Reuse incident-creation style category -> service validation.
+    if not Department.objects.filter(category=department, service_name=sub_department).exists():
+        return JsonResponse(
+            {"error": "Invalid sub department for selected department"},
+            status=400,
+        )
+
+    try:
+        obj = ExceptionTracker.objects.create(
+            exception_title=title,
+            description=description,
+            exception_type=exception_type,
+            department=department,
+            sub_department=sub_department,
+            status=status,
+            priority=priority,
+            reported_time=timezone.now(),
+        )
+    except ProgrammingError as exc:
+        msg = str(exc)
+        if "exception_tracker" in msg.lower() or "1146" in msg:
+            return JsonResponse(
+                {
+                    "error": (
+                        "Exception table is not created yet. "
+                        "Create `Exception_tracker` first."
+                    )
+                },
+                status=503,
+            )
+        raise
+
+    return JsonResponse(
+        {
+            "success": True,
+            "exception": {
+                "id": obj.id,
+                "title": obj.exception_title or "",
+                "description": obj.description or "",
+                "type": obj.exception_type or "",
+                "department": obj.department or "",
+                "subDepartment": obj.sub_department or "",
+                "status": obj.status or "Monitoring",
+                "priority": obj.priority or "Medium",
+                "reportedTime": timezone.localtime(obj.reported_time).strftime("%b %d, %Y %I:%M %p"),
+            },
+        }
+    )

@@ -5,6 +5,7 @@ Enterprise-level data models
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 
 
 class Organization(models.Model):
@@ -596,6 +597,44 @@ class Department(models.Model):
     
     def __str__(self):
         return f"{self.category} - {self.service_name}"
+
+
+class ExceptionTracker(models.Model):
+    """Exception tracker records mapped to Exception_tracker table."""
+
+    STATUS_CHOICES = [
+        ("Monitoring", "Monitoring"),
+        ("Resolved", "Resolved"),
+        ("Closed", "Closed"),
+        ("In Progress", "In Progress"),
+    ]
+
+    PRIORITY_CHOICES = [
+        ("Low", "Low"),
+        ("Medium", "Medium"),
+        ("High", "High"),
+        ("Critical", "Critical"),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    exception_title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    exception_type = models.CharField(max_length=100, blank=True, null=True)
+    department = models.CharField(max_length=100, blank=True, null=True)
+    sub_department = models.CharField(max_length=100, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="Monitoring")
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default="Medium")
+    reported_time = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = "Exception_tracker"
+        managed = False
+        ordering = ["-reported_time", "-id"]
+
+    def __str__(self):
+        return self.exception_title
 
 
 class State(models.Model):
