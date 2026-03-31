@@ -13,6 +13,7 @@
         <ul class="nav-links">
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
             <li class="nav-item"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incident Management</a></li>
+            <li class="nav-item"><a href="{% url 'exception_tracking' %}"><i class="fa-solid fa-triangle-exclamation"></i> Exception Tracking</a></li>
             <li class="nav-item active"><a href="{% url 'situation_updates' %}"><i class="fa-solid fa-clipboard-list"></i> Situation Updates</a></li>
             <li class="nav-item"><a href="{% url 'shift_packets' %}"><i class="fa-solid fa-file-lines"></i> Shift Packets</a></li>
             <li class="nav-item"><a href="{% url 'reports' %}"><i class="fa-solid fa-chart-bar"></i> Reports</a></li>
@@ -68,79 +69,46 @@
         <div class="view-container">
             <div class="card" style="margin-bottom: 1rem;">
                 <div class="card-header">
-                   
-                    <span style="font-size: 0.85rem; color: #6b7280;">Select an incident to add a situation update</span>
+                    <span style="font-size: 0.85rem; color: #6b7280;">Choose Incident or Exception context before opening the update form</span>
                 </div>
                 <div class="card-body" style="padding: 1rem;">
-                    <div class="form-group" style="margin-bottom: 0; position: relative; display: flex; align-items: center; gap: 1rem; width: 100%;">
-                        <label class="form-label" for="incident_search_input" style="white-space: nowrap; margin-bottom: 0; font-weight: 600; color: #111827;">
-                            Select Incident
+                    <div class="form-group" style="margin-bottom: 0.9rem;">
+                        <label class="form-label" style="font-weight: 600; color: #111827; margin-bottom: 0.6rem; display: block;">
+                            Select Context for Situation Update
                         </label>
-                        <!-- Custom single searchable dropdown -->
-                        <div id="incident_dropdown_wrapper" style="position: relative; flex: 1 1 auto; min-width: 0; max-width: 520px;">
-                            <input
-                                type="text"
-                                id="incident_search_input"
-                                class="form-control"
-                                placeholder="Search or select incident by ID or title"
-                                autocomplete="off"
-                                {% if selected_incident %}
-                                    value="[INC-{{ selected_incident.id }}] {{ selected_incident.title }}"
-                                {% endif %}
-                            >
-                            <!-- Dropdown icon at the end of the same field -->
-                            <button
-                                type="button"
-                                id="incident_dropdown_toggle"
-                                style="
-                                    position: absolute;
-                                    top: 50%;
-                                    right: 0.75rem;
-                                    transform: translateY(-50%);
-                                    border: none;
-                                    background: transparent;
-                                    padding: 0;
-                                    cursor: pointer;
-                                    color: #9ca3af;
-                                "
-                                aria-label="Toggle incident list"
-                            >
-                                <i class="fa-solid fa-chevron-down"></i>
+                        <div id="contextChoiceCards" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; max-width: 560px;">
+                            <button id="incidentContextCard" type="button" class="context-option-btn" data-context="incident" style="border: 1px solid #d1d5db; background: #ffffff; border-radius: 10px; padding: 0.75rem; text-align: left; cursor: pointer; transition: all 0.2s ease;">
+                                <div style="font-weight: 700; color: #111827; margin-bottom: 0.2rem;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.35rem; color: #4f46e5;"></i>Incident</div>
+                                <div style="font-size: 0.82rem; color: #6b7280;">Resilience context (during event)</div>
                             </button>
-                            <!-- Dropdown list (same field visually) -->
-                            <div id="incident_dropdown_list" style="
-                                position: absolute;
-                                top: 100%;
-                                left: 0;
-                                right: 0;
-                                max-height: 260px;
-                                overflow-y: auto;
-                                background: #ffffff;
-                                border: 1px solid #e5e7eb;
-                                border-top: none;
-                                border-radius: 0 0 0.5rem 0.5rem;
-                                box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
-                                z-index: 50;
-                                display: none;
-                            ">
+                            <button id="exceptionContextCard" type="button" class="context-option-btn" data-context="exception" style="border: 1px solid #d1d5db; background: #ffffff; border-radius: 10px; padding: 0.75rem; text-align: left; cursor: pointer; transition: all 0.2s ease;">
+                                <div style="font-weight: 700; color: #111827; margin-bottom: 0.2rem;"><i class="fa-solid fa-wrench" style="margin-right: 0.35rem; color: #ea580c;"></i>Exception</div>
+                                <div style="font-size: 0.82rem; color: #6b7280;">Continuum context (before/after event)</div>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="incidentSelectorRow" class="form-group" style="margin-bottom: 0; display: none; align-items: center; gap: 1rem; width: 100%;">
+                        <label class="form-label" for="incident_search_input" style="white-space: nowrap; margin-bottom: 0; font-weight: 600; color: #111827;">Select Incident</label>
+                        <div style="flex: 1 1 auto; min-width: 0; max-width: 520px;">
+                            <select id="incident_search_input" class="form-control">
+                                <option value="">Select incident</option>
                                 {% for inc in incidents %}
-                                    <div class="incident-option"
-                                         data-incident-id="{{ inc.id }}"
-                                         data-incident-label="[INC-{{ inc.id }}] {{ inc.title }}"
-                                         style="
-                                            padding: 0.5rem 0.75rem;
-                                            cursor: pointer;
-                                            font-size: 0.875rem;
-                                            border-bottom: 1px solid #f3f4f6;
-                                         ">
-                                        [INC-{{ inc.id }}] {{ inc.title }}
-                                    </div>
+                                    <option value="{{ inc.id }}">[INC-{{ inc.id }}] {{ inc.title }}</option>
                                 {% empty %}
-                                    <div style="padding: 0.5rem 0.75rem; font-size: 0.875rem; color: #6b7280;">
-                                        No incidents available
-                                    </div>
+                                    <option value="">No incidents available</option>
                                 {% endfor %}
-                            </div>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="exceptionSelectorRow" class="form-group" style="margin-top: 0.75rem; margin-bottom: 0; display: none; align-items: center; gap: 1rem; width: 100%;">
+                        <label class="form-label" for="exception_search_input" style="white-space: nowrap; margin-bottom: 0; font-weight: 600; color: #111827;">Select Exception</label>
+                        <div style="flex: 1 1 auto; min-width: 0; max-width: 520px;">
+                            <select id="exception_search_input" class="form-control">
+                                <option value="">Select exception</option>
+                                <option value="exc-1">Blocked Culvert</option>
+                                <option value="exc-2">Road Crack</option>
+                                <option value="exc-3">Erosion Risk</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -150,19 +118,13 @@
                 <div class="card-header" style="display: flex; align-items: center; justify-content: space-between;">
                     <div>
                         <h3 class="card-title" style="margin-bottom: 0.15rem;">Situation Logs List</h3>
-                        {% if selected_incident %}
-                            <span style="font-size: 0.85rem; color: #6b7280;">
-                                Showing updates for [INC-{{ selected_incident.id }}] {{ selected_incident.title }}
-                            </span>
-                        {% else %}
-                            <span style="font-size: 0.85rem; color: #6b7280;">
-                                Select an incident above to view situation updates
-                            </span>
-                        {% endif %}
+                        <span id="situationContextHint" style="font-size: 0.85rem; color: #6b7280;">Select context and item above to view updates</span>
                     </div>
                     <button type="button"
-                            onclick="openAddSituationUpdateModal('{{ selected_incident.id }}')"
-                            {% if not selected_incident %}disabled style="opacity:0.5; cursor:not-allowed;"{% else %}style="
+                            id="openSituationUpdateBtn"
+                            onclick="openAddSituationUpdateModal()"
+                            disabled
+                            style="
                                 display: inline-flex;
                                 align-items: center;
                                 gap: 0.35rem;
@@ -173,9 +135,10 @@
                                 border-radius: 0.375rem;
                                 font-size: 0.85rem;
                                 font-weight: 600;
-                                cursor: pointer;
+                                cursor: not-allowed;
+                                opacity: 0.5;
                                 box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
-                            "{% endif %}>
+                            ">
                         <i class="fa-solid fa-plus"></i>
                         <span>Situation Update</span>
                     </button>
@@ -323,6 +286,8 @@
                 <form method="post" action="{% url 'situation_updates' %}" id="addSituationUpdateForm" enctype="multipart/form-data">
                     {% csrf_token %}
                     <input type="hidden" name="incident_id" id="modal_incident_id" value="">
+                    <input type="hidden" name="context_type" id="modal_context_type" value="">
+                    <input type="hidden" name="context_value" id="modal_context_value" value="">
 
                     <div id="situationUpdateFormErrors" style="
                         display: none;
@@ -334,6 +299,32 @@
                         margin-bottom: 1rem;
                         font-size: 0.95rem;
                     "></div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.8rem;">
+                        <div class="form-group">
+                            <label class="form-label" style="font-weight: 700; color: #374151;">Context</label>
+                            <div id="modalContextBadge" style="padding: 0.55rem 0.65rem; border: 1px solid #d1d5db; border-radius: 0.5rem; background: #f9fafb; font-weight: 600; color: #111827;">Context: —</div>
+                        </div>
+                        <div id="modalIncidentField" class="form-group" style="display: none;">
+                            <label class="form-label" for="modal_incident_select">Select Incident</label>
+                            <select id="modal_incident_select" class="form-control">
+                                <option value="">Select incident</option>
+                                {% for inc in incidents %}
+                                    <option value="{{ inc.id }}">[INC-{{ inc.id }}] {{ inc.title }}</option>
+                                {% empty %}
+                                    <option value="">No incidents available</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="modalExceptionField" class="form-group" style="display: none;">
+                            <label class="form-label" for="modal_exception_select">Select Exception</label>
+                            <select id="modal_exception_select" class="form-control">
+                                <option value="">Select exception</option>
+                                <option value="Blocked Culvert">Blocked Culvert</option>
+                                <option value="Road Crack">Road Crack</option>
+                                <option value="Erosion Risk">Erosion Risk</option>
+                            </select>
+                        </div>
+                    </div>
 
                     <!-- Layout matches the “Add Situation Update” screenshot -->
                     <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -422,10 +413,130 @@
             </div>
         </div>
     </div>
+    <div id="contextSelectionModal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(2, 6, 23, 0.45);
+        z-index: 1001;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    ">
+        <div style="
+            background: #ffffff;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            width: min(560px, 100%);
+            box-shadow: 0 20px 60px rgba(15, 23, 42, 0.28);
+            padding: 1rem 1.1rem 1.1rem;
+        ">
+            <h3 style="margin: 0 0 0.35rem; font-size: 1.12rem; color: #111827;">Select Context for Situation Update</h3>
+            <p style="margin: 0 0 0.9rem; color: #6b7280; font-size: 0.9rem;">Choose where this update belongs.</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                <button id="modalChooseIncident" type="button" style="border: 1px solid #6366f1; background: #eef2ff; color: #1f2937; border-radius: 10px; padding: 0.85rem; text-align: left; cursor: pointer;">
+                    <div style="font-weight: 700;"><i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.35rem;"></i>Incident</div>
+                    <div style="font-size: 0.82rem; color: #6b7280; margin-top: 0.2rem;">Resilience (during event)</div>
+                </button>
+                <button id="modalChooseException" type="button" style="border: 1px solid #ea580c; background: #fff7ed; color: #1f2937; border-radius: 10px; padding: 0.85rem; text-align: left; cursor: pointer;">
+                    <div style="font-weight: 700;"><i class="fa-solid fa-wrench" style="margin-right: 0.35rem;"></i>Exception</div>
+                    <div style="font-size: 0.82rem; color: #6b7280; margin-top: 0.2rem;">Continuum (before/after event)</div>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script>
-    function openAddSituationUpdateModal(incidentId) {
-        document.getElementById('modal_incident_id').value = incidentId || '';
+    var selectedContextType = '';
+    var selectedContextValue = '';
+
+    function applyContextSelection(contextType) {
+        selectedContextType = contextType;
+        selectedContextValue = '';
+
+        var incidentCard = document.getElementById('incidentContextCard');
+        var exceptionCard = document.getElementById('exceptionContextCard');
+        var incidentRow = document.getElementById('incidentSelectorRow');
+        var exceptionRow = document.getElementById('exceptionSelectorRow');
+        var hint = document.getElementById('situationContextHint');
+        var openBtn = document.getElementById('openSituationUpdateBtn');
+
+        [incidentCard, exceptionCard].forEach(function(card) {
+            if (!card) return;
+            card.style.borderColor = '#d1d5db';
+            card.style.background = '#ffffff';
+            card.style.boxShadow = 'none';
+        });
+
+        if (contextType === 'incident') {
+            if (incidentCard) {
+                incidentCard.style.borderColor = '#6366f1';
+                incidentCard.style.background = '#eef2ff';
+                incidentCard.style.boxShadow = '0 0 0 1px rgba(99,102,241,0.25)';
+            }
+            if (incidentRow) incidentRow.style.display = 'flex';
+            if (exceptionRow) exceptionRow.style.display = 'none';
+            if (hint) hint.textContent = 'Context: Incident. Select an incident to continue.';
+            var exSel = document.getElementById('exception_search_input');
+            if (exSel) exSel.value = '';
+        } else {
+            if (exceptionCard) {
+                exceptionCard.style.borderColor = '#ea580c';
+                exceptionCard.style.background = '#fff7ed';
+                exceptionCard.style.boxShadow = '0 0 0 1px rgba(234,88,12,0.25)';
+            }
+            if (incidentRow) incidentRow.style.display = 'none';
+            if (exceptionRow) exceptionRow.style.display = 'flex';
+            if (hint) hint.textContent = 'Context: Exception. Select an exception to continue.';
+            var incSel = document.getElementById('incident_search_input');
+            if (incSel) incSel.value = '';
+        }
+
+        if (openBtn) {
+            openBtn.disabled = true;
+            openBtn.style.cursor = 'not-allowed';
+            openBtn.style.opacity = '0.5';
+        }
+    }
+
+    function updateActionButtonState() {
+        var openBtn = document.getElementById('openSituationUpdateBtn');
+        if (!openBtn) return;
+        var canOpen = !!selectedContextType && !!selectedContextValue;
+        openBtn.disabled = !canOpen;
+        openBtn.style.cursor = canOpen ? 'pointer' : 'not-allowed';
+        openBtn.style.opacity = canOpen ? '1' : '0.5';
+    }
+
+    function openAddSituationUpdateModal() {
+        if (!selectedContextType || !selectedContextValue) return;
+        document.getElementById('modal_incident_id').value = selectedContextType === 'incident' ? selectedContextValue : '';
+        document.getElementById('modal_context_type').value = selectedContextType;
+        document.getElementById('modal_context_value').value = selectedContextValue;
+
+        var badge = document.getElementById('modalContextBadge');
+        var incidentField = document.getElementById('modalIncidentField');
+        var exceptionField = document.getElementById('modalExceptionField');
+        var incidentSelect = document.getElementById('modal_incident_select');
+        var exceptionSelect = document.getElementById('modal_exception_select');
+
+        if (selectedContextType === 'incident') {
+            if (badge) badge.textContent = 'Context: Incident';
+            if (incidentField) incidentField.style.display = 'block';
+            if (exceptionField) exceptionField.style.display = 'none';
+            if (incidentSelect) incidentSelect.value = selectedContextValue;
+            if (exceptionSelect) exceptionSelect.value = '';
+        } else {
+            if (badge) badge.textContent = 'Context: Exception';
+            if (incidentField) incidentField.style.display = 'none';
+            if (exceptionField) exceptionField.style.display = 'block';
+            if (exceptionSelect) exceptionSelect.value = selectedContextValue;
+            if (incidentSelect) incidentSelect.value = '';
+        }
+
         document.getElementById('addSituationUpdateModal').style.display = 'flex';
         var errEl = document.getElementById('situationUpdateFormErrors');
         if (errEl) {
@@ -483,79 +594,64 @@
         document.getElementById('addSituationUpdateModal').style.display = 'none';
     }
     document.addEventListener('DOMContentLoaded', function() {
-        var searchInput = document.getElementById('incident_search_input');
-        var dropdownList = document.getElementById('incident_dropdown_list');
+        var incidentCard = document.getElementById('incidentContextCard');
+        var exceptionCard = document.getElementById('exceptionContextCard');
+        var incidentSelectTop = document.getElementById('incident_search_input');
+        var exceptionSelectTop = document.getElementById('exception_search_input');
+        var contextModal = document.getElementById('contextSelectionModal');
+        var modalChooseIncident = document.getElementById('modalChooseIncident');
+        var modalChooseException = document.getElementById('modalChooseException');
 
-        if (searchInput && dropdownList) {
-            var options = dropdownList.getElementsByClassName('incident-option');
-            var toggleBtn = document.getElementById('incident_dropdown_toggle');
-
-            function openDropdown() {
-                dropdownList.style.display = 'block';
-            }
-
-            function closeDropdown() {
-                dropdownList.style.display = 'none';
-            }
-
-            // Show all incidents when the field gains focus
-            searchInput.addEventListener('focus', function () {
-                searchInput.select();
-                for (var i = 0; i < options.length; i++) {
-                    options[i].style.display = '';
-                }
-                openDropdown();
-            });
-
-            // Filter as user types
-            searchInput.addEventListener('input', function () {
-                var term = this.value.toLowerCase();
-                for (var i = 0; i < options.length; i++) {
-                    var opt = options[i];
-                    var label = opt.getAttribute('data-incident-label').toLowerCase();
-                    opt.style.display = label.indexOf(term) !== -1 ? '' : 'none';
-                }
-                openDropdown();
-            });
-
-            // Toggle button on the right of the same field
-            if (toggleBtn) {
-                toggleBtn.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    if (dropdownList.style.display === 'block') {
-                        closeDropdown();
-                    } else {
-                        searchInput.focus();
-                        // Ensure all options visible when manually toggled
-                        for (var i = 0; i < options.length; i++) {
-                            options[i].style.display = '';
-                        }
-                        openDropdown();
-                    }
-                });
-            }
-
-            // Click selection
-            for (var j = 0; j < options.length; j++) {
-                options[j].addEventListener('click', function () {
-                    var label = this.getAttribute('data-incident-label');
-                    var id = this.getAttribute('data-incident-id');
-                    searchInput.value = label;
-                    closeDropdown();
-                    if (id) {
-                        var url = "{% url 'situation_updates' %}" + "?incident_id=" + encodeURIComponent(id);
-                        window.location.href = url;
-                    }
-                });
-            }
-
-            // Close when clicking outside
-            document.addEventListener('click', function (e) {
-                if (!document.getElementById('incident_dropdown_wrapper').contains(e.target)) {
-                    closeDropdown();
-                }
+        if (incidentCard) {
+            incidentCard.addEventListener('click', function() {
+                applyContextSelection('incident');
             });
         }
+        if (exceptionCard) {
+            exceptionCard.addEventListener('click', function() {
+                applyContextSelection('exception');
+            });
+        }
+        if (incidentSelectTop) {
+            incidentSelectTop.addEventListener('change', function() {
+                selectedContextValue = incidentSelectTop.value;
+                var hint = document.getElementById('situationContextHint');
+                if (hint) {
+                    hint.textContent = selectedContextValue
+                        ? 'Context: Incident. Selected "' + incidentSelectTop.options[incidentSelectTop.selectedIndex].text + '".'
+                        : 'Context: Incident. Select an incident to continue.';
+                }
+                updateActionButtonState();
+            });
+        }
+        if (exceptionSelectTop) {
+            exceptionSelectTop.addEventListener('change', function() {
+                selectedContextValue = exceptionSelectTop.value;
+                var hint = document.getElementById('situationContextHint');
+                if (hint) {
+                    hint.textContent = selectedContextValue
+                        ? 'Context: Exception. Selected "' + exceptionSelectTop.options[exceptionSelectTop.selectedIndex].text + '".'
+                        : 'Context: Exception. Select an exception to continue.';
+                }
+                updateActionButtonState();
+            });
+        }
+
+        // Open with an intermediate step: force context choice first.
+        if (contextModal) contextModal.style.display = 'flex';
+        if (modalChooseIncident) {
+            modalChooseIncident.addEventListener('click', function () {
+                applyContextSelection('incident');
+                if (contextModal) contextModal.style.display = 'none';
+            });
+        }
+        if (modalChooseException) {
+            modalChooseException.addEventListener('click', function () {
+                applyContextSelection('exception');
+                if (contextModal) contextModal.style.display = 'none';
+            });
+        }
+        applyContextSelection('incident');
 
         // Department -> Sub Category dependent dropdown
         var deptSelect = document.getElementById('department');
@@ -608,6 +704,7 @@
 
                 // Match the required fields shown in your screenshot.
                 var requiredIds = [
+                    selectedContextType === 'exception' ? 'modal_exception_select' : 'modal_incident_select',
                     'situationupdate_title',
                     'update_time',
                     'situationupdate_description',

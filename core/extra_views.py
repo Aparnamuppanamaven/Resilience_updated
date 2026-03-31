@@ -1097,3 +1097,11 @@ def api_report_summary(request):
         )
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+
+def exception_tracking_page(request):
+    """
+    UI-only Exception Tracking module.
+    Frontend state only; no backend persistence.
+    """
+    return render(request, "core/exception_tracking.html")

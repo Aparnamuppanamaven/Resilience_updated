@@ -1,0 +1,436 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Exception Tracking - Resilience System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .et-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    }
+    .et-content {
+        padding: 1.25rem;
+    }
+    .et-topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    .et-title {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #111827;
+    }
+    .et-btn-primary {
+        border: none;
+        border-radius: 8px;
+        padding: 0.6rem 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: #fff;
+        background: #4f46e5;
+        box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25);
+    }
+    .et-modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(17, 24, 39, 0.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 1rem;
+    }
+    .et-modal-overlay.open {
+        display: flex;
+    }
+    .et-modal {
+        width: min(760px, 100%);
+        max-height: 90vh;
+        overflow: auto;
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 24px 70px rgba(2, 6, 23, 0.35);
+    }
+    .et-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.95rem 1rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .et-modal-title {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #111827;
+    }
+    .et-close {
+        border: none;
+        background: none;
+        font-size: 1.2rem;
+        color: #6b7280;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0.2rem;
+    }
+    .et-form {
+        padding: 1rem;
+    }
+    .et-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem 0.9rem;
+    }
+    .et-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+    .et-field-full {
+        grid-column: 1 / -1;
+    }
+    .et-label {
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: #374151;
+    }
+    .et-input, .et-select, .et-textarea, .et-input-readonly {
+        width: 100%;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 0.55rem 0.65rem;
+        font-size: 0.92rem;
+        font-family: inherit;
+        background: #fff;
+    }
+    .et-textarea {
+        min-height: 78px;
+        resize: vertical;
+    }
+    .et-input-readonly {
+        background: #f9fafb;
+        color: #374151;
+    }
+    .et-actions {
+        margin-top: 1rem;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.6rem;
+    }
+    .et-btn {
+        border: none;
+        border-radius: 7px;
+        padding: 0.58rem 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: #fff;
+        background: #4f46e5;
+    }
+    .et-btn-cancel {
+        background: #64748b;
+    }
+    .et-table-wrap {
+        overflow: auto;
+    }
+    .et-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+    .et-table th {
+        background: #f9fafb;
+        color: #374151;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.02em;
+    }
+    .et-table th, .et-table td {
+        border-bottom: 1px solid #e5e7eb;
+        padding: 0.7rem 0.75rem;
+        text-align: left;
+        vertical-align: top;
+    }
+    .badge {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 0.2rem 0.55rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+    .status-monitoring { background: #dcfce7; color: #166534; }
+    .status-needs-attention { background: #ffedd5; color: #9a3412; }
+    .status-in-progress { background: #dbeafe; color: #1e3a8a; }
+    .status-resolved { background: #ecfeff; color: #155e75; }
+    .priority-low { background: #f3f4f6; color: #374151; }
+    .priority-medium { background: #fef3c7; color: #92400e; }
+    .priority-high { background: #fee2e2; color: #991b1b; }
+    .et-empty {
+        padding: 1rem;
+        color: #6b7280;
+        font-size: 0.92rem;
+    }
+    @media (max-width: 900px) {
+        .et-grid { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    <nav class="sidebar">
+        <a href="{% url 'dashboard' %}" class="sidebar-header" style="text-decoration: none; color: var(--primary-color); display: flex; align-items: center; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            <span class="logo-text">Resilience</span>
+        </a>
+        <ul class="nav-links">
+            <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incident Management</a></li>
+            <li class="nav-item active"><a href="{% url 'exception_tracking' %}"><i class="fa-solid fa-triangle-exclamation"></i> Exception Tracking</a></li>
+            <li class="nav-item"><a href="{% url 'situation_updates' %}"><i class="fa-solid fa-clipboard-list"></i> Situation Updates</a></li>
+            <li class="nav-item"><a href="{% url 'shift_packets' %}"><i class="fa-solid fa-file-lines"></i> Shift Packets</a></li>
+            <li class="nav-item"><a href="{% url 'reports' %}"><i class="fa-solid fa-chart-bar"></i> Reports</a></li>
+            <li class="nav-item"><a href="{% url 'system_logs' %}"><i class="fa-solid fa-list-check"></i> System Logs</a></li>
+            <li class="nav-item nav-item-user-management"><a href="{% url 'admin_module' %}"><i class="fa-solid fa-gear"></i> User Management</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            {% include 'core/_profile_dropdown.html' %}
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <header class="top-header" style="display:flex; align-items:center; justify-content:space-between;">
+            <h2 style="margin:0;">Exception Tracking</h2>
+            <button id="openExceptionModalBtn" type="button" class="et-btn-primary">
+                <i class="fa-solid fa-plus"></i> Create  Exception
+            </button>
+        </header>
+
+        <div class="et-content">
+            <section class="et-card">
+                <div class="et-table-wrap">
+                    <table class="et-table">
+                        <thead>
+                            <tr>
+                                <th>Exception Title</th>
+                                <th>Description</th>
+                                <th>Exception Type</th>
+                                <th>Department</th>
+                                <th>Sub Department</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Reported Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exceptionsBody"></tbody>
+                    </table>
+                </div>
+                <div id="emptyState" class="et-empty">No exceptions yet. Click "Create New Exception" to add one.</div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<div id="exceptionModalOverlay" class="et-modal-overlay" aria-hidden="true">
+    <div class="et-modal">
+        <div class="et-modal-header">
+            <h3 class="et-modal-title">New Exception Creation</h3>
+            <button id="closeExceptionModalBtn" type="button" class="et-close" aria-label="Close">&times;</button>
+        </div>
+        <form id="exceptionForm" class="et-form">
+            <div class="et-grid">
+                <div class="et-field et-field-full">
+                    <label class="et-label" for="exceptionTitle">Exception Title</label>
+                    <input id="exceptionTitle" class="et-input" type="text" placeholder="e.g., Blocked culvert near Route 6" required>
+                </div>
+
+                <div class="et-field et-field-full">
+                    <label class="et-label" for="description">Description</label>
+                    <textarea id="description" class="et-textarea" placeholder="Describe the exception..." required></textarea>
+                </div>
+
+                <div class="et-field">
+                    <label class="et-label" for="exceptionType">Exception Type</label>
+                    <select id="exceptionType" class="et-select" required>
+                        <option value="">Select type</option>
+                        <option>Blockage</option>
+                        <option>Crack</option>
+                        <option>Erosion</option>
+                        <option>Maintenance Issue</option>
+                        <option>Warning Sign</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+
+                <div class="et-field">
+                    <label class="et-label" for="department">Department</label>
+                    <select id="department" class="et-select" required>
+                        <option value="">Select department</option>
+                        <option value="Public Works">Public Works</option>
+                        <option value="Transportation">Transportation</option>
+                        <option value="Stormwater">Stormwater</option>
+                        <option value="Road Maintenance">Road Maintenance</option>
+                        <option value="Emergency Operations">Emergency Operations</option>
+                    </select>
+                </div>
+
+                <div class="et-field">
+                    <label class="et-label" for="subDepartment">Sub Department</label>
+                    <select id="subDepartment" class="et-select" required>
+                        <option value="">Select sub department</option>
+                    </select>
+                </div>
+
+                <div class="et-field">
+                    <label class="et-label" for="status">Status</label>
+                    <select id="status" class="et-select" required>
+                        <option>Monitoring</option>
+                        <option>Needs Attention</option>
+                        <option>In Progress</option>
+                        <option>Resolved</option>
+                    </select>
+                </div>
+
+                <div class="et-field">
+                    <label class="et-label" for="priority">Priority</label>
+                    <select id="priority" class="et-select" required>
+                        <option>Low</option>
+                        <option>Medium</option>
+                        <option>High</option>
+                    </select>
+                </div>
+
+                <div class="et-field">
+                    <label class="et-label" for="reportedTime">Reported Time</label>
+                    <input id="reportedTime" class="et-input-readonly" type="text" readonly>
+                </div>
+            </div>
+
+            <div class="et-actions">
+                <button id="cancelExceptionBtn" type="button" class="et-btn et-btn-cancel">Cancel</button>
+                <button type="submit" class="et-btn">Submit</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const overlay = document.getElementById("exceptionModalOverlay");
+        const openBtn = document.getElementById("openExceptionModalBtn");
+        const closeBtn = document.getElementById("closeExceptionModalBtn");
+        const cancelBtn = document.getElementById("cancelExceptionBtn");
+        const form = document.getElementById("exceptionForm");
+        const tbody = document.getElementById("exceptionsBody");
+        const emptyState = document.getElementById("emptyState");
+        const reportedTimeInput = document.getElementById("reportedTime");
+
+        function toClassSuffix(value) {
+            return value.toLowerCase().replace(/\s+/g, "-");
+        }
+
+        function currentTimeLabel(dateObj) {
+            return dateObj.toLocaleString();
+        }
+
+        function openModal() {
+            const now = new Date();
+            reportedTimeInput.value = currentTimeLabel(now);
+            overlay.classList.add("open");
+            overlay.setAttribute("aria-hidden", "false");
+            document.body.style.overflow = "hidden";
+            setTimeout(function () {
+                const firstField = document.getElementById("exceptionTitle");
+                if (firstField) firstField.focus();
+            }, 0);
+        }
+
+        function closeModal() {
+            overlay.classList.remove("open");
+            overlay.setAttribute("aria-hidden", "true");
+            document.body.style.overflow = "";
+        }
+
+        function addRow(data) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${data.title}</td>
+                <td>${data.description}</td>
+                <td>${data.type}</td>
+                <td>${data.department}</td>
+                <td>${data.subDepartment}</td>
+                <td><span class="badge status-${toClassSuffix(data.status)}">${data.status}</span></td>
+                <td><span class="badge priority-${toClassSuffix(data.priority)}">${data.priority}</span></td>
+                <td>${data.reportedTime}</td>
+            `;
+            tbody.prepend(tr);
+            emptyState.style.display = "none";
+        }
+
+        openBtn.addEventListener("click", openModal);
+        closeBtn.addEventListener("click", closeModal);
+        cancelBtn.addEventListener("click", closeModal);
+
+        overlay.addEventListener("click", function (event) {
+            if (event.target === overlay) {
+                closeModal();
+            }
+        });
+
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            const payload = {
+                title: document.getElementById("exceptionTitle").value.trim(),
+                description: document.getElementById("description").value.trim(),
+                type: document.getElementById("exceptionType").value,
+                department: document.getElementById("department").value,
+                subDepartment: document.getElementById("subDepartment").value,
+                status: document.getElementById("status").value,
+                priority: document.getElementById("priority").value,
+                reportedTime: reportedTimeInput.value || currentTimeLabel(new Date())
+            };
+
+            if (!payload.title || !payload.description || !payload.type || !payload.department || !payload.subDepartment) {
+                return;
+            }
+
+            addRow(payload);
+            form.reset();
+            document.getElementById("status").value = "Monitoring";
+            document.getElementById("priority").value = "Low";
+            document.getElementById("subDepartment").innerHTML = '<option value="">Select sub department</option>';
+            closeModal();
+        });
+
+        const departmentSelect = document.getElementById("department");
+        const subDepartmentSelect = document.getElementById("subDepartment");
+        const subDepartmentOptions = {
+            "Public Works": ["Drainage Team", "Field Operations", "Asset Inspection"],
+            "Transportation": ["Road Safety", "Traffic Operations", "Bridge Unit"],
+            "Stormwater": ["Culvert Team", "Canal Maintenance", "Flood Monitoring"],
+            "Road Maintenance": ["Pavement Repair", "Routine Maintenance", "Emergency Patch Crew"],
+            "Emergency Operations": ["Command Team", "Response Coordination", "Alerting Cell"]
+        };
+
+        departmentSelect.addEventListener("change", function () {
+            const selected = departmentSelect.value;
+            subDepartmentSelect.innerHTML = '<option value="">Select sub department</option>';
+            (subDepartmentOptions[selected] || []).forEach(function (name) {
+                const opt = document.createElement("option");
+                opt.value = name;
+                opt.textContent = name;
+                subDepartmentSelect.appendChild(opt);
+            });
+        });
+    })();
+</script>
+{% endblock %}

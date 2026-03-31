@@ -13,6 +13,7 @@
         <ul class="nav-links">
             <li class="nav-item"><a href="{% url 'dashboard' %}"><i class="fa-solid fa-chart-line"></i> Dashboard</a></li>
             <li class="nav-item active"><a href="{% url 'incidents_list' %}"><i class="fa-solid fa-list"></i> Incident Management</a></li>
+            <li class="nav-item"><a href="{% url 'exception_tracking' %}"><i class="fa-solid fa-triangle-exclamation"></i> Exception Tracking</a></li>
             <li class="nav-item"><a href="{% url 'situation_updates' %}"><i class="fa-solid fa-clipboard-list"></i> Situation Updates</a></li>
             <li class="nav-item"><a href="{% url 'shift_packets' %}"><i class="fa-solid fa-file-lines"></i> Shift Packets</a></li>
             <li class="nav-item"><a href="{% url 'reports' %}"><i class="fa-solid fa-chart-bar"></i> Reports</a></li>
@@ -549,7 +550,7 @@
                             {% endif %}
                         </div>
                         <div class="form-group">
-                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">sub Department</label>
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">Sub Department</label>
                             {{ create_incident_form.sub_category }}
                             {% if create_incident_form.sub_category.errors %}
                                 <div style="color: #ef4444; font-size: 0.875rem; margin-top: 0.25rem;">{{ create_incident_form.sub_category.errors }}</div>
@@ -674,15 +675,15 @@
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                         <div class="form-group">
-                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.category.label }}</label>
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">Department</label>
                             <select id="edit_incidentCategorySelect" class="form-control" disabled>
-                                <option value="">Select category</option>
+                                <option value="">Select department</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">{{ create_incident_form.sub_category.label }}</label>
+                            <label class="form-label" style="font-weight: 600; color: #374151; margin-bottom: 0.5rem; display: block;">Sub Department</label>
                             <select id="edit_incidentSubCategorySelect" class="form-control" disabled>
-                                <option value="">Select sub category</option>
+                                <option value="">Select sub department</option>
                             </select>
                         </div>
                     </div>
@@ -910,7 +911,7 @@
             subCategorySelect.innerHTML = '';
             const opt = document.createElement('option');
             opt.value = '';
-            opt.textContent = 'Select sub category';
+            opt.textContent = 'Select sub department';
             subCategorySelect.appendChild(opt);
 
             const category = data.category || '';
@@ -1043,20 +1044,20 @@
             subCategorySelect.innerHTML = '';
             const opt = document.createElement('option');
             opt.value = '';
-            opt.textContent = placeholderText || 'Select sub category';
+            opt.textContent = placeholderText || 'Select sub department';
             subCategorySelect.appendChild(opt);
         };
 
         const loadServices = async (category) => {
             resetSubCategory('Loading...');
             if (!category) {
-                resetSubCategory('Select sub category');
+                resetSubCategory('Select sub department');
                 return;
             }
             try {
                 const resp = await fetch(`{% url 'department_services_api' %}?category=${encodeURIComponent(category)}`);
                 const data = await resp.json();
-                resetSubCategory('Select sub category');
+                resetSubCategory('Select sub department');
                 (data.services || []).forEach((name) => {
                     const opt = document.createElement('option');
                     opt.value = name;
@@ -1064,7 +1065,7 @@
                     subCategorySelect.appendChild(opt);
                 });
             } catch (e) {
-                resetSubCategory('Select sub category');
+                resetSubCategory('Select sub department');
             }
         };
 
