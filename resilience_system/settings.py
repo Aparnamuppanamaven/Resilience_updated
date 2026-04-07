@@ -30,6 +30,12 @@ load_dotenv(env_path)
 # --------------------------------------------------
 pymysql.install_as_MySQLdb()
 
+# Django 4.2+ checks mysqlclient >= 2.2.1 via MySQLdb.version_info; PyMySQL
+# reports its own version and fails that check. Satisfy the guard only (driver is PyMySQL).
+import MySQLdb
+
+MySQLdb.version_info = (2, 2, 1)
+
 # --------------------------------------------------
 # SECURITY
 # --------------------------------------------------

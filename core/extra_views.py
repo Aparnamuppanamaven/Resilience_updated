@@ -841,6 +841,7 @@ def reports_pdf(request):
 def system_logs_page(request):
     """
     System Logs page backed by TxLog table.
+    Transaction log rows are scoped to the current user (Django auth or legacy session).
     """
     auth_redirect = _require_auth(request)
     if auth_redirect:
@@ -848,13 +849,20 @@ def system_logs_page(request):
 
     organization, current_status, last_sync_display = _get_org_and_status(request)
 
-    # Fetch latest system logs from TxLog.
+    # Fetch latest system logs from TxLog for this user only (actionby matches session user id).
     # If organization/tenant context exists, filter by that tenant_id; otherwise, show recent global logs.
     logs_qs = TxLog.objects.all()
     if organization is not None:
         tenant_id = getattr(organization, "tenant_id", None) or getattr(organization, "pk", None)
         if tenant_id is not None:
             logs_qs = logs_qs.filter(tenant_id=tenant_id)
+
+    if request.user.is_authenticated:
+        current_actor_id = request.user.id
+    else:
+        current_actor_id = request.session.get("user_credentials_id")
+    if current_actor_id is not None:
+        logs_qs = logs_qs.filter(actionby=current_actor_id)
 
     logs = list(logs_qs.order_by("-created_date")[:200])
 
